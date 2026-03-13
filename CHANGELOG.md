@@ -47,3 +47,66 @@
 - Mailpit UI accessible at `localhost:8025`
 - Azurite blob storage emulator running on `localhost:10000`
 - Hot reload configured for both backend and frontend via volume mounts
+
+---
+
+## Epic 1: Shared Kernel, Database & Auth
+
+### Task 1.1 — SharedKernel Project
+- `BaseEntity<TId>` with Id, CreatedAt, UpdatedAt, soft-delete, domain events collection
+- `IDomainEvent` interface and `DomainEventDispatcher` (reflection-based handler dispatch)
+- `Result<T>` pattern for operation results (Success/Failure with implicit conversion)
+- `GlobalExceptionHandler` implementing `IExceptionHandler` (returns JSON error responses)
+- `ICurrentUser` interface and `Roles` constants (Customer, Admin)
+- `IModule` interface for module registration pattern
+- Health check endpoints: `/health/live` (liveness), `/health/ready` (DB connectivity), `/health` (all)
+- CORS configured via `appsettings` with origins whitelist
+- Rate limiting with fixed window on auth endpoints (10 req/min)
+
+### Task 1.2 — Database Schema Design
+- All 5 PostgreSQL schemas created: `identity`, `portfolio`, `eshop`, `booking`, `blog`
+- Identity: `users`, `refresh_tokens` (2 tables)
+- Portfolio: `photos`, `tags`, `photo_tags`, `collections`, `collection_photos`, `photo_variants` (6 tables)
+- EShop: `products`, `orders`, `order_items`, `shopping_carts`, `cart_items` (5 tables)
+- Booking: `session_types`, `availability_slots`, `bookings` (3 tables)
+- Blog: `posts`, `categories`, `post_categories`, `tags`, `post_tags` (5 tables)
+- Total: 21 tables across 5 schemas
+
+### Task 1.3 — EF Core Setup
+- One `DbContext` per module schema (IdentityDbContext, PortfolioDbContext, EShopDbContext, BookingDbContext, BlogDbContext)
+- All contexts configured with Npgsql provider and schema-specific migration history tables
+- Development mode uses `EnsureCreated` + `CreateTables` for auto-schema creation
+- Production mode configured for proper EF Core migrations
+- Seed data: 4 booking session types, 4 blog categories, 1 admin user
+- Soft-delete query filters on entities with `DeletedAt`
+
+### Task 1.4 — Authentication & Authorization
+- Local email/password registration with BCrypt password hashing
+- Local email/password login with JWT access token (15 min) + refresh token (7 days)
+- Refresh token rotation (old token revoked on refresh)
+- Google OAuth login endpoint (creates/links user accounts)
+- `/api/auth/me` endpoint returning current user profile (requires auth)
+- `CurrentUser` service extracting claims from JWT via `IHttpContextAccessor`
+- JWT configuration via `appsettings` (issuer, audience, secret, expiration)
+- Admin user seeded: `admin@dogphoto.sk` / `admin123`
+
+### Task 1.5 — Module Registration Pattern & Architecture Tests
+- `IModule` interface with static abstract `AddServices()` and `MapEndpoints()`
+- `DependencyInjection.AddInfrastructure()` extension method registers all DbContexts, auth, DI
+- `AuthEndpoints.MapAuthEndpoints()` extension method for auth route group
+- Architecture tests (xUnit + NetArchTest):
+  - SharedKernel does not depend on Infrastructure
+  - SharedKernel does not depend on Api
+  - Infrastructure does not depend on Api
+  - Infrastructure.Auth implements SharedKernel interfaces
+- All 4 architecture tests passing
+
+### Verification
+- All health checks return Healthy (live, ready, default)
+- User registration returns JWT tokens and user data
+- User login validates credentials and returns tokens
+- Authenticated `/api/auth/me` returns user profile
+- Admin user can log in with seeded credentials (Role: Admin)
+- All 5 database schemas with 21 tables verified via psql
+- Seed data present (4 session types, 4 categories, 1 admin)
+- Architecture tests: 4/4 passing
