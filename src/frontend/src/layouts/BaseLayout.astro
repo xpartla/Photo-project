@@ -1,0 +1,42 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+  lang?: string;
+}
+
+const { title, description = "DogPhoto — Dog Photography Bratislava", lang = "sk" } = Astro.props;
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <a href={`/${lang}`}>DogPhoto</a>
+        <ul>
+          <li><a href={`/${lang}/portfolio`}>Portfolio</a></li>
+          <li><a href={`/${lang === "sk" ? "sk/rezervacia" : "en/booking"}`}>{lang === "sk" ? "Rezervácia" : "Booking"}</a></li>
+          <li><a href={`/${lang === "sk" ? "sk/obchod" : "en/shop"}`}>{lang === "sk" ? "Obchod" : "Shop"}</a></li>
+          <li><a href={`/${lang}/blog`}>Blog</a></li>
+        </ul>
+        <div>
+          <a href="/sk">SK</a> | <a href="/en">EN</a>
+        </div>
+      </nav>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer>
+      <p>&copy; {new Date().getFullYear()} DogPhoto</p>
+    </footer>
+  </body>
+</html>

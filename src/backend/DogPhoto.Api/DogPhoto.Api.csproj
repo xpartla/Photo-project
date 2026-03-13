@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DogPhoto.SharedKernel\DogPhoto.SharedKernel.csproj" />
+    <ProjectReference Include="..\DogPhoto.Infrastructure\DogPhoto.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
