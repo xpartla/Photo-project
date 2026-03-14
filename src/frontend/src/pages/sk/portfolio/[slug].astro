@@ -1,0 +1,173 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../components/SeoMeta.astro";
+import ResponsiveImage from "../../../components/ResponsiveImage.astro";
+import { getPhoto } from "../../../lib/api";
+import { t } from "../../../lib/i18n";
+import { getFallbackUrl } from "../../../lib/imageUrl";
+
+const lang = "sk";
+const { slug } = Astro.params;
+
+let photo;
+try {
+  photo = await getPhoto(slug!, lang);
+} catch {
+  return Astro.redirect("/sk/portfolio");
+}
+
+const pageTitle = `${photo.title || photo.slug} — Portfólio — DogPhoto`;
+const pageDescription = photo.description || photo.altText || t(lang, "portfolio.description");
+const ogImage = getFallbackUrl(photo.variants);
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "ImageObject",
+    name: photo.title,
+    description: photo.description || photo.altText,
+    contentUrl: ogImage,
+    author: { "@type": "Person", name: "DogPhoto" },
+    ...(photo.shotDate && { datePublished: photo.shotDate }),
+    ...(photo.cameraSettings && {
+      exifData: [
+        { "@type": "PropertyValue", name: "Camera Settings", value: photo.cameraSettings },
+      ],
+    }),
+    ...(photo.location && {
+      contentLocation: { "@type": "Place", name: photo.location },
+    }),
+    ...(photo.tags.length > 0 && {
+      keywords: photo.tags.map((tag) => tag.name).join(", "),
+    }),
+    inLanguage: "sk",
+  },
+];
+---
+
+<BaseLayout title={pageTitle} description={pageDescription} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={pageDescription}
+    lang={lang}
+    path={`/sk/portfolio/${slug}`}
+    ogType="article"
+    ogImage={ogImage}
+    ogImageWidth={photo.width || undefined}
+    ogImageHeight={photo.height || undefined}
+    jsonLd={jsonLd}
+  />
+
+  <article class="photo-detail">
+    <nav class="breadcrumb">
+      <a href="/sk/portfolio">{t(lang, "portfolio.backToPortfolio")}</a>
+    </nav>
+
+    <div class="photo-main">
+      <ResponsiveImage
+        variants={photo.variants}
+        alt={photo.altText || photo.title || ""}
+        width={photo.width || 1200}
+        height={photo.height || 800}
+        dominantColor={photo.dominantColor}
+        blurhash={photo.blurhash}
+        loading="eager"
+        fetchpriority="high"
+        sizes="(max-width: 800px) 100vw, (max-width: 1400px) 80vw, 1200px"
+      />
+    </div>
+
+    <div class="photo-info">
+      {photo.title && <h1>{photo.title}</h1>}
+      {photo.description && <p class="description">{photo.description}</p>}
+
+      <dl class="metadata">
+        {photo.cameraSettings && (
+          <>
+            <dt>{t(lang, "portfolio.cameraSettings")}</dt>
+            <dd>{photo.cameraSettings}</dd>
+          </>
+        )}
+        {photo.location && (
+          <>
+            <dt>{t(lang, "portfolio.location")}</dt>
+            <dd>{photo.location}</dd>
+          </>
+        )}
+        {photo.shotDate && (
+          <>
+            <dt>{t(lang, "portfolio.shotDate")}</dt>
+            <dd>{new Date(photo.shotDate).toLocaleDateString("sk-SK")}</dd>
+          </>
+        )}
+      </dl>
+
+      {photo.tags.length > 0 && (
+        <div class="tags">
+          {photo.tags.map((tag) => (
+            <a href={`/sk/portfolio?tag=${tag.slug}`} class="tag">{tag.name}</a>
+          ))}
+        </div>
+      )}
+
+      {photo.collections.length > 0 && (
+        <div class="collections">
+          {photo.collections.map((col) => (
+            <a href={`/sk/portfolio/kolekcie/${col.slug}`}>{t(lang, "portfolio.viewCollection")}: {col.name}</a>
+          ))}
+        </div>
+      )}
+
+      <!-- Placeholder for shop link (Epic 6) -->
+      <div class="buy-link">
+        <span class="buy-placeholder">{t(lang, "portfolio.buyAsPrint")}</span>
+      </div>
+    </div>
+
+    {photo.relatedPhotos.length > 0 && (
+      <section class="related">
+        <h2>{t(lang, "portfolio.relatedPhotos")}</h2>
+        <div class="related-grid">
+          {photo.relatedPhotos.map((rp) => (
+            <a href={`/sk/portfolio/${rp.slug}`} class="related-card">
+              <ResponsiveImage
+                variants={rp.variants}
+                alt={rp.altText || rp.title || ""}
+                width={rp.width || 400}
+                height={rp.height || 300}
+                dominantColor={rp.dominantColor}
+                sizes="(max-width: 600px) 50vw, 200px"
+              />
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+  </article>
+</BaseLayout>
+
+<style>
+  .photo-detail { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+  .breadcrumb { margin-bottom: 1rem; }
+  .breadcrumb a { color: #666; text-decoration: none; }
+  .photo-main { margin-bottom: 1.5rem; }
+  .photo-main :global(picture) { display: block; }
+  .photo-main :global(img) { width: 100%; height: auto; display: block; border-radius: 4px; }
+  .photo-info h1 { margin: 0 0 0.5rem; }
+  .description { color: #444; line-height: 1.6; }
+  .metadata { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; margin: 1rem 0; }
+  .metadata dt { font-weight: 600; color: #555; }
+  .metadata dd { margin: 0; }
+  .tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
+  .tag { background: #f0f0f0; padding: 0.25rem 0.75rem; border-radius: 999px; text-decoration: none; color: #333; font-size: 0.85rem; }
+  .collections { margin: 1rem 0; }
+  .collections a { display: block; color: #333; margin-bottom: 0.25rem; }
+  .buy-link { margin: 1.5rem 0; }
+  .buy-placeholder { display: inline-block; padding: 0.5rem 1.5rem; border: 2px dashed #ccc; border-radius: 4px; color: #999; }
+  .related { margin-top: 3rem; }
+  .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+  .related-card { display: block; border-radius: 4px; overflow: hidden; }
+  .related-card :global(picture) { display: block; }
+  .related-card :global(img) { width: 100%; height: auto; display: block; }
+</style>

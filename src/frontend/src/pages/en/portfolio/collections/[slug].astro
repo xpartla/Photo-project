@@ -1,0 +1,100 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../../components/SeoMeta.astro";
+import ResponsiveImage from "../../../../components/ResponsiveImage.astro";
+import { getCollection } from "../../../../lib/api";
+import { t } from "../../../../lib/i18n";
+
+const lang = "en";
+const { slug } = Astro.params;
+const page = Number(Astro.url.searchParams.get("page") || "1");
+
+let collection;
+try {
+  collection = await getCollection(slug!, { lang, page, size: 24 });
+} catch {
+  return Astro.redirect("/en/portfolio");
+}
+
+const pageTitle = `${collection.name} — Portfolio — DogPhoto`;
+const pageDescription = collection.description || `${collection.name} — photo collection`;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ImageGallery",
+  name: collection.name,
+  description: pageDescription,
+  author: { "@type": "Person", name: "DogPhoto" },
+  inLanguage: "en",
+  numberOfItems: collection.photos.totalCount,
+};
+---
+
+<BaseLayout title={pageTitle} description={pageDescription} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={pageDescription}
+    lang={lang}
+    path={`/en/portfolio/collections/${slug}`}
+    jsonLd={jsonLd}
+  />
+
+  <section class="collection-detail">
+    <nav class="breadcrumb">
+      <a href="/en/portfolio">{t(lang, "portfolio.backToPortfolio")}</a>
+    </nav>
+
+    <h1>{collection.name}</h1>
+    {collection.description && <p class="description">{collection.description}</p>}
+    <p class="count">{collection.photos.totalCount} {t(lang, "portfolio.photosInCollection")}</p>
+
+    {collection.photos.items.length === 0 ? (
+      <p>{t(lang, "portfolio.noPhotos")}</p>
+    ) : (
+      <div class="gallery-grid">
+        {collection.photos.items.map((photo) => (
+          <a href={`/en/portfolio/${photo.slug}`} class="photo-card">
+            <ResponsiveImage
+              variants={photo.variants}
+              alt={photo.altText || photo.title || ""}
+              width={photo.width || 800}
+              height={photo.height || 600}
+              dominantColor={photo.dominantColor}
+              blurhash={photo.blurhash}
+              sizes="(max-width: 600px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
+            {photo.title && <span class="photo-title">{photo.title}</span>}
+          </a>
+        ))}
+      </div>
+    )}
+
+    {collection.photos.totalPages > 1 && (
+      <nav class="pagination">
+        {collection.photos.page > 1 && (
+          <a href={`/en/portfolio/collections/${slug}?page=${collection.photos.page - 1}`}>&laquo; Previous</a>
+        )}
+        <span>{collection.photos.page} / {collection.photos.totalPages}</span>
+        {collection.photos.page < collection.photos.totalPages && (
+          <a href={`/en/portfolio/collections/${slug}?page=${collection.photos.page + 1}`}>Next &raquo;</a>
+        )}
+      </nav>
+    )}
+  </section>
+</BaseLayout>
+
+<style>
+  .collection-detail { max-width: 1400px; margin: 0 auto; padding: 1rem; }
+  .breadcrumb { margin-bottom: 1rem; }
+  .breadcrumb a { color: #666; text-decoration: none; }
+  .description { color: #444; line-height: 1.6; }
+  .count { color: #888; margin-bottom: 1.5rem; }
+  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+  .photo-card { text-decoration: none; color: inherit; display: block; border-radius: 4px; overflow: hidden; }
+  .photo-card :global(picture) { display: block; }
+  .photo-card :global(img) { width: 100%; height: auto; display: block; }
+  .photo-title { display: block; padding: 0.5rem 0; font-size: 0.9rem; }
+  .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; padding: 1rem; }
+  .pagination a { text-decoration: none; color: #333; }
+</style>

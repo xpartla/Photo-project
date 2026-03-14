@@ -12,7 +12,9 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.7",
     "@astrojs/node": "^10.0.0",
-    "astro": "^6.0.4"
+    "astro": "^6.0.4",
+    "typescript": "^5.9.3"
   }
 }

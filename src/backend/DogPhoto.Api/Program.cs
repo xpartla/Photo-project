@@ -3,6 +3,7 @@ using DogPhoto.Infrastructure;
 using DogPhoto.Infrastructure.Auth;
 using DogPhoto.Infrastructure.BlobStorage;
 using DogPhoto.Infrastructure.ImagePipeline;
+using DogPhoto.Infrastructure.Portfolio;
 using DogPhoto.SharedKernel.Middleware;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -78,6 +79,9 @@ app.MapAuthEndpoints();
 
 // Image pipeline endpoints
 app.MapImagePipelineEndpoints();
+
+// Portfolio endpoints
+app.MapPortfolioEndpoints();
 
 app.MapGet("/", () => "DogPhoto API");
 

@@ -169,3 +169,63 @@
 - Full pipeline works end-to-end in Docker Compose
 - Architecture tests: 4/4 passing
 - Health checks: all Healthy
+
+---
+
+## Epic 3: Portfolio Module (Local)
+
+### Task 3.1 — Backend API
+- Created `PortfolioEndpoints.cs` with full CRUD API:
+  - `GET /api/portfolio/photos` — paginated, filterable by tag/collection, bilingual
+  - `GET /api/portfolio/photos/{slug}` — photo detail with EXIF, variants, related photos
+  - `GET /api/portfolio/collections` — list collections with cover photos
+  - `GET /api/portfolio/collections/{slug}` — collection detail with paginated photos
+  - `POST /api/portfolio/photos` — update photo metadata (Admin)
+  - `PUT /api/portfolio/photos/{id}` — update photo fields and tags (Admin)
+  - `DELETE /api/portfolio/photos/{id}` — soft delete (Admin)
+  - `POST /api/portfolio/tags` — create tags (Admin)
+  - `GET /api/portfolio/tags` — list tags with photo counts
+  - `POST /api/portfolio/collections` — create collection with photos (Admin)
+  - `PUT /api/portfolio/collections/{id}` — update collection (Admin)
+  - `DELETE /api/portfolio/collections/{id}` — soft delete (Admin)
+- All public endpoints support `?lang=sk|en` parameter for bilingual content
+- Admin endpoints require JWT authentication with Admin role
+
+### Task 3.2 — Frontend Pages
+- Switched Astro output to `server` mode for dynamic API fetching
+- Created API client (`src/lib/api.ts`) with typed interfaces for all portfolio data
+- Created i18n helper (`src/lib/i18n.ts`) with alternate URL generation for hreflang
+- Portfolio gallery pages:
+  - `/sk/portfolio` and `/en/portfolio` — masonry grid with lazy loading, collections strip, tag filtering, pagination
+  - `/sk/portfolio/[slug]` and `/en/portfolio/[slug]` — single photo with EXIF data, tags, related photos
+  - `/sk/portfolio/kolekcie/[slug]` and `/en/portfolio/collections/[slug]` — collection view with paginated photos
+- Added `<slot name="head">` to `BaseLayout` for per-page SEO injection
+- "Buy as print" placeholder links on photo detail pages (ready for Epic 6)
+
+### Task 3.3 — SEO Implementation
+- Created `SeoMeta.astro` component providing:
+  - `<link rel="canonical">` on every page
+  - `hreflang` tags linking SK/EN versions (including `x-default`)
+  - OpenGraph metadata (`og:title`, `og:description`, `og:type`, `og:image`, `og:locale`)
+  - Twitter Card (`summary_large_image`) on photo pages
+  - JSON-LD structured data per page type
+- JSON-LD `ImageGallery` on portfolio index and collection pages
+- JSON-LD `ImageObject` on photo detail pages with:
+  - `contentUrl`, `author`, `datePublished`, `exifData`, `contentLocation`, `keywords`
+- Bilingual route mapping: SK `/kolekcie/` ↔ EN `/collections/`
+
+### Task 3.4 — Portfolio ↔ Shop Links
+- "Buy as print" placeholder on photo detail pages (dashed border, ready for shop module)
+
+### Infrastructure Changes
+- Added portfolio-specific i18n strings to `sk.json` and `en.json` (13 new keys each)
+- Astro output mode changed from `static` to `server` for SSR
+
+### Verification
+- Backend builds: 0 errors, 0 warnings
+- Frontend type check: 0 errors, 0 warnings
+- Architecture tests: 4/4 passing
+- All portfolio API endpoints registered and accessible
+- Bilingual routing works (`/sk/portfolio`, `/en/portfolio`)
+- JSON-LD, OpenGraph, hreflang metadata present on all portfolio pages
+- Admin can manage photos, tags, and collections via API

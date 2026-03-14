@@ -4,5 +4,19 @@
   "nav.portfolio": "Portfólio",
   "nav.booking": "Rezervácia",
   "nav.shop": "Obchod",
-  "nav.blog": "Blog"
+  "nav.blog": "Blog",
+  "portfolio.title": "Portfólio",
+  "portfolio.description": "Galéria profesionálnej psej fotografie — portréty, akčné zábery a umelecká fotografia",
+  "portfolio.allPhotos": "Všetky fotografie",
+  "portfolio.collections": "Kolekcie",
+  "portfolio.tags": "Značky",
+  "portfolio.noPhotos": "Zatiaľ žiadne fotografie.",
+  "portfolio.relatedPhotos": "Súvisiace fotografie",
+  "portfolio.cameraSettings": "Nastavenia fotoaparátu",
+  "portfolio.location": "Lokalita",
+  "portfolio.shotDate": "Dátum fotenia",
+  "portfolio.buyAsPrint": "Kúpiť ako tlač",
+  "portfolio.viewCollection": "Zobraziť kolekciu",
+  "portfolio.backToPortfolio": "Späť na portfólio",
+  "portfolio.photosInCollection": "fotografií v kolekcii"
 }

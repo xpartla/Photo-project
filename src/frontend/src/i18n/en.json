@@ -4,5 +4,19 @@
   "nav.portfolio": "Portfolio",
   "nav.booking": "Booking",
   "nav.shop": "Shop",
-  "nav.blog": "Blog"
+  "nav.blog": "Blog",
+  "portfolio.title": "Portfolio",
+  "portfolio.description": "Professional dog photography gallery — portraits, action shots, and fine art photography",
+  "portfolio.allPhotos": "All photos",
+  "portfolio.collections": "Collections",
+  "portfolio.tags": "Tags",
+  "portfolio.noPhotos": "No photos yet.",
+  "portfolio.relatedPhotos": "Related photos",
+  "portfolio.cameraSettings": "Camera settings",
+  "portfolio.location": "Location",
+  "portfolio.shotDate": "Shot date",
+  "portfolio.buyAsPrint": "Buy as print",
+  "portfolio.viewCollection": "View collection",
+  "portfolio.backToPortfolio": "Back to portfolio",
+  "portfolio.photosInCollection": "photos in collection"
 }
