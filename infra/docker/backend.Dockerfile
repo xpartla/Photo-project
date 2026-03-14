@@ -10,6 +10,7 @@ COPY src/backend/DogPhoto.sln ./
 COPY src/backend/DogPhoto.Api/DogPhoto.Api.csproj ./DogPhoto.Api/
 COPY src/backend/DogPhoto.SharedKernel/DogPhoto.SharedKernel.csproj ./DogPhoto.SharedKernel/
 COPY src/backend/DogPhoto.Infrastructure/DogPhoto.Infrastructure.csproj ./DogPhoto.Infrastructure/
+COPY src/backend/tests/DogPhoto.ArchTests/DogPhoto.ArchTests.csproj ./tests/DogPhoto.ArchTests/
 
 RUN dotnet restore
 
@@ -31,6 +32,7 @@ COPY src/backend/DogPhoto.sln ./
 COPY src/backend/DogPhoto.Api/DogPhoto.Api.csproj ./DogPhoto.Api/
 COPY src/backend/DogPhoto.SharedKernel/DogPhoto.SharedKernel.csproj ./DogPhoto.SharedKernel/
 COPY src/backend/DogPhoto.Infrastructure/DogPhoto.Infrastructure.csproj ./DogPhoto.Infrastructure/
+COPY src/backend/tests/DogPhoto.ArchTests/DogPhoto.ArchTests.csproj ./tests/DogPhoto.ArchTests/
 
 RUN dotnet restore
 

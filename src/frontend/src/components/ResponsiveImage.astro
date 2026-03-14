@@ -1,0 +1,50 @@
+---
+import { buildSrcset, getFallbackUrl, type ImageVariant } from "../lib/imageUrl";
+
+interface Props {
+  variants: ImageVariant[];
+  alt: string;
+  width: number;
+  height: number;
+  dominantColor?: string;
+  blurhash?: string;
+  loading?: "lazy" | "eager";
+  fetchpriority?: "high" | "low" | "auto";
+  sizes?: string;
+  class?: string;
+}
+
+const {
+  variants,
+  alt,
+  width,
+  height,
+  dominantColor,
+  loading = "lazy",
+  fetchpriority,
+  sizes = "(max-width: 400px) 400px, (max-width: 800px) 800px, (max-width: 1200px) 1200px, 2000px",
+  class: className,
+} = Astro.props;
+
+const webpSrcset = buildSrcset(variants, "webp");
+const fallbackUrl = getFallbackUrl(variants);
+const bgStyle = dominantColor ? `background-color: ${dominantColor}` : undefined;
+---
+
+<picture>
+  {webpSrcset && (
+    <source srcset={webpSrcset} sizes={sizes} type="image/webp" />
+  )}
+  <img
+    src={fallbackUrl}
+    alt={alt}
+    width={width}
+    height={height}
+    loading={loading}
+    decoding="async"
+    fetchpriority={fetchpriority}
+    style={bgStyle}
+    class={className}
+    data-blurhash={Astro.props.blurhash}
+  />
+</picture>

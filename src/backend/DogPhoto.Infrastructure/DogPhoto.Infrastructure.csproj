@@ -16,6 +16,8 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.*-*" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.*-*" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.*" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.*" />
   </ItemGroup>
 
   <ItemGroup>

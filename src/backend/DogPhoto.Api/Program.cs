@@ -1,6 +1,8 @@
 using System.Threading.RateLimiting;
 using DogPhoto.Infrastructure;
 using DogPhoto.Infrastructure.Auth;
+using DogPhoto.Infrastructure.BlobStorage;
+using DogPhoto.Infrastructure.ImagePipeline;
 using DogPhoto.SharedKernel.Middleware;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -50,6 +52,10 @@ var app = builder.Build();
 await DependencyInjection.ApplyMigrationsAsync(app.Services);
 await DependencyInjection.SeedDataAsync(app.Services);
 
+// Ensure blob storage containers exist
+var blobStorage = app.Services.GetRequiredService<IBlobStorageService>();
+await blobStorage.EnsureContainersExistAsync();
+
 app.UseExceptionHandler();
 app.UseCors();
 app.UseAuthentication();
@@ -69,6 +75,9 @@ app.MapHealthChecks("/health"); // backward compat
 
 // Auth endpoints
 app.MapAuthEndpoints();
+
+// Image pipeline endpoints
+app.MapImagePipelineEndpoints();
 
 app.MapGet("/", () => "DogPhoto API");
 

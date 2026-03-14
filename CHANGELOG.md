@@ -110,3 +110,62 @@
 - All 5 database schemas with 21 tables verified via psql
 - Seed data present (4 session types, 4 categories, 1 admin)
 - Architecture tests: 4/4 passing
+
+---
+
+## Epic 2: Image Pipeline (Local)
+
+### Task 2.1 — Upload Flow
+- `POST /api/image-pipeline/upload` endpoint (Admin-only, multipart form)
+  - Accepts image file (JPEG, PNG, WebP, TIFF) + metadata (slug, titles, alt text, location)
+  - Validates content type and slug uniqueness
+  - Stores original in Azurite `originals/` container (private access)
+  - Creates `Photo` record in portfolio schema
+  - Queues photo for background processing
+- `GET /api/image-pipeline/photos/{id}/status` endpoint (Admin-only)
+  - Returns processing status, variant count, extracted metadata
+- `IBlobStorageService` with upload, download, and container management
+  - `originals/` container: private access
+  - `processed/` container: public blob-level access
+  - Blob containers auto-created on API startup
+
+### Task 2.2 — Image Processing (SixLabors.ImageSharp)
+- Background processing via `Channel<Guid>` queue + `BackgroundService` worker
+- EXIF metadata extraction: camera model, f-number, exposure time, ISO, focal length, shot date
+- Blurhash placeholder generation (4×3 components, inline DCT encoder)
+- Dominant color extraction (resize to 1×1 pixel, hex output)
+- Responsive variant generation:
+  - Widths: 400px (thumbnail), 800px, 1200px (gallery), 2000px (full preview)
+  - Formats: WebP (quality 80), JPEG (quality 85)
+  - Only generates variants ≤ original width
+  - 8 variants per image (4 widths × 2 formats)
+- Variants stored in `processed/{photoId}/{width}w.{format}` blob paths
+- Each variant recorded in `photo_variants` table with dimensions, format, quality, URL, size
+
+### Task 2.3 — Frontend Image Component
+- `<ResponsiveImage>` Astro component (`src/frontend/src/components/ResponsiveImage.astro`)
+  - `<picture>` element with WebP `<source>` srcset and JPEG `<img>` fallback
+  - Responsive `sizes` attribute for viewport-based selection
+  - `loading="lazy"` / `loading="eager"` + `fetchpriority` support
+  - Dominant color background placeholder via inline style
+  - `data-blurhash` attribute for progressive loading (client-side decode)
+- Image URL abstraction layer (`src/frontend/src/lib/imageUrl.ts`)
+  - Returns Azurite URLs locally, CDN URLs in production (via `PUBLIC_BLOB_BASE_URL`)
+  - `buildSrcset()`, `getFallbackUrl()`, `getVariantUrl()` utilities
+
+### Infrastructure Changes
+- Added `Azure.Storage.Blobs` and `SixLabors.ImageSharp` NuGet packages
+- Azurite now runs with `--skipApiVersionCheck` for SDK compatibility
+- API depends on Azurite service in Docker Compose
+- Backend Dockerfile copies test project for restore
+
+### Verification
+- Admin can upload an image via `POST /api/image-pipeline/upload` (returns 201)
+- Background worker generates all 8 variants and stores in Azurite `processed/` container
+- All variants accessible via HTTP (200 response from Azurite)
+- Photo metadata extracted: width, height, dominant color, blurhash
+- Status endpoint confirms processing complete with variant count
+- Frontend `<ResponsiveImage>` component renders `<picture>` with srcset
+- Full pipeline works end-to-end in Docker Compose
+- Architecture tests: 4/4 passing
+- Health checks: all Healthy

@@ -1,5 +1,7 @@
 using System.Text;
 using DogPhoto.Infrastructure.Auth;
+using DogPhoto.Infrastructure.BlobStorage;
+using DogPhoto.Infrastructure.ImagePipeline;
 using DogPhoto.Infrastructure.Persistence.Blog;
 using DogPhoto.Infrastructure.Persistence.Booking;
 using DogPhoto.Infrastructure.Persistence.EShop;
@@ -70,6 +72,16 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddHttpContextAccessor();
+
+        // Blob storage
+        services.AddSingleton<IBlobStorageService, BlobStorageService>();
+
+        // Image pipeline
+        services.AddScoped<IImageProcessor, ImageProcessor>();
+        var processingQueue = new ImageProcessingQueue();
+        services.AddSingleton(processingQueue);
+        services.AddSingleton<IImageProcessingQueue>(processingQueue);
+        services.AddHostedService<ImageProcessingWorker>();
 
         return services;
     }
