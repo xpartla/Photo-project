@@ -109,7 +109,8 @@ public class ImageProcessor : IImageProcessor
         {
             if (DateTime.TryParseExact(dateOriginal.Value, "yyyy:MM:dd HH:mm:ss",
                     System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None, out var date))
+                    System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                    out var date))
                 return date;
         }
 

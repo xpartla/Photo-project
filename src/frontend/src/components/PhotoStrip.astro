@@ -1,0 +1,253 @@
+---
+import { buildSrcset, getFallbackUrl } from "../lib/imageUrl";
+import type { PhotoSummary } from "../lib/api";
+
+interface Props {
+  photos: PhotoSummary[];
+  label: string;
+  lang: string;
+  shopLinkText: string;
+}
+
+const { photos, label, lang, shopLinkText } = Astro.props;
+
+// Shuffle photos deterministically per build but randomly
+const shuffled = [...photos].sort(() => Math.random() - 0.5);
+---
+
+<section class="photo-strip" aria-label={label}>
+  <h2 class="photo-strip__label">{label}</h2>
+  <div class="photo-strip__track" data-photo-strip>
+    {shuffled.map((photo, i) => {
+      const webpSrcset = buildSrcset(photo.variants, "webp");
+      const fallbackUrl = getFallbackUrl(photo.variants);
+      return (
+        <div
+          class="photo-strip__card"
+          data-strip-card
+          style={`z-index: ${shuffled.length - i}`}
+        >
+          <div class="photo-strip__frame">
+            <picture>
+              {webpSrcset && (
+                <source srcset={webpSrcset} sizes="280px" type="image/webp" />
+              )}
+              <img
+                src={fallbackUrl}
+                alt={photo.altText || photo.title}
+                width={photo.width}
+                height={photo.height}
+                loading="lazy"
+                decoding="async"
+                style={photo.dominantColor ? `background-color: ${photo.dominantColor}` : undefined}
+              />
+            </picture>
+          </div>
+          <div class="photo-strip__info">
+            <span class="photo-strip__title">{photo.title}</span>
+            <a href={`/${lang}/obchod/${photo.slug}`} class="photo-strip__shop-link">
+              {shopLinkText}
+            </a>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</section>
+
+<style lang="scss">
+  @use "sass:color";
+  @use "../styles/variables" as *;
+
+  .photo-strip {
+    padding: 2rem 0;
+    overflow: hidden;
+
+    &__label {
+      font-family: $font-heading;
+      font-size: 2rem;
+      color: $dark;
+      padding-left: 3rem;
+      margin-bottom: 1.5rem;
+    }
+
+    &__track {
+      display: flex;
+      align-items: flex-start;
+      padding: 1rem 3rem 3rem;
+      gap: 0px;
+    }
+
+    &__card {
+      flex-shrink: 0;
+      width: 280px;
+      margin-right: -80px;
+      transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                  z-index 0s;
+      cursor: pointer;
+      will-change: transform;
+
+      &:last-child {
+        margin-right: 0;
+      }
+    }
+
+    &__frame {
+      background: #fff;
+      padding: 10px;
+      border: $outline-width solid $outline;
+      border-radius: 4px;
+      box-shadow: 3px 3px 0 $outline;
+
+      picture {
+        display: block;
+      }
+
+      img {
+        display: block;
+        width: 100%;
+        height: 320px;
+        object-fit: cover;
+        border-radius: 2px;
+      }
+    }
+
+    &__info {
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      padding: 0.6rem 0.25rem 0;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    &__card:hover &__info,
+    &__card.is-active &__info {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    &__title {
+      display: block;
+      font-family: $font-body;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: $dark;
+      margin-bottom: 0.25rem;
+    }
+
+    &__shop-link {
+      display: inline-block;
+      font-family: $font-body;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: $white;
+      background: $blue;
+      border: $outline-width solid $outline;
+      border-radius: 6px;
+      padding: 0.3rem 0.9rem;
+      text-decoration: none;
+      transition: background $transition-fast, transform $transition-fast;
+
+      &:hover {
+        background: color.adjust($blue, $lightness: -10%);
+        transform: translateY(-1px);
+      }
+    }
+  }
+
+  // ── Mobile ──────────────────────────────────────────
+  @media (max-width: $breakpoint-md) {
+    .photo-strip {
+      &__label {
+        padding-left: 1.25rem;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+      }
+
+      &__track {
+        padding: 0.5rem 1.25rem 2rem;
+        gap: 1rem;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+
+        // Hide scrollbar
+        scrollbar-width: none;
+        &::-webkit-scrollbar {
+          display: none;
+        }
+      }
+
+      &__card {
+        width: 220px;
+        margin-right: 0;
+        scroll-snap-align: center;
+      }
+
+      &__frame img {
+        height: 260px;
+      }
+
+      &__info {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+    }
+  }
+</style>
+
+<script>
+  function initStrips() {
+    const SPREAD_PX = 60;
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    if (isMobile) return;
+
+    document.querySelectorAll<HTMLElement>("[data-photo-strip]").forEach((track) => {
+      const cards = Array.from(track.querySelectorAll<HTMLElement>("[data-strip-card]"));
+      const baseZIndexes = cards.map((_, i) => cards.length - i);
+
+      function resetCards() {
+        cards.forEach((card, i) => {
+          card.style.transform = "";
+          card.style.zIndex = String(baseZIndexes[i]);
+          card.classList.remove("is-active");
+        });
+      }
+
+      cards.forEach((card, hoveredIdx) => {
+        card.addEventListener("mouseenter", () => {
+          card.style.zIndex = String(cards.length + 1);
+          card.classList.add("is-active");
+
+          cards.forEach((other, i) => {
+            if (i === hoveredIdx) {
+              other.style.transform = "scale(1.03)";
+              return;
+            }
+            // Push cards to the left or right of hovered card
+            const offset = i < hoveredIdx ? -SPREAD_PX : SPREAD_PX;
+            other.style.transform = `translateX(${offset}px)`;
+            other.style.zIndex = String(baseZIndexes[i]);
+            other.classList.remove("is-active");
+          });
+        });
+
+        card.addEventListener("mouseleave", () => {
+          // Only reset if no other card is being hovered
+          const stillHovering = track.querySelector("[data-strip-card]:hover");
+          if (!stillHovering) {
+            resetCards();
+          }
+        });
+      });
+
+      track.addEventListener("mouseleave", resetCards);
+    });
+  }
+
+  initStrips();
+  document.addEventListener("astro:after-swap", initStrips);
+</script>

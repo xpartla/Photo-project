@@ -1,8 +1,49 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import PhotoStrip from "../../components/PhotoStrip.astro";
+import { getPhotos } from "../../lib/api";
+import { t } from "../../lib/i18n";
+
+const lang = "en";
+
+let dogPhotos = [];
+let filmPhotos = [];
+
+try {
+  const [dogResult, filmResult] = await Promise.all([
+    getPhotos({ tag: "dog", size: 7, lang }),
+    getPhotos({ tag: "film", size: 7, lang }),
+  ]);
+  dogPhotos = dogResult.items;
+  filmPhotos = filmResult.items;
+} catch (e) {
+  console.error("Failed to fetch home photos:", e);
+}
 ---
 
-<BaseLayout title="DogPhoto — Dog Photography Bratislava" lang="en">
-  <h1>DogPhoto</h1>
-  <p>Professional dog photography in Bratislava</p>
+<BaseLayout title={t(lang, "site.title")} lang={lang}>
+  <main class="home">
+    {dogPhotos.length > 0 && (
+      <PhotoStrip
+        photos={dogPhotos}
+        label={t(lang, "home.dogPhotos")}
+        lang={lang}
+        shopLinkText={t(lang, "home.viewInShop")}
+      />
+    )}
+    {filmPhotos.length > 0 && (
+      <PhotoStrip
+        photos={filmPhotos}
+        label={t(lang, "home.filmPhotos")}
+        lang={lang}
+        shopLinkText={t(lang, "home.viewInShop")}
+      />
+    )}
+  </main>
 </BaseLayout>
+
+<style>
+  .home {
+    padding-top: 1rem;
+  }
+</style>

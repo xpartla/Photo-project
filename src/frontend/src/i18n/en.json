@@ -23,5 +23,8 @@
   "portfolio.buyAsPrint": "Buy as print",
   "portfolio.viewCollection": "View collection",
   "portfolio.backToPortfolio": "Back to portfolio",
-  "portfolio.photosInCollection": "photos in collection"
+  "portfolio.photosInCollection": "photos in collection",
+  "home.dogPhotos": "Dog Photography",
+  "home.filmPhotos": "Film Photography",
+  "home.viewInShop": "Shop"
 }
