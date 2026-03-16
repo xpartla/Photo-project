@@ -46,7 +46,7 @@ const hasFilm = filmPhotos.length > 0;
   <svg class="portfolio-hero__underline" viewBox="0 0 300 12" fill="none" aria-hidden="true">
     <path
       d="M0 6 Q25 0 50 6 Q75 12 100 6 Q125 0 150 6 Q175 12 200 6 Q225 0 250 6 Q275 12 300 6"
-      stroke="#FACE68"
+      stroke="#F2B880"
       stroke-width="4"
       stroke-linecap="round"
     />
@@ -280,15 +280,15 @@ const hasFilm = filmPhotos.length > 0;
   }
 
   .split-column--dog {
-    --accent: #{$yellow};
-    background: linear-gradient(135deg, rgba($yellow, 0.04) 0%, transparent 60%);
+    --accent: #{$peach};
+    background: linear-gradient(135deg, rgba($peach, 0.04) 0%, transparent 60%);
     border-radius: 12px;
     padding: 0 0.5rem;
   }
 
   .split-column--film {
-    --accent: #{$blue};
-    background: linear-gradient(225deg, rgba($blue, 0.04) 0%, transparent 60%);
+    --accent: #{$lavender};
+    background: linear-gradient(225deg, rgba($lavender, 0.04) 0%, transparent 60%);
     border-radius: 12px;
     padding: 0 0.5rem;
   }
@@ -346,12 +346,12 @@ const hasFilm = filmPhotos.length > 0;
     border-radius: 2px;
     background: repeating-linear-gradient(
       to bottom,
-      $yellow 0,
-      $yellow 20px,
+      $peach 0,
+      $peach 20px,
       transparent 20px,
       transparent 28px,
-      $blue 28px,
-      $blue 48px,
+      $lavender 28px,
+      $lavender 48px,
       transparent 48px,
       transparent 56px
     );
@@ -447,7 +447,7 @@ const hasFilm = filmPhotos.length > 0;
 
   // Focus outline for keyboard nav
   .portfolio-card:focus-visible {
-    outline: 3px solid var(--accent, $blue);
+    outline: 3px solid var(--accent, $sage);
     outline-offset: 4px;
     border-radius: 4px;
   }
@@ -506,7 +506,7 @@ const hasFilm = filmPhotos.length > 0;
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: $red;
+    background: $rose;
     border: $outline-width solid $outline;
     color: $white;
     font-size: 1.5rem;
@@ -523,7 +523,7 @@ const hasFilm = filmPhotos.length > 0;
     &:hover,
     &:focus-visible {
       transform: scale(1.12);
-      background: color.adjust($red, $lightness: -10%);
+      background: color.adjust($rose, $lightness: -10%);
     }
 
     &:focus-visible {
@@ -607,12 +607,12 @@ const hasFilm = filmPhotos.length > 0;
     }
 
     &--detail {
-      background: $yellow;
+      background: $peach;
       color: $dark;
     }
 
     &--shop {
-      background: $blue;
+      background: $sage;
       color: $white;
     }
   }

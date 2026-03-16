@@ -185,8 +185,10 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
     position: sticky;
     top: 0;
     z-index: 100;
-    background-color: $white;
+    background-color: rgba($white, 0.92);
+    backdrop-filter: blur(10px);
     border-bottom: $outline-width solid $outline;
+    box-shadow: 0 2px 8px rgba($dark, 0.06);
     height: $nav-height;
 
     &__inner {
@@ -207,9 +209,10 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
       letter-spacing: 0.5px;
       transition: color $transition-base;
       flex-shrink: 0;
+      position: relative;
 
       &:hover {
-        color: $blue;
+        color: $sage;
       }
     }
 
@@ -245,12 +248,13 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
 
       &:hover {
         border-color: $outline;
-        background-color: $yellow;
+        background-color: $peach;
       }
 
       &--active {
         border-color: $outline;
-        background-color: $yellow;
+        background-color: $peach;
+        box-shadow: 2px 2px 0 $outline;
       }
     }
 
@@ -264,13 +268,15 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
       padding: 6px 18px;
       border-radius: 8px;
       border: $outline-width solid $outline;
-      background-color: $blue;
+      background-color: $sage;
       color: $white;
+      box-shadow: 2px 2px 0 $outline;
       transition: all $transition-base;
 
       &:hover {
-        background-color: color.adjust($blue, $lightness: -8%);
+        background-color: color.adjust($sage, $lightness: -8%);
         transform: translateY(-1px);
+        box-shadow: 3px 3px 0 $outline;
       }
     }
 
@@ -286,7 +292,8 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
       transition: all $transition-fast;
 
       &:hover {
-        background-color: $orange;
+        background-color: $terracotta;
+        color: $white;
       }
     }
 
@@ -307,13 +314,15 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
       height: 40px;
       border-radius: 50%;
       border: $outline-width solid $outline;
-      background-color: $yellow;
+      background-color: $peach;
       color: $dark;
+      box-shadow: 2px 2px 0 $outline;
       transition: all $transition-base;
 
       &:hover {
-        background-color: color.adjust($yellow, $lightness: -8%);
+        background-color: color.adjust($peach, $lightness: -8%);
         transform: translateY(-1px);
+        box-shadow: 3px 3px 0 $outline;
       }
     }
 
@@ -360,7 +369,7 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
       }
 
       &--logout {
-        color: $red;
+        color: $rose;
       }
     }
 
@@ -413,8 +422,10 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
       top: $nav-height;
       left: 0;
       right: 0;
-      background-color: $white;
+      background-color: rgba($white, 0.97);
+      backdrop-filter: blur(10px);
       border-bottom: $outline-width solid $outline;
+      box-shadow: 0 4px 12px rgba($dark, 0.08);
       padding: 16px 24px 24px;
 
       &--open {
@@ -443,7 +454,7 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
 
       &:hover, &--active {
         border-color: $outline;
-        background-color: $yellow;
+        background-color: $peach;
       }
 
       &--lang {
@@ -453,7 +464,8 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
         border-color: $outline;
 
         &:hover {
-          background-color: $orange;
+          background-color: $terracotta;
+          color: $white;
         }
       }
     }
