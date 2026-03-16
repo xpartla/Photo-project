@@ -1,0 +1,35 @@
+// ──────────────────────────────────────────
+// DogPhoto Design Tokens
+// Cuphead-style: thick outlines, bold vintage pastels
+// ──────────────────────────────────────────
+
+// Colors
+$blue: #5A9CB5;
+$yellow: #FACE68;
+$orange: #FAAC68;
+$red: #FA6868;
+
+$white: #FFF8F0;
+$cream: #FFF3E0;
+$dark: #2A2A2A;
+$outline: #2A2A2A;
+
+// Outline
+$outline-width: 3px;
+$outline-width-thick: 4px;
+
+// Fonts
+$font-body: 'Nunito', sans-serif;
+$font-heading: 'Titan One', cursive;
+
+// Breakpoints (desktop-first)
+$breakpoint-lg: 1024px;
+$breakpoint-md: 768px;
+$breakpoint-sm: 480px;
+
+// Spacing
+$nav-height: 72px;
+
+// Transitions
+$transition-fast: 150ms ease;
+$transition-base: 250ms ease;
