@@ -9,6 +9,16 @@ const BLOB_BASE_URL =
 
 const PROCESSED_CONTAINER = "processed";
 
+/**
+ * Rewrite internal Docker blob URLs to browser-accessible URLs.
+ */
+function rewriteBlobUrl(url: string): string {
+  return url.replace(
+    /^http:\/\/azurite:10000\/devstoreaccount1/,
+    BLOB_BASE_URL
+  );
+}
+
 export interface ImageVariant {
   width: number;
   height: number;
@@ -44,7 +54,7 @@ export function buildSrcset(variants: ImageVariant[], format: string): string {
   return variants
     .filter((v) => v.format === format)
     .sort((a, b) => a.width - b.width)
-    .map((v) => `${v.blobUrl} ${v.width}w`)
+    .map((v) => `${rewriteBlobUrl(v.blobUrl)} ${v.width}w`)
     .join(", ");
 }
 
@@ -57,5 +67,6 @@ export function getFallbackUrl(variants: ImageVariant[]): string {
     .sort((a, b) => b.width - a.width);
 
   const preferred = jpegs.find((v) => v.width === 1200);
-  return preferred?.blobUrl ?? jpegs[0]?.blobUrl ?? "";
+  const url = preferred?.blobUrl ?? jpegs[0]?.blobUrl ?? "";
+  return url ? rewriteBlobUrl(url) : "";
 }

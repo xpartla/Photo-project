@@ -219,7 +219,7 @@ public static class PortfolioEndpoints
 
         // ── Admin endpoints ────────────────────────────────────────────
 
-        var admin = group.RequireAuthorization();
+        var admin = app.MapGroup("/api/portfolio").WithTags("Portfolio").RequireAuthorization();
 
         admin.MapPost("/photos", async (
             CreatePhotoRequest request,
