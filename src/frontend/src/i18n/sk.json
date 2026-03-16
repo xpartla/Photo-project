@@ -24,7 +24,19 @@
   "portfolio.viewCollection": "Zobraziť kolekciu",
   "portfolio.backToPortfolio": "Späť na portfólio",
   "portfolio.photosInCollection": "fotografií v kolekcii",
+  "portfolio.dogSection": "Psia fotografia",
+  "portfolio.filmSection": "Filmová fotografia",
+  "portfolio.heroSubtitle": "Objavte svet cez náš objektív",
+  "portfolio.viewDetail": "Detail fotky",
+  "portfolio.close": "Zavrieť",
   "home.dogPhotos": "Psia fotografia",
   "home.filmPhotos": "Filmová fotografia",
-  "home.viewInShop": "Obchod"
+  "home.viewInShop": "Obchod",
+  "home.tagline": "Profesionálne psie fotenie v Bratislave",
+  "home.subtitle": "Zachytíme osobnosť vášho miláčika",
+  "home.ctaPortfolio": "Pozrieť portfólio",
+  "home.ctaBooking": "Rezervovať fotenie",
+  "home.ctaBanner": "Pripravení na nezabudnuteľné fotky?",
+  "home.ctaBannerSub": "Zarezervujte si termín a vytvoríme spolu niečo výnimočné",
+  "home.ctaBookNow": "Rezervovať teraz"
 }

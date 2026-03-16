@@ -1,25 +1,25 @@
 ---
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import SeoMeta from "../../../components/SeoMeta.astro";
-import ResponsiveImage from "../../../components/ResponsiveImage.astro";
-import { getPhotos, getCollections } from "../../../lib/api";
+import PortfolioSplit from "../../../components/PortfolioSplit.astro";
+import { getPhotos } from "../../../lib/api";
 import { t } from "../../../lib/i18n";
-import type { PaginatedResult, PhotoSummary, CollectionSummary } from "../../../lib/api";
+import type { PhotoSummary } from "../../../lib/api";
 
 const lang = "sk";
-const page = Number(Astro.url.searchParams.get("page") || "1");
-const tag = Astro.url.searchParams.get("tag") || undefined;
 
-let photos: PaginatedResult<PhotoSummary>;
-let collections: CollectionSummary[];
+let dogPhotos: PhotoSummary[];
+let filmPhotos: PhotoSummary[];
 try {
-  [photos, collections] = await Promise.all([
-    getPhotos({ page, size: 24, tag, lang }),
-    getCollections(lang),
+  const [dogs, films] = await Promise.all([
+    getPhotos({ size: 50, tag: "dog", lang }),
+    getPhotos({ size: 50, tag: "film", lang }),
   ]);
+  dogPhotos = dogs.items;
+  filmPhotos = films.items;
 } catch {
-  photos = { items: [], page: 1, size: 24, totalCount: 0, totalPages: 0 };
-  collections = [];
+  dogPhotos = [];
+  filmPhotos = [];
 }
 
 const pageTitle = `${t(lang, "portfolio.title")} — DogPhoto`;
@@ -30,11 +30,8 @@ const jsonLd = {
   "@type": "ImageGallery",
   name: t(lang, "portfolio.title"),
   description: pageDescription,
-  author: {
-    "@type": "Person",
-    name: "DogPhoto",
-  },
-  inLanguage: "sk",
+  author: { "@type": "Person", name: "DogPhoto" },
+  inLanguage: lang,
 };
 ---
 
@@ -44,89 +41,23 @@ const jsonLd = {
     title={pageTitle}
     description={pageDescription}
     lang={lang}
-    path={`/sk/portfolio${tag ? `?tag=${tag}` : ""}`}
+    path="/sk/portfolio"
     jsonLd={jsonLd}
   />
 
-  <section class="portfolio">
-    <h1>{t(lang, "portfolio.title")}</h1>
-
-    {collections.length > 0 && (
-      <section class="collections-strip">
-        <h2>{t(lang, "portfolio.collections")}</h2>
-        <div class="collections-grid">
-          {collections.map((col) => (
-            <a href={`/sk/portfolio/kolekcie/${col.slug}`} class="collection-card">
-              {col.coverPhoto && (
-                <ResponsiveImage
-                  variants={col.coverPhoto.variants}
-                  alt={col.coverPhoto.altText || col.name}
-                  width={col.coverPhoto.width || 400}
-                  height={col.coverPhoto.height || 300}
-                  dominantColor={col.coverPhoto.dominantColor}
-                  sizes="(max-width: 600px) 100vw, 300px"
-                />
-              )}
-              <h3>{col.name}</h3>
-              <span>{col.photoCount} {t(lang, "portfolio.photosInCollection")}</span>
-            </a>
-          ))}
-        </div>
-      </section>
-    )}
-
-    <section class="photo-gallery">
-      <h2>{t(lang, "portfolio.allPhotos")}</h2>
-      {photos.items.length === 0 ? (
-        <p>{t(lang, "portfolio.noPhotos")}</p>
-      ) : (
-        <div class="gallery-grid">
-          {photos.items.map((photo) => (
-            <a href={`/sk/portfolio/${photo.slug}`} class="photo-card">
-              <ResponsiveImage
-                variants={photo.variants}
-                alt={photo.altText || photo.title || ""}
-                width={photo.width || 800}
-                height={photo.height || 600}
-                dominantColor={photo.dominantColor}
-                blurhash={photo.blurhash}
-                sizes="(max-width: 600px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              />
-              {photo.title && <span class="photo-title">{photo.title}</span>}
-            </a>
-          ))}
-        </div>
-      )}
-
-      {photos.totalPages > 1 && (
-        <nav class="pagination">
-          {photos.page > 1 && (
-            <a href={`/sk/portfolio?page=${photos.page - 1}${tag ? `&tag=${tag}` : ""}`}>&laquo; Predchádzajúca</a>
-          )}
-          <span>{photos.page} / {photos.totalPages}</span>
-          {photos.page < photos.totalPages && (
-            <a href={`/sk/portfolio?page=${photos.page + 1}${tag ? `&tag=${tag}` : ""}`}>Nasledujúca &raquo;</a>
-          )}
-        </nav>
-      )}
-    </section>
-  </section>
+  <PortfolioSplit
+    lang={lang}
+    dogPhotos={dogPhotos}
+    filmPhotos={filmPhotos}
+    labels={{
+      title: t(lang, "portfolio.title"),
+      subtitle: t(lang, "portfolio.heroSubtitle"),
+      dogSection: t(lang, "portfolio.dogSection"),
+      filmSection: t(lang, "portfolio.filmSection"),
+      viewDetail: t(lang, "portfolio.viewDetail"),
+      buyAsPrint: t(lang, "portfolio.buyAsPrint"),
+      close: t(lang, "portfolio.close"),
+      noPhotos: t(lang, "portfolio.noPhotos"),
+    }}
+  />
 </BaseLayout>
-
-<style>
-  .portfolio { max-width: 1400px; margin: 0 auto; padding: 1rem; }
-  .collections-strip { margin-bottom: 2rem; }
-  .collections-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
-  .collection-card { text-decoration: none; color: inherit; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0; }
-  .collection-card h3 { padding: 0.5rem 1rem 0; margin: 0; }
-  .collection-card span { padding: 0 1rem 0.5rem; display: block; color: #666; font-size: 0.9rem; }
-  .collection-card :global(picture) { display: block; }
-  .collection-card :global(img) { width: 100%; height: 200px; object-fit: cover; display: block; }
-  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
-  .photo-card { text-decoration: none; color: inherit; display: block; position: relative; border-radius: 4px; overflow: hidden; }
-  .photo-card :global(picture) { display: block; }
-  .photo-card :global(img) { width: 100%; height: auto; display: block; }
-  .photo-title { display: block; padding: 0.5rem 0; font-size: 0.9rem; }
-  .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; padding: 1rem; }
-  .pagination a { text-decoration: none; color: #333; }
-</style>

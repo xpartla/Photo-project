@@ -7,15 +7,16 @@ interface Props {
   label: string;
   lang: string;
   shopLinkText: string;
+  accent?: string;
 }
 
-const { photos, label, lang, shopLinkText } = Astro.props;
+const { photos, label, lang, shopLinkText, accent = "#FACE68" } = Astro.props;
 
-// Shuffle photos deterministically per build but randomly
 const shuffled = [...photos].sort(() => Math.random() - 0.5);
+const rotations = [-1.5, 1, -0.5, 1.5, -1, 0.5, -2, 1.2];
 ---
 
-<section class="photo-strip" aria-label={label}>
+<section class="photo-strip" aria-label={label} style={`--strip-accent: ${accent}`}>
   <h2 class="photo-strip__label">{label}</h2>
   <div class="photo-strip__track" data-photo-strip>
     {shuffled.map((photo, i) => {
@@ -25,7 +26,7 @@ const shuffled = [...photos].sort(() => Math.random() - 0.5);
         <div
           class="photo-strip__card"
           data-strip-card
-          style={`z-index: ${shuffled.length - i}`}
+          style={`z-index: ${shuffled.length - i}; --card-index: ${i}; --rotation: ${rotations[i % rotations.length]}deg`}
         >
           <div class="photo-strip__frame">
             <picture>
@@ -60,7 +61,7 @@ const shuffled = [...photos].sort(() => Math.random() - 0.5);
   @use "../styles/variables" as *;
 
   .photo-strip {
-    padding: 2rem 0;
+    padding: 2.5rem 0;
     overflow: hidden;
 
     &__label {
@@ -69,6 +70,16 @@ const shuffled = [...photos].sort(() => Math.random() - 0.5);
       color: $dark;
       padding-left: 3rem;
       margin-bottom: 1.5rem;
+
+      &::after {
+        content: "";
+        display: block;
+        width: 50px;
+        height: 4px;
+        background: var(--strip-accent, $yellow);
+        border-radius: 2px;
+        margin-top: 0.3rem;
+      }
     }
 
     &__track {
@@ -82,14 +93,31 @@ const shuffled = [...photos].sort(() => Math.random() - 0.5);
       flex-shrink: 0;
       width: 280px;
       margin-right: -80px;
-      transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                  z-index 0s;
       cursor: pointer;
       will-change: transform;
+
+      // Reveal — uses translate + opacity (separate from JS-managed transform)
+      opacity: 0;
+      translate: 0 24px;
+
+      // Hover/spread — uses transform (managed by JS inline styles)
+      transition:
+        transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        z-index 0s;
 
       &:last-child {
         margin-right: 0;
       }
+    }
+
+    // Revealed: staggered card entrance
+    &--revealed &__card {
+      opacity: 1;
+      translate: 0 0;
+      transition:
+        opacity 0.5s ease calc(var(--card-index, 0) * 0.08s),
+        translate 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--card-index, 0) * 0.08s),
+        transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
     &__frame {
@@ -98,9 +126,16 @@ const shuffled = [...photos].sort(() => Math.random() - 0.5);
       border: $outline-width solid $outline;
       border-radius: 4px;
       box-shadow: 3px 3px 0 $outline;
+      transform: rotate(var(--rotation, 0deg));
+      transition:
+        transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        box-shadow 0.35s ease,
+        border-color 0.35s ease;
 
       picture {
         display: block;
+        overflow: hidden;
+        border-radius: 2px;
       }
 
       img {
@@ -109,6 +144,7 @@ const shuffled = [...photos].sort(() => Math.random() - 0.5);
         height: 320px;
         object-fit: cover;
         border-radius: 2px;
+        transition: transform 0.4s ease;
       }
     }
 
@@ -143,23 +179,85 @@ const shuffled = [...photos].sort(() => Math.random() - 0.5);
       font-weight: 700;
       font-size: 0.85rem;
       color: $white;
-      background: $blue;
+      background: var(--strip-accent, $blue);
       border: $outline-width solid $outline;
       border-radius: 6px;
       padding: 0.3rem 0.9rem;
+      box-shadow: 2px 2px 0 $outline;
       text-decoration: none;
-      transition: background $transition-fast, transform $transition-fast;
+      transition:
+        background $transition-fast,
+        transform $transition-fast,
+        box-shadow $transition-fast;
 
       &:hover {
-        background: color.adjust($blue, $lightness: -10%);
-        transform: translateY(-1px);
+        transform: translateY(-2px);
+        box-shadow: 3px 3px 0 $outline;
+      }
+    }
+
+    // ── Hover effects (desktop only) ────────
+    @media (hover: hover) {
+      &__card:hover &__frame,
+      &__card.is-active &__frame {
+        transform: rotate(0deg) translateY(-5px);
+        box-shadow: 5px 7px 0 $outline;
+        border-color: var(--strip-accent, $outline);
+      }
+
+      &__card:hover &__frame img,
+      &__card.is-active &__frame img {
+        transform: scale(1.04);
       }
     }
   }
 
-  // ── Mobile ──────────────────────────────────────────
+  // ── Large desktop (1440+) ─────────────────
+  @media (min-width: 1440px) {
+    .photo-strip {
+      &__label {
+        padding-left: 4rem;
+        font-size: 2.2rem;
+      }
+
+      &__track {
+        padding: 1rem 4rem 3.5rem;
+      }
+
+      &__card {
+        width: 320px;
+        margin-right: -90px;
+      }
+
+      &__frame img {
+        height: 380px;
+      }
+    }
+  }
+
+  // ── Mobile ────────────────────────────────
   @media (max-width: $breakpoint-md) {
     .photo-strip {
+      padding: 1.5rem 0;
+
+      // Mobile: strip-level fade instead of card stagger
+      opacity: 0;
+      transition: opacity 0.5s ease;
+
+      &--revealed {
+        opacity: 1;
+      }
+
+      &__card {
+        opacity: 1;
+        translate: none;
+      }
+
+      &--revealed &__card {
+        transition:
+          transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      }
+
       &__label {
         padding-left: 1.25rem;
         font-size: 1.5rem;
@@ -173,7 +271,6 @@ const shuffled = [...photos].sort(() => Math.random() - 0.5);
         scroll-snap-type: x mandatory;
         -webkit-overflow-scrolling: touch;
 
-        // Hide scrollbar
         scrollbar-width: none;
         &::-webkit-scrollbar {
           display: none;
@@ -186,8 +283,12 @@ const shuffled = [...photos].sort(() => Math.random() - 0.5);
         scroll-snap-align: center;
       }
 
-      &__frame img {
-        height: 260px;
+      &__frame {
+        transform: none;
+
+        img {
+          height: 260px;
+        }
       }
 
       &__info {
@@ -197,55 +298,109 @@ const shuffled = [...photos].sort(() => Math.random() - 0.5);
       }
     }
   }
+
+  // ── Reduced motion ────────────────────────
+  @media (prefers-reduced-motion: reduce) {
+    .photo-strip {
+      opacity: 1;
+    }
+
+    .photo-strip__card {
+      opacity: 1;
+      translate: none;
+    }
+
+    .photo-strip--revealed .photo-strip__card {
+      transition:
+        transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .photo-strip__frame {
+      transform: none;
+      transition-duration: 0.01ms;
+    }
+  }
 </style>
 
 <script>
   function initStrips() {
+    // ── Scroll Reveal ───────────────────────
+    const prefersReduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    const revealObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("photo-strip--revealed");
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -30px 0px" }
+    );
+
+    document
+      .querySelectorAll<HTMLElement>(".photo-strip")
+      .forEach((strip) => {
+        if (prefersReduced) {
+          strip.classList.add("photo-strip--revealed");
+        } else {
+          revealObserver.observe(strip);
+        }
+      });
+
+    // ── Hover Spread (desktop only) ─────────
     const SPREAD_PX = 60;
     const isMobile = window.matchMedia("(max-width: 768px)").matches;
     if (isMobile) return;
 
-    document.querySelectorAll<HTMLElement>("[data-photo-strip]").forEach((track) => {
-      const cards = Array.from(track.querySelectorAll<HTMLElement>("[data-strip-card]"));
-      const baseZIndexes = cards.map((_, i) => cards.length - i);
+    document
+      .querySelectorAll<HTMLElement>("[data-photo-strip]")
+      .forEach((track) => {
+        const cards = Array.from(
+          track.querySelectorAll<HTMLElement>("[data-strip-card]")
+        );
+        const baseZIndexes = cards.map((_, i) => cards.length - i);
 
-      function resetCards() {
-        cards.forEach((card, i) => {
-          card.style.transform = "";
-          card.style.zIndex = String(baseZIndexes[i]);
-          card.classList.remove("is-active");
-        });
-      }
+        function resetCards() {
+          cards.forEach((card, i) => {
+            card.style.transform = "";
+            card.style.zIndex = String(baseZIndexes[i]);
+            card.classList.remove("is-active");
+          });
+        }
 
-      cards.forEach((card, hoveredIdx) => {
-        card.addEventListener("mouseenter", () => {
-          card.style.zIndex = String(cards.length + 1);
-          card.classList.add("is-active");
+        cards.forEach((card, hoveredIdx) => {
+          card.addEventListener("mouseenter", () => {
+            card.style.zIndex = String(cards.length + 1);
+            card.classList.add("is-active");
 
-          cards.forEach((other, i) => {
-            if (i === hoveredIdx) {
-              other.style.transform = "scale(1.03)";
-              return;
+            cards.forEach((other, i) => {
+              if (i === hoveredIdx) {
+                other.style.transform = "scale(1.03)";
+                return;
+              }
+              const offset = i < hoveredIdx ? -SPREAD_PX : SPREAD_PX;
+              other.style.transform = `translateX(${offset}px)`;
+              other.style.zIndex = String(baseZIndexes[i]);
+              other.classList.remove("is-active");
+            });
+          });
+
+          card.addEventListener("mouseleave", () => {
+            const stillHovering = track.querySelector(
+              "[data-strip-card]:hover"
+            );
+            if (!stillHovering) {
+              resetCards();
             }
-            // Push cards to the left or right of hovered card
-            const offset = i < hoveredIdx ? -SPREAD_PX : SPREAD_PX;
-            other.style.transform = `translateX(${offset}px)`;
-            other.style.zIndex = String(baseZIndexes[i]);
-            other.classList.remove("is-active");
           });
         });
 
-        card.addEventListener("mouseleave", () => {
-          // Only reset if no other card is being hovered
-          const stillHovering = track.querySelector("[data-strip-card]:hover");
-          if (!stillHovering) {
-            resetCards();
-          }
-        });
+        track.addEventListener("mouseleave", resetCards);
       });
-
-      track.addEventListener("mouseleave", resetCards);
-    });
   }
 
   initStrips();

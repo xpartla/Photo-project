@@ -24,7 +24,19 @@
   "portfolio.viewCollection": "View collection",
   "portfolio.backToPortfolio": "Back to portfolio",
   "portfolio.photosInCollection": "photos in collection",
+  "portfolio.dogSection": "Dog Photography",
+  "portfolio.filmSection": "Film Photography",
+  "portfolio.heroSubtitle": "Discover the world through our lens",
+  "portfolio.viewDetail": "Photo details",
+  "portfolio.close": "Close",
   "home.dogPhotos": "Dog Photography",
   "home.filmPhotos": "Film Photography",
-  "home.viewInShop": "Shop"
+  "home.viewInShop": "Shop",
+  "home.tagline": "Professional dog photography in Bratislava",
+  "home.subtitle": "We capture your pet's unique personality",
+  "home.ctaPortfolio": "View portfolio",
+  "home.ctaBooking": "Book a session",
+  "home.ctaBanner": "Ready for unforgettable photos?",
+  "home.ctaBannerSub": "Book your session and let's create something special together",
+  "home.ctaBookNow": "Book now"
 }

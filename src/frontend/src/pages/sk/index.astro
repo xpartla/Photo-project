@@ -1,6 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import PhotoStrip from "../../components/PhotoStrip.astro";
+import HomeContent from "../../components/HomeContent.astro";
 import { getPhotos } from "../../lib/api";
 import { t } from "../../lib/i18n";
 
@@ -22,28 +22,21 @@ try {
 ---
 
 <BaseLayout title={t(lang, "site.title")} lang={lang}>
-  <main class="home">
-    {dogPhotos.length > 0 && (
-      <PhotoStrip
-        photos={dogPhotos}
-        label={t(lang, "home.dogPhotos")}
-        lang={lang}
-        shopLinkText={t(lang, "home.viewInShop")}
-      />
-    )}
-    {filmPhotos.length > 0 && (
-      <PhotoStrip
-        photos={filmPhotos}
-        label={t(lang, "home.filmPhotos")}
-        lang={lang}
-        shopLinkText={t(lang, "home.viewInShop")}
-      />
-    )}
-  </main>
+  <HomeContent
+    lang={lang}
+    dogPhotos={dogPhotos}
+    filmPhotos={filmPhotos}
+    labels={{
+      tagline: t(lang, "home.tagline"),
+      subtitle: t(lang, "home.subtitle"),
+      ctaPortfolio: t(lang, "home.ctaPortfolio"),
+      ctaBooking: t(lang, "home.ctaBooking"),
+      dogPhotos: t(lang, "home.dogPhotos"),
+      filmPhotos: t(lang, "home.filmPhotos"),
+      shopLinkText: t(lang, "home.viewInShop"),
+      ctaBanner: t(lang, "home.ctaBanner"),
+      ctaBannerSub: t(lang, "home.ctaBannerSub"),
+      ctaBookNow: t(lang, "home.ctaBookNow"),
+    }}
+  />
 </BaseLayout>
-
-<style>
-  .home {
-    padding-top: 1rem;
-  }
-</style>
