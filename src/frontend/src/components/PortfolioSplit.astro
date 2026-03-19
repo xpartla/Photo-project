@@ -168,11 +168,11 @@ const hasFilm = filmPhotos.length > 0;
       data-shop-base={shopBase}
     >
       <div class="lightbox__backdrop" data-lightbox-close></div>
-      <div class="lightbox__panel">
-        <button class="lightbox__close" data-lightbox-close aria-label={labels.close}>
-          &times;
-        </button>
+      <div class="lightbox__panel" data-lightbox-close>
         <div class="lightbox__frame">
+          <button class="lightbox__close" data-lightbox-close aria-label={labels.close}>
+            &times;
+          </button>
           <img id="lightbox-img" src="" alt="" />
         </div>
         <div class="lightbox__info">
@@ -494,7 +494,6 @@ const hasFilm = filmPhotos.length > 0;
     width: 92vw;
     max-height: 90vh;
     overflow-y: auto;
-    overflow-x: hidden;
     padding-top: 20px;
     padding-right: 20px;
     transform: scale(0.92);
@@ -508,8 +507,8 @@ const hasFilm = filmPhotos.length > 0;
 
   .lightbox__close {
     position: absolute;
-    top: 0;
-    right: 0;
+    top: -14px;
+    right: -14px;
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -540,19 +539,15 @@ const hasFilm = filmPhotos.length > 0;
   }
 
   .lightbox__frame {
-    background: #fff;
-    padding: 12px;
-    border: $outline-width-thick solid $outline;
-    border-radius: 4px;
-    box-shadow: 4px 4px 0 $outline;
-    width: 100%;
+    position: relative;
+    max-width: 100%;
+    width: fit-content;
 
     img {
       display: block;
-      width: 100%;
+      max-width: 100%;
       max-height: 65vh;
-      object-fit: contain;
-      border-radius: 2px;
+      border-radius: 4px;
     }
   }
 
@@ -735,15 +730,11 @@ const hasFilm = filmPhotos.length > 0;
     }
 
     .lightbox__close {
-      top: 0;
-      right: 0;
+      top: -12px;
+      right: -12px;
       width: 36px;
       height: 36px;
       font-size: 1.3rem;
-    }
-
-    .lightbox__frame {
-      padding: 8px;
     }
 
     .lightbox__frame img {
