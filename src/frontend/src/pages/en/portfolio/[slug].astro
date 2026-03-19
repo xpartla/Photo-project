@@ -22,6 +22,7 @@ const ogImage = getFallbackUrl(photo.variants);
 
 const hasTechnicalDetails = photo.cameraSettings || photo.location || photo.shotDate;
 const rotations = [-2, 1.5, -1, 2.5, -0.5, 1, -1.5, 0.5];
+const isPortrait = (photo.height || 0) > (photo.width || 0);
 
 const jsonLd = [
   {
@@ -93,7 +94,7 @@ const jsonLd = [
     </nav>
 
     <!-- Image showcase -->
-    <section class="showcase" data-reveal>
+    <section class={`showcase ${isPortrait ? "showcase--portrait" : ""}`} data-reveal>
       <div class="showcase__frame">
         <ResponsiveImage
           variants={photo.variants}
@@ -214,10 +215,13 @@ const jsonLd = [
           </svg>
         </div>
         <div class="related__track">
-          {photo.relatedPhotos.map((rp, i) => (
+          {photo.relatedPhotos.map((rp, i) => {
+            const rpIsPortrait = (rp.height || 0) > (rp.width || 0);
+            return (
             <a
               href={`/en/portfolio/${rp.slug}`}
               class="related-card"
+              data-orientation={rpIsPortrait ? "portrait" : "landscape"}
               style={`--rotation: ${rotations[i % rotations.length]}deg; --delay: ${i * 0.08}s`}
             >
               <div class="related-card__frame">
@@ -232,7 +236,8 @@ const jsonLd = [
               </div>
               <span class="related-card__title">{rp.title}</span>
             </a>
-          ))}
+            );
+          })}
         </div>
       </section>
     )}
@@ -384,6 +389,11 @@ const jsonLd = [
       object-fit: contain;
       border-radius: 3px;
     }
+  }
+
+  .showcase--portrait .showcase__frame {
+    max-width: 600px;
+    margin: 0 auto;
   }
 
   // ── Info panel ────────────────────────────────────────
@@ -679,6 +689,7 @@ const jsonLd = [
 
   .related__track {
     display: flex;
+    align-items: center;
     gap: 1.5rem;
     overflow-x: auto;
     overflow-y: visible;
@@ -725,11 +736,20 @@ const jsonLd = [
     :global(img) {
       display: block;
       width: 100%;
-      height: 180px;
+      height: auto;
+      aspect-ratio: 4 / 3;
       object-fit: cover;
       border-radius: 2px;
       transition: transform 0.4s ease;
     }
+  }
+
+  .related-card[data-orientation="portrait"] {
+    flex: 0 0 200px;
+  }
+
+  .related-card[data-orientation="portrait"] .related-card__frame :global(img) {
+    aspect-ratio: 3 / 4;
   }
 
   .related-card__title {
@@ -837,8 +857,8 @@ const jsonLd = [
       flex: 0 0 220px;
     }
 
-    .related-card__frame :global(img) {
-      height: 150px;
+    .related-card[data-orientation="portrait"] {
+      flex: 0 0 170px;
     }
 
     .detail__sparkle {
@@ -867,8 +887,8 @@ const jsonLd = [
       flex: 0 0 190px;
     }
 
-    .related-card__frame :global(img) {
-      height: 130px;
+    .related-card[data-orientation="portrait"] {
+      flex: 0 0 150px;
     }
   }
 

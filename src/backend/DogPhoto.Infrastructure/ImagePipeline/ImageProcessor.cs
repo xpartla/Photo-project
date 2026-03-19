@@ -50,6 +50,10 @@ public class ImageProcessor : IImageProcessor
     {
         using var image = await Image.LoadAsync<Rgba32>(originalStream);
 
+        // Apply EXIF orientation so Width/Height reflect display dimensions
+        // and variants are generated in the correct orientation.
+        image.Mutate(x => x.AutoOrient());
+
         var metadata = ExtractMetadata(image);
         var variants = await GenerateVariantsAsync(photoId, image);
 
