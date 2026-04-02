@@ -1,0 +1,156 @@
+@use "../variables" as *;
+
+.collection-detail {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.collection-detail h1 {
+  font-family: $font-heading;
+  font-size: 2.5rem;
+  color: $dark;
+  margin: 0 0 0.5rem;
+}
+
+.breadcrumb {
+  margin-bottom: 1.5rem;
+}
+
+.breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: $dark;
+  text-decoration: none;
+  padding: 0.4rem 0.8rem;
+  border: $outline-width solid $outline;
+  border-radius: 8px;
+  box-shadow: 2px 2px 0 $outline;
+  background: $white;
+  transition:
+    transform $transition-fast,
+    box-shadow $transition-fast,
+    background $transition-fast;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 3px 4px 0 $outline;
+    background: $peach;
+  }
+}
+
+.description {
+  font-family: $font-body;
+  font-weight: 600;
+  color: $dark;
+  line-height: 1.6;
+}
+
+.count {
+  font-family: $font-body;
+  font-weight: 600;
+  color: $terracotta;
+  margin-bottom: 1.5rem;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.photo-card {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  background: #fff;
+  padding: 8px;
+  border: $outline-width solid $outline;
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 $outline;
+  overflow: hidden;
+  transition:
+    transform $transition-base,
+    box-shadow $transition-base;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 5px 6px 0 $outline;
+  }
+}
+
+.photo-card :global(picture) {
+  display: block;
+}
+
+.photo-card :global(img) {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 3px;
+}
+
+.photo-title {
+  display: block;
+  padding: 0.6rem 0.25rem 0.25rem;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: $dark;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1rem;
+}
+
+.pagination a {
+  font-family: $font-body;
+  font-weight: 700;
+  text-decoration: none;
+  color: $dark;
+  padding: 0.5rem 1rem;
+  border: $outline-width solid $outline;
+  border-radius: 8px;
+  box-shadow: 2px 2px 0 $outline;
+  background: $white;
+  transition:
+    transform $transition-fast,
+    box-shadow $transition-fast,
+    background $transition-fast;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 3px 3px 0 $outline;
+    background: $peach;
+  }
+}
+
+.pagination span {
+  font-family: $font-body;
+  font-weight: 700;
+  color: $dark;
+}
+
+@media (max-width: $breakpoint-md) {
+  .collection-detail {
+    padding: 1rem;
+  }
+
+  .collection-detail h1 {
+    font-size: 1.8rem;
+  }
+
+  .gallery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+}

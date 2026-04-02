@@ -1,0 +1,693 @@
+@use "sass:color";
+@use "../variables" as *;
+
+// ── Keyframes ─────────────────────────────────────────
+@keyframes dropIn {
+  0% { transform: translateY(-30px); opacity: 0; }
+  60% { transform: translateY(4px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes drawLine {
+  from { stroke-dashoffset: 320; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes twinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.6; }
+  50% { transform: scale(1.3) rotate(20deg); opacity: 1; }
+}
+
+@keyframes gentleSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes frameIn {
+  0% { transform: scale(0.92) rotate(-1deg); opacity: 0; }
+  60% { transform: scale(1.01) rotate(0.3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+// ── Detail container ──────────────────────────────────
+.detail {
+  position: relative;
+  overflow: hidden;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem 4rem;
+}
+
+// ── Background decorations ────────────────────────────
+.detail__deco {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.detail__sparkle {
+  position: absolute;
+
+  &--1 { top: 15%; left: 5%; width: 28px; animation: twinkle 3s ease-in-out infinite; }
+  &--2 { top: 35%; right: 4%; width: 22px; animation: twinkle 3s ease-in-out 0.7s infinite; }
+  &--3 { bottom: 20%; left: 8%; width: 20px; animation: twinkle 3s ease-in-out 1.4s infinite; }
+}
+
+.detail__circle {
+  position: absolute;
+  opacity: 0.08;
+
+  &--1 { top: 10%; right: -3%; width: 200px; animation: gentleSpin 40s linear infinite; }
+  &--2 { bottom: 5%; left: -4%; width: 160px; animation: gentleSpin 35s linear infinite reverse; }
+}
+
+// ── Breadcrumb ────────────────────────────────────────
+.detail__breadcrumb {
+  position: relative;
+  z-index: 1;
+  padding: 1.5rem 0 1rem;
+}
+
+.detail__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: $dark;
+  text-decoration: none;
+  padding: 0.4rem 1rem 0.4rem 0.7rem;
+  border: $outline-width solid $outline;
+  border-radius: 8px;
+  box-shadow: 2px 2px 0 $outline;
+  background: $white;
+  transition:
+    transform $transition-fast,
+    box-shadow $transition-fast,
+    background $transition-fast;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 3px 4px 0 $outline;
+    background: $peach;
+  }
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow: 1px 1px 0 $outline;
+  }
+}
+
+// ── Image showcase ────────────────────────────────────
+.showcase {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 2.5rem;
+}
+
+.showcase__frame {
+  background: #fff;
+  padding: 12px;
+  border: $outline-width-thick solid $outline;
+  border-radius: 6px;
+  box-shadow: 5px 5px 0 $outline;
+  animation: frameIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transition: box-shadow 0.4s ease;
+
+  &:hover {
+    box-shadow: 7px 8px 0 $outline;
+  }
+
+  :global(picture) {
+    display: block;
+  }
+
+  :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: calc(100vh - 200px);
+    object-fit: contain;
+    border-radius: 3px;
+  }
+}
+
+.showcase--portrait .showcase__frame {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+// ── Info panel ────────────────────────────────────────
+.info {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 3rem;
+}
+
+.info__content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.info__title {
+  font-family: $font-heading;
+  font-size: 2.8rem;
+  color: $dark;
+  margin: 0 0 1rem;
+  text-align: center;
+  animation: dropIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.info__underline {
+  display: block;
+  width: 180px;
+  height: 12px;
+  margin: -4px auto 0;
+
+  path {
+    stroke-dasharray: 320;
+    stroke-dashoffset: 320;
+    animation: drawLine 1s ease 0.3s forwards;
+  }
+}
+
+.info__description {
+  font-family: $font-body;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: $dark;
+  line-height: 1.7;
+  text-align: center;
+  max-width: 650px;
+  margin: 1.25rem auto 1.5rem;
+  opacity: 0;
+  animation: fadeUp 0.6s ease 0.5s forwards;
+}
+
+// ── Tags ──────────────────────────────────────────────
+.info__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1.75rem;
+  opacity: 0;
+  animation: fadeUp 0.6s ease 0.6s forwards;
+}
+
+.tag-pill {
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.9rem;
+  background: rgba($lavender, 0.15);
+  border: 2px solid $lavender;
+  border-radius: 20px;
+  color: $dark;
+  text-decoration: none;
+  transition:
+    background $transition-fast,
+    transform $transition-fast,
+    box-shadow $transition-fast;
+
+  &:hover {
+    background: $lavender;
+    color: $white;
+    transform: translateY(-2px);
+    box-shadow: 2px 3px 0 $outline;
+  }
+}
+
+// ── Action buttons ────────────────────────────────────
+.info__actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1.75rem;
+  opacity: 0;
+  animation: fadeUp 0.6s ease 0.7s forwards;
+}
+
+.action-btn {
+  font-family: $font-body;
+  font-weight: 800;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 0.7rem 1.8rem;
+  border: $outline-width-thick solid $outline;
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 $outline;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform $transition-fast,
+    box-shadow $transition-fast,
+    background $transition-fast;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 5px 6px 0 $outline;
+  }
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow: 2px 2px 0 $outline;
+  }
+
+  &--primary {
+    background: $peach;
+    color: $dark;
+
+    background-image: linear-gradient(
+      110deg,
+      transparent 25%,
+      rgba(255, 255, 255, 0.3) 37%,
+      transparent 50%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 3s ease-in-out infinite 2s;
+
+    &:hover { background-color: color.adjust($peach, $lightness: -5%); }
+  }
+
+  &--secondary {
+    background: $sage;
+    color: $white;
+
+    &:hover { background: color.adjust($sage, $lightness: -8%); }
+  }
+}
+
+// ── Collections ───────────────────────────────────────
+.info__collections {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.collection-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: $dark;
+  text-decoration: none;
+  padding: 0.35rem 0.85rem;
+  border: 2px solid $terracotta;
+  border-radius: 8px;
+  background: rgba($terracotta, 0.08);
+  transition:
+    background $transition-fast,
+    transform $transition-fast,
+    color $transition-fast;
+
+  &:hover {
+    background: $terracotta;
+    color: $white;
+    transform: translateY(-2px);
+  }
+}
+
+// ── Technical details (collapsible) ───────────────────
+.tech-details {
+  max-width: 500px;
+  margin: 0 auto 1rem;
+  border: $outline-width solid $outline;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 3px 3px 0 $outline;
+  background: $white;
+}
+
+.tech-details__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: $dark;
+  cursor: pointer;
+  list-style: none;
+  transition: background $transition-fast;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  &:hover {
+    background: rgba($peach, 0.1);
+  }
+}
+
+.tech-details__icon {
+  flex-shrink: 0;
+  color: $terracotta;
+}
+
+.tech-details__chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+  color: $dark;
+}
+
+.tech-details[open] .tech-details__chevron {
+  transform: rotate(180deg);
+}
+
+.tech-details__body {
+  padding: 0 1rem 1rem;
+  border-top: 2px dashed rgba($outline, 0.15);
+}
+
+.tech-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.5rem 0;
+  font-family: $font-body;
+  font-size: 0.9rem;
+
+  & + & {
+    border-top: 1px solid rgba($outline, 0.08);
+  }
+}
+
+.tech-row__label {
+  font-weight: 700;
+  color: $terracotta;
+}
+
+.tech-row__value {
+  color: $dark;
+  text-align: right;
+  font-weight: 600;
+}
+
+// ── Related photos ────────────────────────────────────
+.related {
+  position: relative;
+  z-index: 1;
+  padding-top: 1rem;
+}
+
+.related__header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.related__title {
+  font-family: $font-heading;
+  font-size: 2rem;
+  color: $dark;
+  margin: 0;
+}
+
+.related__underline {
+  display: block;
+  width: 150px;
+  height: 10px;
+  margin: 0 auto;
+
+  path {
+    stroke-dasharray: 250;
+    stroke-dashoffset: 250;
+  }
+}
+
+.related.revealed .related__underline path {
+  animation: drawLine 1s ease 0.3s forwards;
+}
+
+.related__track {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 1rem 0.5rem 2rem;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+
+  mask-image: linear-gradient(to right, transparent, black 2%, black 98%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 2%, black 98%, transparent);
+}
+
+.related-card {
+  flex: 0 0 260px;
+  scroll-snap-align: center;
+  text-decoration: none;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.5s ease var(--delay, 0s),
+    transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) var(--delay, 0s);
+}
+
+.related.revealed .related-card {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.related-card__frame {
+  background: #fff;
+  padding: 8px;
+  border: $outline-width solid $outline;
+  border-radius: 4px;
+  box-shadow: 3px 3px 0 $outline;
+  overflow: hidden;
+  transform: rotate(var(--rotation, 0deg));
+  transition:
+    transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    box-shadow 0.35s ease,
+    border-color 0.35s ease;
+
+  :global(picture) { display: block; }
+
+  :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: 2px;
+    transition: transform 0.4s ease;
+  }
+}
+
+.related-card[data-orientation="portrait"] {
+  flex: 0 0 200px;
+}
+
+.related-card[data-orientation="portrait"] .related-card__frame :global(img) {
+  aspect-ratio: 3 / 4;
+}
+
+.related-card__title {
+  display: block;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: $dark;
+  padding: 0.5rem 0.25rem 0;
+  transition: color $transition-fast;
+}
+
+@media (hover: hover) {
+  .related-card:hover .related-card__frame {
+    transform: rotate(0deg) translateY(-6px);
+    box-shadow: 5px 7px 0 $outline;
+    border-color: $lavender;
+  }
+
+  .related-card:hover .related-card__frame :global(img) {
+    transform: scale(1.06);
+  }
+
+  .related-card:hover .related-card__title {
+    color: $lavender;
+  }
+}
+
+// ── Data-reveal animation trigger ─────────────────────
+[data-reveal] {
+  &.revealed {
+    // Class added by JS — child animations play on reveal
+  }
+}
+
+// ── Responsive: Tablet ────────────────────────────────
+@media (max-width: $breakpoint-lg) {
+  .info__title {
+    font-size: 2.2rem;
+  }
+
+  .related__title {
+    font-size: 1.6rem;
+  }
+
+  .detail__sparkle {
+    &--1 { width: 22px; }
+    &--2 { width: 18px; }
+    &--3 { width: 16px; }
+  }
+
+  .detail__circle {
+    &--1 { width: 150px; }
+    &--2 { width: 120px; }
+  }
+}
+
+// ── Responsive: Mobile ────────────────────────────────
+@media (max-width: $breakpoint-md) {
+  .detail {
+    padding: 0 1rem 3rem;
+  }
+
+  .detail__breadcrumb {
+    padding: 1rem 0 0.75rem;
+  }
+
+  .showcase__frame {
+    padding: 8px;
+    box-shadow: 3px 3px 0 $outline;
+
+    :global(img) {
+      max-height: calc(100vh - 180px);
+    }
+  }
+
+  .info__title {
+    font-size: 1.8rem;
+  }
+
+  .info__underline {
+    width: 130px;
+  }
+
+  .info__description {
+    font-size: 1rem;
+  }
+
+  .info__actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .action-btn {
+    width: 100%;
+    max-width: 280px;
+    text-align: center;
+  }
+
+  .related__track {
+    gap: 1rem;
+  }
+
+  .related-card {
+    flex: 0 0 220px;
+  }
+
+  .related-card[data-orientation="portrait"] {
+    flex: 0 0 170px;
+  }
+
+  .detail__sparkle {
+    &--1 { width: 18px; }
+    &--2 { width: 14px; }
+    &--3 { display: none; }
+  }
+
+  .detail__circle {
+    &--1 { width: 110px; }
+    &--2 { width: 90px; }
+  }
+}
+
+// ── Responsive: Small mobile ──────────────────────────
+@media (max-width: $breakpoint-sm) {
+  .info__title {
+    font-size: 1.5rem;
+  }
+
+  .info__underline {
+    width: 100px;
+  }
+
+  .related-card {
+    flex: 0 0 190px;
+  }
+
+  .related-card[data-orientation="portrait"] {
+    flex: 0 0 150px;
+  }
+}
+
+// ── Reduced motion ────────────────────────────────────
+@media (prefers-reduced-motion: reduce) {
+  .info__title,
+  .info__description,
+  .info__tags,
+  .info__actions {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .info__underline path,
+  .related__underline path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .showcase__frame {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .detail__sparkle {
+    animation: none;
+    opacity: 0.6;
+  }
+
+  .detail__circle {
+    animation: none;
+  }
+
+  .action-btn--primary {
+    animation: none;
+  }
+
+  .related-card {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .tech-details__chevron {
+    transition: none;
+  }
+}

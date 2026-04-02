@@ -84,17 +84,6 @@ const jsonLd = {
   </section>
 </BaseLayout>
 
-<style>
-  .collection-detail { max-width: 1400px; margin: 0 auto; padding: 1rem; }
-  .breadcrumb { margin-bottom: 1rem; }
-  .breadcrumb a { color: #666; text-decoration: none; }
-  .description { color: #444; line-height: 1.6; }
-  .count { color: #888; margin-bottom: 1.5rem; }
-  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
-  .photo-card { text-decoration: none; color: inherit; display: block; border-radius: 4px; overflow: hidden; }
-  .photo-card :global(picture) { display: block; }
-  .photo-card :global(img) { width: 100%; height: auto; display: block; }
-  .photo-title { display: block; padding: 0.5rem 0; font-size: 0.9rem; }
-  .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; padding: 1rem; }
-  .pagination a { text-decoration: none; color: #333; }
+<style lang="scss">
+  @use "../../../../styles/components/collection-detail";
 </style>

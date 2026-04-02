@@ -1,0 +1,272 @@
+@use "sass:color";
+@use "../variables" as *;
+
+.photo-strip {
+  padding: 2.5rem 0;
+  overflow: hidden;
+
+  &__label {
+    font-family: $font-heading;
+    font-size: 2rem;
+    color: $dark;
+    padding-left: 3rem;
+    margin-bottom: 1.5rem;
+
+    &::after {
+      content: "";
+      display: block;
+      width: 50px;
+      height: 4px;
+      background: var(--strip-accent, $peach);
+      border-radius: 2px;
+      margin-top: 0.3rem;
+    }
+  }
+
+  &__track {
+    display: flex;
+    align-items: center;
+    padding: 1rem 3rem 3rem;
+    gap: 0px;
+  }
+
+  &__card {
+    flex-shrink: 0;
+    width: 280px;
+    margin-right: -80px;
+    cursor: pointer;
+    will-change: transform;
+
+    // Reveal — uses translate + opacity (separate from JS-managed transform)
+    opacity: 0;
+    translate: 0 24px;
+
+    // Hover/spread — uses transform (managed by JS inline styles)
+    transition:
+      transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      z-index 0s;
+
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+
+  // Revealed: staggered card entrance
+  &--revealed &__card {
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity 0.5s ease calc(var(--card-index, 0) * 0.08s),
+      translate 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--card-index, 0) * 0.08s),
+      transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  &__frame {
+    background: #fff;
+    padding: 10px;
+    border: $outline-width solid $outline;
+    border-radius: 4px;
+    box-shadow: 3px 3px 0 $outline;
+    transform: rotate(var(--rotation, 0deg));
+    transition:
+      transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      box-shadow 0.35s ease,
+      border-color 0.35s ease;
+
+    picture {
+      display: block;
+      overflow: hidden;
+      border-radius: 2px;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+      border-radius: 2px;
+      transition: transform 0.4s ease;
+    }
+  }
+
+  &__card[data-orientation="portrait"] {
+    width: 220px;
+  }
+
+  &__card[data-orientation="portrait"] &__frame img {
+    aspect-ratio: 3 / 4;
+  }
+
+  &__info {
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    padding: 0.6rem 0.25rem 0;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  &__card:hover &__info,
+  &__card.is-active &__info {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  &__title {
+    display: block;
+    font-family: $font-body;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: $dark;
+    margin-bottom: 0.25rem;
+  }
+
+  &__shop-link {
+    display: inline-block;
+    font-family: $font-body;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: $white;
+    background: var(--strip-accent, $sage);
+    border: $outline-width solid $outline;
+    border-radius: 6px;
+    padding: 0.3rem 0.9rem;
+    box-shadow: 2px 2px 0 $outline;
+    text-decoration: none;
+    transition:
+      background $transition-fast,
+      transform $transition-fast,
+      box-shadow $transition-fast;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 3px 3px 0 $outline;
+    }
+  }
+
+  // ── Hover effects (desktop only) ────────
+  @media (hover: hover) {
+    &__card:hover &__frame,
+    &__card.is-active &__frame {
+      transform: rotate(0deg) translateY(-5px);
+      box-shadow: 5px 7px 0 $outline;
+      border-color: var(--strip-accent, $outline);
+    }
+
+    &__card:hover &__frame img,
+    &__card.is-active &__frame img {
+      transform: scale(1.04);
+    }
+  }
+}
+
+// ── Large desktop (1440+) ─────────────────
+@media (min-width: 1440px) {
+  .photo-strip {
+    &__label {
+      padding-left: 4rem;
+      font-size: 2.2rem;
+    }
+
+    &__track {
+      padding: 1rem 4rem 3.5rem;
+    }
+
+    &__card {
+      width: 320px;
+      margin-right: -90px;
+    }
+
+    &__card[data-orientation="portrait"] {
+      width: 260px;
+    }
+  }
+}
+
+// ── Mobile ────────────────────────────────
+@media (max-width: $breakpoint-md) {
+  .photo-strip {
+    padding: 1.5rem 0;
+
+    // Mobile: strip-level fade instead of card stagger
+    opacity: 0;
+    transition: opacity 0.5s ease;
+
+    &--revealed {
+      opacity: 1;
+    }
+
+    &__card {
+      opacity: 1;
+      translate: none;
+    }
+
+    &--revealed &__card {
+      transition:
+        transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    &__label {
+      padding-left: 1.25rem;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    &__track {
+      padding: 0.5rem 1.25rem 2rem;
+      gap: 1rem;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+
+      scrollbar-width: none;
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+
+    &__card {
+      width: 220px;
+      margin-right: 0;
+      scroll-snap-align: center;
+    }
+
+    &__card[data-orientation="portrait"] {
+      width: 180px;
+    }
+
+    &__frame {
+      transform: none;
+    }
+
+    &__info {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+  }
+}
+
+// ── Reduced motion ────────────────────────
+@media (prefers-reduced-motion: reduce) {
+  .photo-strip {
+    opacity: 1;
+  }
+
+  .photo-strip__card {
+    opacity: 1;
+    translate: none;
+  }
+
+  .photo-strip--revealed .photo-strip__card {
+    transition:
+      transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .photo-strip__frame {
+    transform: none;
+    transition-duration: 0.01ms;
+  }
+}

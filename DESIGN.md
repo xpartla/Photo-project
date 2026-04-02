@@ -20,31 +20,33 @@ The brand serves two audiences: dog owners looking for portrait sessions, and ar
 
 ## Color Palette
 
-### Primary Colors
-| Name     | Hex       | Usage                                       |
-|----------|-----------|---------------------------------------------|
-| Blue     | `#5A9CB5` | Primary action, links, CTA buttons, accents |
-| Yellow   | `#FACE68` | Highlights, active states, hover fills      |
-| Orange   | `#FAAC68` | Secondary accents, warnings, tags           |
-| Red      | `#FA6868` | Destructive actions, errors, sale badges    |
+### Primary Colors (Vintage Watercolor)
+| Name       | Variable      | Hex       | Usage                                          |
+|------------|---------------|-----------|-------------------------------------------------|
+| Sage       | `$sage`       | `#7EAA92` | Primary CTAs, login button, secondary accents   |
+| Peach      | `$peach`      | `#F2B880` | Highlights, active nav links, hover fills, hero |
+| Lavender   | `$lavender`   | `#B8A0C8` | Film section accent, tags, related photo links  |
+| Terracotta | `$terracotta` | `#D4896A` | Language switcher hover, collection links, EXIF |
+| Rose       | `$rose`       | `#D97B8F` | Close buttons, logout, destructive actions      |
 
 ### Neutral Colors
-| Name     | Hex       | Usage                                       |
-|----------|-----------|---------------------------------------------|
-| White    | `#FFF8F0` | Card backgrounds, navbar, dropdowns         |
-| Cream    | `#FFF3E0` | Page background, subtle fills               |
-| Dark     | `#2A2A2A` | Text, outlines, borders — the "ink" color   |
+| Name     | Variable  | Hex       | Usage                                       |
+|----------|-----------|-----------|---------------------------------------------|
+| White    | `$white`  | `#FFF8F0` | Card backgrounds, navbar, dropdowns         |
+| Cream    | `$cream`  | `#FFF3E0` | Page background, subtle fills               |
+| Dark     | `$dark`   | `#2A2A2A` | Text, outlines, borders — the "ink" color   |
 
 ### Extended Palette (derived)
-- **Blue light:** `lighten($blue, 25%)` — info banners, selected tags
-- **Yellow light:** `lighten($yellow, 15%)` — table row hover
-- **Red light:** `lighten($red, 20%)` — error field backgrounds
-- Use `darken()` by 8–12% for hover/pressed states on filled elements
+- **Peach light:** `rgba($peach, 0.15)` — subtle background tints, tag fills
+- **Lavender light:** `rgba($lavender, 0.15)` — tag pill backgrounds
+- **Terracotta light:** `rgba($terracotta, 0.08)` — collection link backgrounds
+- Use `color.adjust($color, $lightness: -8%)` for hover/pressed states on filled elements
 
 ### Color Rules
 - **Outlines are always `$dark` (`#2A2A2A`)**. Never use colored outlines — the dark ink look is non-negotiable.
-- **Text is always `$dark`** on light backgrounds. On `$blue` or `$dark` backgrounds, use `$white`.
+- **Text is always `$dark`** on light backgrounds. On `$sage` or `$dark` backgrounds, use `$white`.
 - **Background alternation:** Alternate between `$cream` and `$white` for page sections to create visual rhythm without hard dividers.
+- **Section accents:** Dog photography sections use `$peach`, film photography sections use `$lavender`.
 
 ---
 
@@ -159,9 +161,9 @@ Use `max-width` media queries (desktop-first):
 └─────────────────────┘
   ████████████████████   ← box-shadow offset
 ```
-- **Primary:** `$blue` fill, `$white` text, `$outline` border + shadow
-- **Secondary:** `$cream` fill, `$dark` text, `$outline` border + shadow
-- **Danger:** `$red` fill, `$white` text, `$outline` border + shadow
+- **Primary:** `$peach` fill, `$dark` text, `$outline` border + shadow
+- **Secondary:** `$sage` fill, `$white` text, `$outline` border + shadow
+- **Danger:** `$rose` fill, `$white` text, `$outline` border + shadow
 - **Ghost:** transparent fill, `$dark` text, `$outline` border, no shadow
 - **Hover:** Darken fill 8%, increase shadow offset +1px, `translateY(-1px)`
 - **Active/Pressed:** Remove shadow, `translateY(1px)` (button "pushes in")
@@ -196,13 +198,13 @@ Photos are the product — frame them deliberately:
 ### Form Inputs
 - 3px `$outline` border, 8px radius
 - `$white` background, `$cream` on focus
-- Focus state: border becomes `$blue`, subtle `box-shadow: 0 0 0 3px lighten($blue, 30%)`
-- Error state: border becomes `$red`, background `lighten($red, 25%)`
+- Focus state: border becomes `$sage`, subtle `box-shadow: 0 0 0 3px lighten($sage, 30%)`
+- Error state: border becomes `$rose`, background `lighten($rose, 25%)`
 
 ### Tags / Badges
 - Pill shape (large border-radius)
 - 2px `$outline` border
-- Fill with palette colors: `$yellow` for categories, `$orange` for tags, `$red` for sale/new
+- Fill with palette colors: `$peach` for categories, `$lavender` for tags, `$rose` for sale/new
 - Font: Nunito 700, 0.8rem, uppercase
 
 ---
@@ -258,7 +260,7 @@ $transition-slow: 400ms ease;   // Page-level transitions, hero entrance
 - Product cards show the photo in a **simulated frame/mat mockup** where possible
 - Size selector uses large, tactile radio buttons with outlines
 - Price displayed in Titan One — prices are a feature, not hidden
-- "Add to cart" uses the primary `$blue` button pattern
+- "Add to cart" uses the primary `$peach` button pattern
 
 ### Film / Analog Touches
 - **Grain overlay:** Optional subtle CSS noise texture on hero sections and page backgrounds (`background-image` with a tiny tiled noise PNG at low opacity)
@@ -291,17 +293,28 @@ $transition-slow: 400ms ease;   // Page-level transitions, hero entrance
 
 ```
 src/styles/
-├── _variables.scss     ← Tokens: colors, fonts, breakpoints, spacing
-├── _mixins.scss        ← Reusable mixins (outline-box, responsive, etc.)
-├── global.scss         ← Reset, base element styles, font imports
+├── _variables.scss          ← Tokens: colors, fonts, breakpoints, spacing
+├── global.scss              ← Reset, base element styles, font imports
+└── components/
+    ├── _navbar.scss          ← Navbar component styles
+    ├── _home-content.scss    ← Homepage hero, CTA banner
+    ├── _photo-strip.scss     ← Photo carousel strip
+    ├── _portfolio-split.scss ← Split gallery view + lightbox
+    ├── _photo-detail.scss    ← Photo detail page (shared EN/SK)
+    ├── _collection-detail.scss ← Collection gallery page
+    └── _layout.scss          ← Layout-level styles (footer)
 ```
 
-Component styles live in scoped `<style lang="scss">` blocks within `.astro` files, importing `_variables` and `_mixins` as needed:
-```scss
+Component styles live in external SCSS files under `src/styles/components/`. Astro files import them via scoped `<style>` blocks:
+```astro
 <style lang="scss">
-  @use "../styles/variables" as *;
-  @use "../styles/mixins" as *;
+  @use "../styles/components/navbar";
 </style>
+```
+
+Each component SCSS file imports `_variables` internally:
+```scss
+@use "../variables" as *;
 ```
 
 ### Key Mixins (to create)
