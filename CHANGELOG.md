@@ -229,3 +229,78 @@
 - Bilingual routing works (`/sk/portfolio`, `/en/portfolio`)
 - JSON-LD, OpenGraph, hreflang metadata present on all portfolio pages
 - Admin can manage photos, tags, and collections via API
+
+---
+
+## Epic 4: Sample Data & Test Infrastructure
+
+### Task 4.1 — Sample Image Seeding Script
+- Created `scripts/seed-images.sh` (bash + curl + jq)
+- Authenticates as the seeded admin user (`admin@dogphoto.sk` / `admin123`) and waits for `/health/ready`
+- Creates `dog` and `film` tags via `POST /api/portfolio/tags` (idempotent — treats HTTP 409 as success)
+- Uploads all 14 images from `img/` (1–7 as `dog-portrait-N`, 8–14 as `film-frame-N`) via `POST /api/image-pipeline/upload` with bilingual SK/EN titles, alt text and descriptions
+- Polls `GET /api/image-pipeline/photos/{id}/status` until each photo finishes background processing
+- Publishes each photo and assigns its tag via `PUT /api/portfolio/photos/{id}` with `isPublished:true`, `sortOrder` and `tagSlugs`
+- Creates two collections via `POST /api/portfolio/collections`:
+  - `dog-portraits` (Psie portréty / Dog Portraits) with the 7 dog photos
+  - `film-collection` (Filmová kolekcia / Film Collection) with the 7 film photos
+- Idempotent end-to-end: re-running the script detects existing tags, photos and collections (HTTP 409) and skips them
+- Configurable via `API_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `IMG_DIR` env vars
+
+### Task 4.2 — Backend Integration Test Harness
+- New project `src/backend/tests/DogPhoto.IntegrationTests` added to `DogPhoto.sln`
+- Packages: `Microsoft.AspNetCore.Mvc.Testing`, `Testcontainers.PostgreSql`, `Testcontainers.Azurite`, `xunit`
+- `Program.cs` made `partial` so `WebApplicationFactory<Program>` can resolve the entry point
+- `ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime` boots the API in-memory against ephemeral Postgres 17 + Azurite Testcontainers and overrides `ConnectionStrings:Default`, `Azure:BlobStorage:ConnectionString`, and `Jwt:*` via in-memory configuration
+- `ApiCollection` xUnit collection fixture shares the container set across the whole suite (containers spin up once per test run)
+- `ApiTestBase` provides `CreateClient()`, `CreateAdminClientAsync()` (logs in as the seeded admin) and `CreateCustomerClientAsync()` (registers a unique customer per call)
+- `SmokeTests` covers `/health/live`, `/health/ready`, admin login + `/api/auth/me`, public portfolio listing, and that `/api/image-pipeline/upload` rejects unauthenticated requests
+- Backend Dockerfile updated to copy the new test project for restore in the dev/build stages
+- Solution builds clean: 0 warnings, 0 errors
+
+### Task 4.3 — Frontend Test Infrastructure
+- Added devDependencies in `src/frontend/package.json`: `vitest@^2.1.0`, `@playwright/test@^1.48.0`, `@axe-core/playwright@^4.10.0`
+- New scripts: `test`, `test:unit`, `test:unit:watch`, `test:e2e`, `test:e2e:install`
+- `vitest.config.ts` — node environment, picks up `tests/unit/**/*.test.ts`
+- `playwright.config.ts` — targets `http://localhost:4321` (the docker compose stack), Chromium project, screenshot/trace on failure
+- Unit tests:
+  - `tests/unit/i18n.test.ts` — `t()` lookup + missing-key fallback, `getAlternateLang()`, bilingual portfolio collection route rewriting
+  - `tests/unit/imageUrl.test.ts` — `buildSrcset()` rewrites `azurite:10000` → `localhost:10000` and sorts widths ascending, `getFallbackUrl()` prefers 1200w jpeg, `getVariantUrl()` builds the expected path
+- E2E scaffolding:
+  - `tests/e2e/pages/BasePage.ts` — Page Object base with navbar/brand/lang-switch/login locators
+  - `tests/e2e/smoke.spec.ts` — verifies `/` redirects to `/sk`, `/sk` and `/en` render the navbar with the correct language switch label, and `/sk` has zero `critical` axe violations against `wcag2a` + `wcag2aa`
+
+### Task 4.4 — Local Test Runner (Makefile)
+- New root `Makefile` with targets:
+  - `up` / `down` / `logs` — wrap `docker compose`
+  - `seed` — runs `scripts/seed-images.sh`
+  - `build-backend` / `build-frontend` — build inside the compose containers
+  - `test-backend-unit` — runs `dotnet test` for `DogPhoto.ArchTests` inside the api container
+  - `test-backend-integration` — runs the new integration test project on the host (Testcontainers needs Docker socket access, which the api dev container does not mount)
+  - `test-frontend-unit` — runs Vitest inside the frontend container
+  - `test-e2e` — runs Playwright on the host against the running compose stack
+  - `playwright-install` — installs Playwright browser binaries on demand
+  - `test` — aggregates unit + arch + frontend unit (the host-only targets are documented for the user to run separately)
+- `make help` documents every target; targets that need a host toolchain (`dotnet`, `node`) print a clear error if the binary is missing
+
+### Task 4.5 — Test runner hardening (post-first-run fixes)
+After bringing the test runner up against the host toolchain, three issues had to be fixed before all four targets passed cleanly:
+
+- **Backend builds were creating root-owned `bin/`/`obj/`.** The original Makefile ran `dotnet build`/`test` inside the api container (which runs as root), so the bind-mounted `src/backend/` ended up with `root:root` files that subsequent host-side builds couldn't overwrite. Reworked the Makefile so `build-backend`, `test-backend-unit`, and `test-backend-integration` all run on the host (`dotnet` is required there anyway for Testcontainers). Added a `make fix-backend-perms` recovery target.
+- **Playwright install ran inside the alpine frontend container, which Playwright doesn't support.** Reworked `playwright-install` and `test-e2e` to run on the host instead. The new `playwright-install` target auto-runs `npm install` in `src/frontend/` if the host's `node_modules/` is missing, then runs `npx playwright install --with-deps chromium`. `test-e2e` checks for the host Playwright binary and tells the user to run `playwright-install` first if it's missing.
+- **`ApiFactory` config overrides were silently ignored.** `Program.cs` calls `services.AddInfrastructure(builder.Configuration)` at the top level, which reads `ConnectionStrings:Default` *eagerly* during service registration — before `WebApplicationFactory<T>.ConfigureWebHost` callbacks are applied. The result: tests against Testcontainers Postgres were actually trying to connect to `Host=db` from `appsettings.Development.json` (the docker-compose hostname, unresolvable from the host network), surfacing as a misleading `EAI_AGAIN` from `getaddrinfo`. Fixed by setting `ConnectionStrings__Default`, `Azure__BlobStorage__ConnectionString` and `Jwt__*` as **process environment variables** in `IAsyncLifetime.InitializeAsync` (immediately after the containers report their mapped ports). Env vars are read by `WebApplication.CreateBuilder()` before any user code runs, so they win over appsettings.
+- The Testcontainers connection strings are also rebuilt explicitly with `Host=127.0.0.1` and the mapped port (rather than relying on `_postgres.GetConnectionString()`/`_azurite.GetConnectionString()`), to bypass any IPv6/`localhost` ambiguity in the WSL2 + .NET 10 RC2 DNS path.
+- Caught a real WCAG 2.0 Level A bug as a bonus: `PhotoStrip.astro` rendered `alt={photo.altText || photo.title}` which produced an `<img>` with no `alt` attribute at all when both fields were null on legacy photo records. Every other portfolio component already used `… || ""` as a defensive empty-string fallback — PhotoStrip was the only inconsistency. Fixed in one line. The Playwright + axe smoke test caught this immediately on its first real run, exactly as designed.
+- Added `test-results/`, `playwright-report/`, `playwright/.cache/` to `src/frontend/.gitignore`.
+
+### Verification
+- `make test-backend-unit` — `Passed!  - Failed: 0, Passed: 4` in 67 ms
+- `make test-backend-integration` — `Passed!  - Failed: 0, Passed: 5` in 3 s (Testcontainers Postgres + Azurite spinning up per run)
+- `make test-frontend-unit` — `Test Files  2 passed (2)`, `Tests  12 passed (12)` in 507 ms (Vitest)
+- `make test-e2e` — `4 passed` in 3.4 s (Playwright + `@axe-core/playwright`, all four smoke specs including the WCAG scan)
+- Backend solution build: 0 warnings, 0 errors (including the new integration test project)
+- `scripts/seed-images.sh` end-to-end against the live compose stack:
+  - Uploaded all 14 images, generated 8 variants per image, applied bilingual metadata
+  - Created `dog-portraits` (7 photos) and `film-collection` (7 photos)
+  - Second invocation correctly detected and skipped existing tags / photos / collections
+- Verified via API: `GET /api/portfolio/photos?tag=dog` and `?tag=film&lang=en` each return all 7 seeded entries with bilingual titles

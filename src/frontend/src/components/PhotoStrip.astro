@@ -37,7 +37,7 @@ const rotations = [-1.5, 1, -0.5, 1.5, -1, 0.5, -2, 1.2];
               )}
               <img
                 src={fallbackUrl}
-                alt={photo.altText || photo.title}
+                alt={photo.altText || photo.title || ""}
                 width={photo.width}
                 height={photo.height}
                 loading="lazy"

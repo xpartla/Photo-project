@@ -86,3 +86,6 @@ app.MapPortfolioEndpoints();
 app.MapGet("/", () => "DogPhoto API");
 
 app.Run();
+
+// Exposed for WebApplicationFactory<Program> in integration tests.
+public partial class Program;
