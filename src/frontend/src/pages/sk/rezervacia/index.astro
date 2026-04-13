@@ -1,0 +1,283 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../components/SeoMeta.astro";
+import { getSessionTypes } from "../../../lib/api";
+import { t } from "../../../lib/i18n";
+import type { SessionType } from "../../../lib/api";
+
+const lang = "sk";
+
+let sessionTypes: SessionType[];
+try {
+  sessionTypes = await getSessionTypes(lang);
+} catch {
+  sessionTypes = [];
+}
+
+const pageTitle = `${t(lang, "booking.title")} — PartlPhoto`;
+const pageDescription = t(lang, "booking.description");
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: "PartlPhoto",
+    description: pageDescription,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: "Bratislava",
+      addressCountry: "SK",
+    },
+    priceRange: "€€",
+  },
+  ...sessionTypes.map((st) => ({
+    "@context": "https://schema.org",
+    "@type": "Service",
+    name: st.name,
+    description: st.description,
+    provider: { "@type": "LocalBusiness", name: "PartlPhoto" },
+    offers: {
+      "@type": "Offer",
+      price: st.basePrice,
+      priceCurrency: st.currency,
+    },
+  })),
+];
+
+const categoryKeys: Record<string, string> = {
+  portrait: "booking.category.portrait",
+  action: "booking.category.action",
+  studio: "booking.category.studio",
+  outdoor: "booking.category.outdoor",
+};
+---
+
+<BaseLayout title={pageTitle} description={pageDescription} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={pageDescription}
+    lang={lang}
+    path="/sk/rezervacia"
+    jsonLd={jsonLd}
+  />
+
+  <div class="booking-hero">
+    <h1 class="booking-hero__title">{t(lang, "booking.title")}</h1>
+    <p class="booking-hero__subtitle">{t(lang, "booking.subtitle")}</p>
+  </div>
+
+  <div class="session-grid">
+    {sessionTypes.map((st) => (
+      <div class="session-card">
+        {st.category && (
+          <span class="session-card__category">
+            {t(lang, categoryKeys[st.category] || `booking.category.${st.category}`)}
+          </span>
+        )}
+        <h2 class="session-card__name">{st.name}</h2>
+        <p class="session-card__description">{st.description}</p>
+        <div class="session-card__meta">
+          <span class="session-card__meta-item">
+            {t(lang, "booking.duration")}: {st.durationMinutes} {t(lang, "booking.minutes")}
+          </span>
+          <span class="session-card__meta-item">
+            {t(lang, "booking.maxDogs")}: {st.maxDogs}
+          </span>
+        </div>
+        <div class="session-card__price">
+          {st.basePrice} {st.currency}
+        </div>
+        {st.includes && st.includes.length > 0 && (
+          <ul class="session-card__includes">
+            {st.includes.map((item) => (
+              <li>{item}</li>
+            ))}
+          </ul>
+        )}
+        <button type="button" class="session-card__cta" data-open-modal={st.slug}>
+          {t(lang, "booking.selectSession")}
+        </button>
+      </div>
+    ))}
+  </div>
+
+  <!-- Session detail modals -->
+  {sessionTypes.map((st) => (
+    <div class="session-modal-overlay" id={`modal-${st.slug}`} data-modal>
+      <div class="session-modal" role="dialog" aria-labelledby={`modal-title-${st.slug}`}>
+        <button type="button" class="session-modal__close" data-close-modal aria-label={t(lang, "portfolio.close")}>&times;</button>
+
+        {st.category && (
+          <span class="session-modal__category">
+            {t(lang, categoryKeys[st.category] || `booking.category.${st.category}`)}
+          </span>
+        )}
+        <h2 class="session-modal__title" id={`modal-title-${st.slug}`}>{st.name}</h2>
+
+        <div class="session-modal__meta">
+          <span>{t(lang, "booking.duration")}: {st.durationMinutes} {t(lang, "booking.minutes")}</span>
+          <span>{t(lang, "booking.maxDogs")}: {st.maxDogs}</span>
+          <span class="session-modal__price">{st.basePrice} {st.currency}</span>
+        </div>
+
+        {st.description && (
+          <p class="session-modal__description">{st.description}</p>
+        )}
+
+        {st.includes && st.includes.length > 0 && (
+          <>
+            <h3 class="session-modal__section-title">{t(lang, "booking.detail.whatIncluded")}</h3>
+            <ul class="session-modal__includes">
+              {st.includes.map((item) => (
+                <li>{item}</li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        <a href={`/sk/rezervacia/kalendar?session=${st.slug}`} class="session-modal__cta">
+          {t(lang, "booking.bookThisSession")}
+        </a>
+
+        <h3 class="session-modal__section-title">{t(lang, "booking.detail.faq")}</h3>
+        <div class="booking-faq">
+          <details class="booking-faq__item">
+            <summary>{t(lang, "booking.detail.faq.howLong")}</summary>
+            <p>{t(lang, "booking.detail.faq.howLongAnswer")}</p>
+          </details>
+          <details class="booking-faq__item">
+            <summary>{t(lang, "booking.detail.faq.howMany")}</summary>
+            <p>{t(lang, "booking.detail.faq.howManyAnswer")}</p>
+          </details>
+          <details class="booking-faq__item">
+            <summary>{t(lang, "booking.detail.faq.where")}</summary>
+            <p>{t(lang, "booking.detail.faq.whereAnswer")}</p>
+          </details>
+        </div>
+      </div>
+    </div>
+  ))}
+
+  <!-- How it works -->
+  <section class="how-it-works">
+    <h2 class="how-it-works__title">{t(lang, "booking.howItWorks.title")}</h2>
+    <div class="how-it-works__steps">
+      <div class="how-it-works__step">
+        <div class="how-it-works__number">1</div>
+        <h3 class="how-it-works__step-title">{t(lang, "booking.howItWorks.step1.title")}</h3>
+        <p class="how-it-works__step-text">{t(lang, "booking.howItWorks.step1.text")}</p>
+      </div>
+      <div class="how-it-works__step">
+        <div class="how-it-works__number">2</div>
+        <h3 class="how-it-works__step-title">{t(lang, "booking.howItWorks.step2.title")}</h3>
+        <p class="how-it-works__step-text">{t(lang, "booking.howItWorks.step2.text")}</p>
+      </div>
+      <div class="how-it-works__step">
+        <div class="how-it-works__number">3</div>
+        <h3 class="how-it-works__step-title">{t(lang, "booking.howItWorks.step3.title")}</h3>
+        <p class="how-it-works__step-text">{t(lang, "booking.howItWorks.step3.text")}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Trust signals -->
+  <div class="trust-strip">
+    <div class="trust-strip__item">
+      <span class="trust-strip__number">{t(lang, "booking.trust.sessions")}</span>
+      <span class="trust-strip__label">{t(lang, "booking.trust.sessionsLabel")}</span>
+    </div>
+    <div class="trust-strip__item">
+      <span class="trust-strip__number">{t(lang, "booking.trust.experience")}</span>
+      <span class="trust-strip__label">{t(lang, "booking.trust.experienceLabel")}</span>
+    </div>
+    <div class="trust-strip__item">
+      <span class="trust-strip__number">{t(lang, "booking.trust.photos")}</span>
+      <span class="trust-strip__label">{t(lang, "booking.trust.photosLabel")}</span>
+    </div>
+  </div>
+
+  <!-- Testimonials -->
+  <section class="testimonials">
+    <h2 class="testimonials__title">{t(lang, "booking.testimonials.title")}</h2>
+    <div class="testimonials__grid">
+      {[1, 2, 3].map((i) => (
+        <div class="testimonials__card">
+          <p class="testimonials__quote">{t(lang, `booking.testimonials.${i}.text`)}</p>
+          <p class="testimonials__author">{t(lang, `booking.testimonials.${i}.author`)}</p>
+          <p class="testimonials__dog">{t(lang, `booking.testimonials.${i}.dog`)}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- About the photographer -->
+  <section class="about-photographer">
+    <h2 class="about-photographer__title">{t(lang, "booking.about.title")}</h2>
+    <p class="about-photographer__text">{t(lang, "booking.about.text")}</p>
+  </section>
+
+  <!-- Bottom CTA -->
+  <div class="booking-cta-banner">
+    <h2 class="booking-cta-banner__title">{t(lang, "booking.cta.title")}</h2>
+    <p class="booking-cta-banner__text">{t(lang, "booking.cta.text")}</p>
+    <a href="/sk/rezervacia/kalendar" class="booking-cta-banner__button">
+      {t(lang, "booking.cta.button")}
+    </a>
+  </div>
+</BaseLayout>
+
+<script>
+  function initModals() {
+    // Open modal
+    document.querySelectorAll<HTMLElement>("[data-open-modal]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const slug = btn.dataset.openModal;
+        const overlay = document.getElementById(`modal-${slug}`);
+        if (overlay) {
+          overlay.classList.add("session-modal-overlay--open");
+          document.body.style.overflow = "hidden";
+        }
+      });
+    });
+
+    // Close via X button
+    document.querySelectorAll<HTMLElement>("[data-close-modal]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const overlay = btn.closest("[data-modal]") as HTMLElement | null;
+        if (overlay) {
+          overlay.classList.remove("session-modal-overlay--open");
+          document.body.style.overflow = "";
+        }
+      });
+    });
+
+    // Close via backdrop click
+    document.querySelectorAll<HTMLElement>("[data-modal]").forEach((overlay) => {
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) {
+          overlay.classList.remove("session-modal-overlay--open");
+          document.body.style.overflow = "";
+        }
+      });
+    });
+
+    // Close via Escape key
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        document.querySelectorAll<HTMLElement>(".session-modal-overlay--open").forEach((overlay) => {
+          overlay.classList.remove("session-modal-overlay--open");
+          document.body.style.overflow = "";
+        });
+      }
+    });
+  }
+
+  // Run on initial load and after Astro SPA navigations
+  initModals();
+  document.addEventListener("astro:after-swap", initModals);
+</script>
+
+<style lang="scss">
+  @use "../../../styles/components/booking";
+</style>

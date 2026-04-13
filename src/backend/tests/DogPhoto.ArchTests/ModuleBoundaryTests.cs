@@ -42,6 +42,20 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
+    public void BookingModule_ShouldNotDependOn_EShopOrBlog()
+    {
+        var result = Types.InAssembly(typeof(Infrastructure.DependencyInjection).Assembly)
+            .That()
+            .ResideInNamespaceContaining("Booking")
+            .ShouldNot()
+            .HaveDependencyOnAny("DogPhoto.Infrastructure.Persistence.EShop", "DogPhoto.Infrastructure.Persistence.Blog")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            "Booking module must not directly reference EShop or Blog.");
+    }
+
+    [Fact]
     public void Infrastructure_ShouldDependOn_SharedKernel()
     {
         // Verify that CurrentUser implements ICurrentUser from SharedKernel

@@ -1,0 +1,85 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../../components/SeoMeta.astro";
+import { t } from "../../../../lib/i18n";
+import type { BookingDetail } from "../../../../lib/api";
+
+const lang = "en";
+const { id } = Astro.params;
+
+const apiBase = import.meta.env.PUBLIC_API_URL || "http://localhost:5000";
+
+let booking: BookingDetail | null = null;
+try {
+  const res = await fetch(`${apiBase}/api/booking/bookings/${id}`);
+  if (res.ok) {
+    booking = await res.json();
+  }
+} catch {
+  // Booking not found or not accessible
+}
+
+const pageTitle = `${t(lang, "booking.confirmation.title")} — PartlPhoto`;
+
+const statusKeys: Record<string, string> = {
+  Pending: "booking.status.pending",
+  Confirmed: "booking.status.confirmed",
+  Cancelled: "booking.status.cancelled",
+};
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={t(lang, "booking.confirmation.message")}
+    lang={lang}
+    path={`/en/booking/confirmation/${id}`}
+  />
+
+  <div class="booking-confirmation">
+    <div class="booking-confirmation__card">
+      <div class="booking-confirmation__icon">&#10003;</div>
+      <h1 class="booking-confirmation__title">{t(lang, "booking.confirmation.title")}</h1>
+      <p class="booking-confirmation__message">{t(lang, "booking.confirmation.message")}</p>
+
+      {booking ? (
+        <>
+          <dl class="booking-confirmation__summary">
+            <dt>{t(lang, "booking.calendar.sessionType")}</dt>
+            <dd>{booking.sessionType.name}</dd>
+
+            {booking.slot && (
+              <>
+                <dt>{t(lang, "booking.duration")}</dt>
+                <dd>{booking.slot.date} &middot; {booking.slot.startTime} - {booking.slot.endTime}</dd>
+              </>
+            )}
+
+            <dt>{t(lang, "booking.form.name")}</dt>
+            <dd>{booking.clientName}</dd>
+
+            <dt>{t(lang, "booking.confirmation.emailSent")}</dt>
+            <dd>{booking.clientEmail}</dd>
+
+            <dt>{t(lang, "booking.price")}</dt>
+            <dd>{booking.totalPrice} EUR</dd>
+          </dl>
+
+          <span class="booking-confirmation__status">
+            {t(lang, statusKeys[booking.status] || "booking.status.pending")}
+          </span>
+        </>
+      ) : (
+        <p class="booking-confirmation__message">{t(lang, "booking.confirmation.emailSent")}</p>
+      )}
+
+      <br /><br />
+      <a href="/en" class="booking-confirmation__back">{t(lang, "booking.confirmation.backHome")}</a>
+    </div>
+  </div>
+</BaseLayout>
+
+<style lang="scss">
+  @use "../../../../styles/components/booking";
+</style>

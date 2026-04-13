@@ -1,0 +1,407 @@
+@use "../variables" as *;
+
+// ── Calendar page layout ──────────────────────────────────────────
+
+.booking-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+
+  &__title {
+    font-family: $font-heading;
+    font-size: 2.25rem;
+    margin: 0 0 8px;
+    color: $dark;
+    text-align: center;
+  }
+
+  &__subtitle {
+    font-family: $font-body;
+    font-size: 1.05rem;
+    color: $dark;
+    opacity: 0.8;
+    margin: 0 0 32px;
+    text-align: center;
+  }
+}
+
+// ── Session type selector ─────────────────────────────────────────
+
+.session-select {
+  margin-bottom: 24px;
+
+  &__label {
+    display: block;
+    font-family: $font-body;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $dark;
+    margin-bottom: 8px;
+  }
+
+  &__input {
+    width: 100%;
+    font-family: $font-body;
+    font-size: 0.95rem;
+    padding: 10px 16px;
+    background: $white;
+    color: $dark;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%232A2A2A' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+
+    &:focus {
+      outline: none;
+      border-color: $sage;
+      box-shadow: 0 0 0 3px rgba($sage, 0.2);
+    }
+  }
+}
+
+// ── Calendar grid ─────────────────────────────────────────────────
+
+.calendar {
+  background: $white;
+  border: $outline-width solid $outline;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 $outline;
+  overflow: hidden;
+  margin-bottom: 24px;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: $cream;
+    border-bottom: $outline-width solid $outline;
+  }
+
+  &__month {
+    font-family: $font-heading;
+    font-size: 1.15rem;
+    color: $dark;
+  }
+
+  &__nav {
+    background: $white;
+    border: 2px solid $outline;
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    color: $dark;
+    transition: transform $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 2px 2px 0 $outline;
+    }
+
+    &:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    &:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+
+      &:hover {
+        transform: none;
+        box-shadow: none;
+      }
+    }
+  }
+
+  &__weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-bottom: 2px solid rgba($dark, 0.1);
+  }
+
+  &__weekday {
+    font-family: $font-body;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+    padding: 10px 0;
+    color: $dark;
+    opacity: 0.5;
+  }
+
+  &__days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    padding: 8px;
+    gap: 4px;
+  }
+
+  &__day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: $font-body;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: default;
+    color: $dark;
+    transition: background $transition-fast, transform $transition-fast;
+
+    &--empty {
+      // Placeholder cell for grid alignment
+    }
+
+    &--unavailable {
+      opacity: 0.3;
+    }
+
+    &--available {
+      background: rgba($sage, 0.15);
+      cursor: pointer;
+
+      &:hover {
+        background: rgba($sage, 0.3);
+        transform: scale(1.05);
+      }
+    }
+
+    &--selected {
+      background: $sage;
+      color: $white;
+      cursor: pointer;
+
+      &:hover {
+        background: darken($sage, 5%);
+      }
+    }
+
+    &--past {
+      opacity: 0.2;
+    }
+
+    &--today {
+      font-weight: 800;
+      box-shadow: inset 0 0 0 2px $peach;
+    }
+  }
+
+  &__hint {
+    font-family: $font-body;
+    font-size: 0.85rem;
+    color: $dark;
+    opacity: 0.6;
+    text-align: center;
+    padding: 16px;
+  }
+}
+
+// ── Slot picker ───────────────────────────────────────────────────
+
+.slot-picker {
+  margin-bottom: 24px;
+
+  &__title {
+    font-family: $font-body;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $dark;
+    margin-bottom: 12px;
+  }
+
+  &__date {
+    font-family: $font-heading;
+    font-size: 1rem;
+    color: $dark;
+    margin-bottom: 12px;
+  }
+
+  &__slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  &__slot {
+    font-family: $font-body;
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 8px 16px;
+    border: 2px solid $outline;
+    border-radius: 20px;
+    background: $white;
+    color: $dark;
+    cursor: pointer;
+    transition: background $transition-fast, transform $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+      background: rgba($peach, 0.15);
+      transform: translateY(-1px);
+      box-shadow: 2px 2px 0 $outline;
+    }
+
+    &:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    &--selected {
+      background: $peach;
+      box-shadow: 2px 2px 0 $outline;
+    }
+
+    &--booked,
+    &--blocked {
+      opacity: 0.3;
+      cursor: not-allowed;
+      text-decoration: line-through;
+
+      &:hover {
+        background: $white;
+        transform: none;
+        box-shadow: none;
+      }
+    }
+  }
+
+  &__empty {
+    font-family: $font-body;
+    font-size: 0.9rem;
+    color: $dark;
+    opacity: 0.6;
+    padding: 12px 0;
+  }
+}
+
+// ── Booking form ──────────────────────────────────────────────────
+
+.booking-form {
+  background: $white;
+  border: $outline-width solid $outline;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 $outline;
+  padding: 28px 24px;
+
+  &__title {
+    font-family: $font-heading;
+    font-size: 1.15rem;
+    margin: 0 0 20px;
+    color: $dark;
+  }
+
+  &__group {
+    margin-bottom: 16px;
+  }
+
+  &__label {
+    display: block;
+    font-family: $font-body;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: $dark;
+    margin-bottom: 6px;
+  }
+
+  &__input,
+  &__select,
+  &__textarea {
+    width: 100%;
+    font-family: $font-body;
+    font-size: 0.95rem;
+    padding: 10px 14px;
+    background: $white;
+    color: $dark;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: $sage;
+      box-shadow: 0 0 0 3px rgba($sage, 0.2);
+    }
+
+    &--error {
+      border-color: $rose;
+      background: rgba($rose, 0.05);
+    }
+  }
+
+  &__textarea {
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  &__error {
+    font-family: $font-body;
+    font-size: 0.8rem;
+    color: $rose;
+    margin-top: 4px;
+  }
+
+  &__submit {
+    width: 100%;
+    font-family: $font-body;
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 14px 24px;
+    background: $sage;
+    color: $white;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    box-shadow: 3px 3px 0 $outline;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: transform $transition-fast, box-shadow $transition-fast, background $transition-fast;
+
+    &:hover {
+      background: darken($sage, 8%);
+      transform: translateY(-1px);
+      box-shadow: 4px 4px 0 $outline;
+    }
+
+    &:active {
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+
+      &:hover {
+        transform: none;
+        box-shadow: 3px 3px 0 $outline;
+      }
+    }
+  }
+
+  &__api-error {
+    font-family: $font-body;
+    font-size: 0.9rem;
+    color: $rose;
+    background: rgba($rose, 0.08);
+    border: 2px solid $rose;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+  }
+}

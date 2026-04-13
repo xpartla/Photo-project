@@ -87,6 +87,72 @@ export interface CollectionDetail {
   photos: PaginatedResult<PhotoSummary>;
 }
 
+// ── Booking types ─────────────────────────────────────────────────
+
+export interface SessionType {
+  id: string;
+  slug: string;
+  name: string;
+  nameSk: string;
+  nameEn: string;
+  description?: string;
+  descriptionSk?: string;
+  descriptionEn?: string;
+  durationMinutes: number;
+  basePrice: number;
+  currency: string;
+  category?: string;
+  includes?: string[];
+  maxDogs: number;
+  isActive: boolean;
+}
+
+export interface AvailabilitySlot {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  isBlocked: boolean;
+  isBooked: boolean;
+  isPast: boolean;
+}
+
+export interface BookingConfirmation {
+  id: string;
+  status: string;
+  sessionType: { id: string; name: string; slug: string };
+  slot?: { date: string; startTime: string; endTime: string };
+  clientName: string;
+  clientEmail: string;
+  totalPrice: number;
+  currency: string;
+}
+
+export interface CreateBookingRequest {
+  sessionTypeId: string;
+  slotId?: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone?: string;
+  dogCount: number;
+  specialRequests?: string;
+}
+
+export interface BookingDetail {
+  id: string;
+  status: string;
+  sessionType: { id: string; name: string; slug: string };
+  slot?: { date: string; startTime: string; endTime: string };
+  clientName: string;
+  clientEmail: string;
+  clientPhone?: string;
+  dogCount: number;
+  specialRequests?: string;
+  totalPrice: number;
+  depositPaid: boolean;
+  createdAt: string;
+}
+
 // ── Portfolio API ──────────────────────────────────────────────────
 
 export async function getPhotos(params?: {
@@ -126,4 +192,37 @@ export async function getCollection(
   if (params?.size) qs.set("size", String(params.size));
   const query = qs.toString();
   return fetchApi(`/api/portfolio/collections/${slug}${query ? `?${query}` : ""}`);
+}
+
+// ── Booking API ───────────────────────────────────────────────────
+
+export async function getSessionTypes(lang?: string): Promise<SessionType[]> {
+  const qs = lang ? `?lang=${lang}` : "";
+  return fetchApi(`/api/booking/session-types${qs}`);
+}
+
+export async function getSessionType(slug: string, lang?: string): Promise<SessionType> {
+  const qs = lang ? `?lang=${lang}` : "";
+  return fetchApi(`/api/booking/session-types/${slug}${qs}`);
+}
+
+export async function getAvailability(month: number, year: number): Promise<AvailabilitySlot[]> {
+  return fetchApi(`/api/booking/availability?month=${month}&year=${year}`);
+}
+
+export async function createBooking(data: CreateBookingRequest): Promise<BookingConfirmation> {
+  const res = await fetch(`${API_BASE}/api/booking/bookings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Booking failed: ${res.status}`);
+  }
+  return res.json() as Promise<BookingConfirmation>;
+}
+
+export async function getBooking(id: string): Promise<BookingDetail> {
+  return fetchApi(`/api/booking/bookings/${id}`);
 }

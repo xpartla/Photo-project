@@ -1,6 +1,7 @@
 using System.Text;
 using DogPhoto.Infrastructure.Auth;
 using DogPhoto.Infrastructure.BlobStorage;
+using DogPhoto.Infrastructure.Email;
 using DogPhoto.Infrastructure.ImagePipeline;
 using DogPhoto.Infrastructure.Persistence.Blog;
 using DogPhoto.Infrastructure.Persistence.Booking;
@@ -8,6 +9,7 @@ using DogPhoto.Infrastructure.Persistence.EShop;
 using DogPhoto.Infrastructure.Persistence.Identity;
 using DogPhoto.Infrastructure.Persistence.Portfolio;
 using DogPhoto.SharedKernel.Auth;
+using DogPhoto.SharedKernel.Email;
 using DogPhoto.SharedKernel.Events;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -75,6 +77,10 @@ public static class DependencyInjection
 
         // Blob storage
         services.AddSingleton<IBlobStorageService, BlobStorageService>();
+
+        // Email
+        services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
+        services.AddScoped<IEmailService, SmtpEmailService>();
 
         // Image pipeline
         services.AddScoped<IImageProcessor, ImageProcessor>();
@@ -164,19 +170,20 @@ public static class DependencyInjection
                     MaxDogs = 3,
                     IncludesJson = """["15 edited photos", "online gallery", "print rights"]"""
                 },
-                new SessionType
-                {
-                    NameSk = "Štúdiové fotenie",
-                    NameEn = "Studio Session",
-                    Slug = "studio-session",
-                    DescriptionSk = "Fotenie v profesionálnom štúdiu s rôznymi pozadiami.",
-                    DescriptionEn = "Photography in professional studio with various backdrops.",
-                    DurationMinutes = 45,
-                    BasePrice = 100,
-                    Category = "studio",
-                    MaxDogs = 1,
-                    IncludesJson = """["8 edited photos", "online gallery", "print rights"]"""
-                },
+                // Studio session — temporarily disabled
+                // new SessionType
+                // {
+                //     NameSk = "Štúdiové fotenie",
+                //     NameEn = "Studio Session",
+                //     Slug = "studio-session",
+                //     DescriptionSk = "Fotenie v profesionálnom štúdiu s rôznymi pozadiami.",
+                //     DescriptionEn = "Photography in professional studio with various backdrops.",
+                //     DurationMinutes = 45,
+                //     BasePrice = 100,
+                //     Category = "studio",
+                //     MaxDogs = 1,
+                //     IncludesJson = """["8 edited photos", "online gallery", "print rights"]"""
+                // },
                 new SessionType
                 {
                     NameSk = "Exteriérové fotenie",

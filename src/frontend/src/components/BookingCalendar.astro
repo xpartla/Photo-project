@@ -1,0 +1,411 @@
+---
+import type { SessionType, AvailabilitySlot } from "../lib/api";
+
+interface Props {
+  lang: string;
+  sessionTypes: SessionType[];
+  initialSlots: AvailabilitySlot[];
+  initialMonth: number;
+  initialYear: number;
+  preselectedSession?: string;
+  apiBase: string;
+  confirmPath: string;
+  translations: Record<string, string>;
+}
+
+const {
+  lang,
+  sessionTypes,
+  initialSlots,
+  initialMonth,
+  initialYear,
+  preselectedSession,
+  apiBase,
+  confirmPath,
+  translations,
+} = Astro.props;
+
+const weekdays = lang === "sk"
+  ? ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"]
+  : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const monthNames = lang === "sk"
+  ? ["Január", "Február", "Marec", "Apríl", "Máj", "Jún", "Júl", "August", "September", "Október", "November", "December"]
+  : ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+---
+
+<div
+  id="booking-calendar"
+  data-session-types={JSON.stringify(sessionTypes)}
+  data-initial-slots={JSON.stringify(initialSlots)}
+  data-month={initialMonth}
+  data-year={initialYear}
+  data-preselected={preselectedSession || ""}
+  data-api-base={apiBase}
+  data-confirm-path={confirmPath}
+  data-weekdays={JSON.stringify(weekdays)}
+  data-month-names={JSON.stringify(monthNames)}
+  data-translations={JSON.stringify(translations)}
+>
+  <!-- Session type selector -->
+  <div class="session-select">
+    <label class="session-select__label" for="session-type-select">
+      {translations["booking.calendar.sessionType"]}
+    </label>
+    <select id="session-type-select" class="session-select__input">
+      {sessionTypes.map((st) => (
+        <option value={st.id} selected={st.slug === preselectedSession} data-slug={st.slug} data-max-dogs={st.maxDogs}>
+          {st.name} — {st.basePrice} {st.currency} ({st.durationMinutes} min)
+        </option>
+      ))}
+    </select>
+  </div>
+
+  <!-- Calendar -->
+  <div class="calendar">
+    <div class="calendar__header">
+      <button type="button" class="calendar__nav" id="cal-prev" aria-label={translations["booking.calendar.prev"]}>&larr;</button>
+      <span class="calendar__month" id="cal-month-label">{monthNames[initialMonth - 1]} {initialYear}</span>
+      <button type="button" class="calendar__nav" id="cal-next" aria-label={translations["booking.calendar.next"]}>&rarr;</button>
+    </div>
+    <div class="calendar__weekdays">
+      {weekdays.map((day) => (
+        <span class="calendar__weekday">{day}</span>
+      ))}
+    </div>
+    <div class="calendar__days" id="cal-days"></div>
+    <p class="calendar__hint" id="cal-hint">{translations["booking.calendar.selectDay"]}</p>
+  </div>
+
+  <!-- Slot picker -->
+  <div id="slot-picker" class="slot-picker" style="display:none;">
+    <span class="slot-picker__title">{translations["booking.calendar.availableSlots"]}</span>
+    <div class="slot-picker__date" id="slot-date"></div>
+    <div class="slot-picker__slots" id="slot-list"></div>
+  </div>
+
+  <!-- Booking form -->
+  <div id="booking-form-container" style="display:none;">
+    <form id="booking-form" class="booking-form" novalidate>
+      <h3 class="booking-form__title">{translations["booking.form.title"]}</h3>
+      <div id="form-api-error" class="booking-form__api-error" style="display:none;"></div>
+
+      <div class="booking-form__group">
+        <label class="booking-form__label" for="field-name">{translations["booking.form.name"]} *</label>
+        <input type="text" id="field-name" name="clientName" class="booking-form__input" required />
+        <div class="booking-form__error" id="error-name"></div>
+      </div>
+
+      <div class="booking-form__group">
+        <label class="booking-form__label" for="field-email">{translations["booking.form.email"]} *</label>
+        <input type="email" id="field-email" name="clientEmail" class="booking-form__input" required />
+        <div class="booking-form__error" id="error-email"></div>
+      </div>
+
+      <div class="booking-form__group">
+        <label class="booking-form__label" for="field-phone">{translations["booking.form.phone"]}</label>
+        <input type="tel" id="field-phone" name="clientPhone" class="booking-form__input" />
+      </div>
+
+      <div class="booking-form__group">
+        <label class="booking-form__label" for="field-dogs">{translations["booking.form.dogCount"]}</label>
+        <input type="number" id="field-dogs" name="dogCount" class="booking-form__input" min="1" max="3" value="1" />
+      </div>
+
+      <div class="booking-form__group">
+        <label class="booking-form__label" for="field-requests">{translations["booking.form.specialRequests"]}</label>
+        <textarea id="field-requests" name="specialRequests" class="booking-form__textarea" rows="3"
+          placeholder={translations["booking.form.specialRequestsPlaceholder"]}></textarea>
+      </div>
+
+      <input type="hidden" id="field-session-type-id" name="sessionTypeId" />
+      <input type="hidden" id="field-slot-id" name="slotId" />
+
+      <button type="submit" class="booking-form__submit" id="submit-btn">
+        {translations["booking.form.submit"]}
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const root = document.getElementById("booking-calendar");
+    if (!root) return;
+
+    // Parse data attributes
+    const sessionTypes = JSON.parse(root.dataset.sessionTypes || "[]");
+    let slots: any[] = JSON.parse(root.dataset.initialSlots || "[]");
+    let currentMonth = parseInt(root.dataset.month || "1", 10);
+    let currentYear = parseInt(root.dataset.year || "2026", 10);
+    const apiBase = root.dataset.apiBase || "";
+    const confirmPath = root.dataset.confirmPath || "";
+    const weekdays = JSON.parse(root.dataset.weekdays || "[]");
+    const monthNames = JSON.parse(root.dataset.monthNames || "[]");
+    const tr = JSON.parse(root.dataset.translations || "{}");
+
+    let selectedDay: string | null = null;
+    let selectedSlotId: string | null = null;
+
+    const sessionSelect = document.getElementById("session-type-select") as HTMLSelectElement;
+    const calDays = document.getElementById("cal-days")!;
+    const calMonthLabel = document.getElementById("cal-month-label")!;
+    const calHint = document.getElementById("cal-hint")!;
+    const calPrev = document.getElementById("cal-prev") as HTMLButtonElement;
+    const calNext = document.getElementById("cal-next") as HTMLButtonElement;
+    const slotPicker = document.getElementById("slot-picker")!;
+    const slotDate = document.getElementById("slot-date")!;
+    const slotList = document.getElementById("slot-list")!;
+    const formContainer = document.getElementById("booking-form-container")!;
+    const bookingForm = document.getElementById("booking-form") as HTMLFormElement;
+    const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+    const formApiError = document.getElementById("form-api-error")!;
+    const fieldSessionTypeId = document.getElementById("field-session-type-id") as HTMLInputElement;
+    const fieldSlotId = document.getElementById("field-slot-id") as HTMLInputElement;
+    const fieldDogs = document.getElementById("field-dogs") as HTMLInputElement;
+
+    // Update max dogs when session type changes
+    sessionSelect.addEventListener("change", () => {
+      const opt = sessionSelect.selectedOptions[0];
+      const maxDogs = parseInt(opt?.dataset.maxDogs || "3", 10);
+      fieldDogs.max = String(maxDogs);
+      if (parseInt(fieldDogs.value, 10) > maxDogs) fieldDogs.value = String(maxDogs);
+    });
+
+    // Initialize max dogs
+    const initOpt = sessionSelect.selectedOptions[0];
+    if (initOpt?.dataset.maxDogs) {
+      fieldDogs.max = initOpt.dataset.maxDogs;
+    }
+
+    // Calendar rendering
+    function renderCalendar() {
+      calMonthLabel.textContent = `${monthNames[currentMonth - 1]} ${currentYear}`;
+      calDays.innerHTML = "";
+
+      const firstDay = new Date(currentYear, currentMonth - 1, 1);
+      // Monday=0, Sunday=6 (ISO week)
+      let startOffset = firstDay.getDay() - 1;
+      if (startOffset < 0) startOffset = 6;
+
+      const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+      // Empty cells for alignment
+      for (let i = 0; i < startOffset; i++) {
+        const cell = document.createElement("div");
+        cell.className = "calendar__day calendar__day--empty";
+        calDays.appendChild(cell);
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const daySlots = slots.filter((s: any) => s.date === dateStr);
+        const availableSlots = daySlots.filter((s: any) => !s.isBlocked && !s.isBooked && !s.isPast);
+        const isPast = daySlots.length > 0 ? daySlots.every((s: any) => s.isPast) : new Date(dateStr) < new Date(todayStr);
+
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.textContent = String(day);
+        cell.className = "calendar__day";
+
+        if (dateStr === todayStr) cell.classList.add("calendar__day--today");
+
+        if (isPast) {
+          cell.classList.add("calendar__day--past");
+        } else if (availableSlots.length > 0) {
+          cell.classList.add("calendar__day--available");
+          if (selectedDay === dateStr) cell.classList.add("calendar__day--selected");
+          cell.addEventListener("click", () => selectDay(dateStr));
+        } else {
+          cell.classList.add("calendar__day--unavailable");
+        }
+
+        calDays.appendChild(cell);
+      }
+
+      // Disable prev if current month
+      const now = new Date();
+      calPrev.disabled = currentYear === now.getFullYear() && currentMonth === now.getMonth() + 1;
+    }
+
+    function selectDay(dateStr: string) {
+      selectedDay = dateStr;
+      selectedSlotId = null;
+      formContainer.style.display = "none";
+
+      // Re-render calendar to update selection
+      renderCalendar();
+
+      // Show slots for selected day
+      const daySlots = slots.filter((s: any) => s.date === dateStr);
+      const available = daySlots.filter((s: any) => !s.isPast);
+
+      if (available.length === 0) {
+        slotPicker.style.display = "none";
+        calHint.textContent = tr["booking.calendar.noSlots"] || "No slots available";
+        calHint.style.display = "";
+        return;
+      }
+
+      calHint.style.display = "none";
+      slotPicker.style.display = "";
+
+      // Format the date
+      const [y, m, d] = dateStr.split("-");
+      slotDate.textContent = `${d}.${m}.${y}`;
+
+      slotList.innerHTML = "";
+      available.forEach((s: any) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = `${s.startTime} - ${s.endTime}`;
+        btn.className = "slot-picker__slot";
+
+        if (s.isBlocked || s.isBooked) {
+          btn.classList.add(s.isBlocked ? "slot-picker__slot--blocked" : "slot-picker__slot--booked");
+        } else {
+          btn.addEventListener("click", () => selectSlot(s.id, btn));
+        }
+
+        slotList.appendChild(btn);
+      });
+    }
+
+    function selectSlot(slotId: string, btn: HTMLButtonElement) {
+      selectedSlotId = slotId;
+
+      // Update slot selection visual
+      slotList.querySelectorAll(".slot-picker__slot--selected").forEach((el) => {
+        el.classList.remove("slot-picker__slot--selected");
+      });
+      btn.classList.add("slot-picker__slot--selected");
+
+      // Show booking form
+      formContainer.style.display = "";
+      fieldSessionTypeId.value = sessionSelect.value;
+      fieldSlotId.value = slotId;
+      formApiError.style.display = "none";
+    }
+
+    // Month navigation
+    async function fetchSlots(month: number, year: number) {
+      try {
+        const res = await fetch(`${apiBase}/api/booking/availability?month=${month}&year=${year}`);
+        if (res.ok) {
+          slots = await res.json();
+        }
+      } catch {
+        // Keep existing slots
+      }
+    }
+
+    calPrev.addEventListener("click", async () => {
+      currentMonth--;
+      if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+      selectedDay = null;
+      selectedSlotId = null;
+      slotPicker.style.display = "none";
+      formContainer.style.display = "none";
+      calHint.style.display = "";
+      calHint.textContent = tr["booking.calendar.selectDay"] || "Select a day";
+      await fetchSlots(currentMonth, currentYear);
+      renderCalendar();
+    });
+
+    calNext.addEventListener("click", async () => {
+      currentMonth++;
+      if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+      selectedDay = null;
+      selectedSlotId = null;
+      slotPicker.style.display = "none";
+      formContainer.style.display = "none";
+      calHint.style.display = "";
+      calHint.textContent = tr["booking.calendar.selectDay"] || "Select a day";
+      await fetchSlots(currentMonth, currentYear);
+      renderCalendar();
+    });
+
+    // Form submission
+    bookingForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      formApiError.style.display = "none";
+
+      // Clear errors
+      document.querySelectorAll(".booking-form__error").forEach((el) => {
+        el.textContent = "";
+      });
+      document.querySelectorAll(".booking-form__input--error").forEach((el) => {
+        el.classList.remove("booking-form__input--error");
+      });
+
+      // Validate
+      const nameEl = document.getElementById("field-name") as HTMLInputElement;
+      const emailEl = document.getElementById("field-email") as HTMLInputElement;
+      let valid = true;
+
+      if (!nameEl.value.trim()) {
+        document.getElementById("error-name")!.textContent = tr["booking.form.required"] || "Required";
+        nameEl.classList.add("booking-form__input--error");
+        valid = false;
+      }
+
+      if (!emailEl.value.trim()) {
+        document.getElementById("error-email")!.textContent = tr["booking.form.required"] || "Required";
+        emailEl.classList.add("booking-form__input--error");
+        valid = false;
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value)) {
+        document.getElementById("error-email")!.textContent = tr["booking.form.invalidEmail"] || "Invalid email";
+        emailEl.classList.add("booking-form__input--error");
+        valid = false;
+      }
+
+      if (!valid) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = tr["booking.form.submitting"] || "Submitting...";
+
+      const payload = {
+        sessionTypeId: fieldSessionTypeId.value,
+        slotId: fieldSlotId.value || undefined,
+        clientName: nameEl.value.trim(),
+        clientEmail: emailEl.value.trim(),
+        clientPhone: (document.getElementById("field-phone") as HTMLInputElement).value.trim() || undefined,
+        dogCount: parseInt(fieldDogs.value, 10) || 1,
+        specialRequests: (document.getElementById("field-requests") as HTMLTextAreaElement).value.trim() || undefined,
+      };
+
+      try {
+        const res = await fetch(`${apiBase}/api/booking/bookings`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          window.location.href = `${confirmPath}/${data.id}`;
+        } else {
+          const err = await res.json().catch(() => ({}));
+          formApiError.textContent = (err as any).error || `Error: ${res.status}`;
+          formApiError.style.display = "";
+          submitBtn.disabled = false;
+          submitBtn.textContent = tr["booking.form.submit"] || "Submit";
+        }
+      } catch {
+        formApiError.textContent = "Network error. Please try again.";
+        formApiError.style.display = "";
+        submitBtn.disabled = false;
+        submitBtn.textContent = tr["booking.form.submit"] || "Submit";
+      }
+    });
+
+    // Initial render
+    renderCalendar();
+  });
+</script>
+
+<style lang="scss">
+  @use "../styles/components/booking-calendar";
+</style>

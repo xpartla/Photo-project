@@ -51,5 +51,24 @@ describe("i18n", () => {
       expect(getAlternateUrl("en", "/en/portfolio/collections/dog-portraits"))
         .toBe("/sk/portfolio/kolekcie/dog-portraits");
     });
+
+    it("rewrites booking routes (rezervacia ↔ booking)", () => {
+      expect(getAlternateUrl("sk", "/sk/rezervacia")).toBe("/en/booking");
+      expect(getAlternateUrl("en", "/en/booking")).toBe("/sk/rezervacia");
+    });
+
+    it("rewrites booking calendar routes (kalendar ↔ schedule)", () => {
+      expect(getAlternateUrl("sk", "/sk/rezervacia/kalendar"))
+        .toBe("/en/booking/schedule");
+      expect(getAlternateUrl("en", "/en/booking/schedule"))
+        .toBe("/sk/rezervacia/kalendar");
+    });
+
+    it("rewrites booking confirmation routes (potvrdenie ↔ confirmation)", () => {
+      expect(getAlternateUrl("sk", "/sk/rezervacia/potvrdenie/abc-123"))
+        .toBe("/en/booking/confirmation/abc-123");
+      expect(getAlternateUrl("en", "/en/booking/confirmation/abc-123"))
+        .toBe("/sk/rezervacia/potvrdenie/abc-123");
+    });
   });
 });

@@ -1,0 +1,83 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../../components/SeoMeta.astro";
+import BookingCalendar from "../../../../components/BookingCalendar.astro";
+import { getSessionTypes, getAvailability } from "../../../../lib/api";
+import { t } from "../../../../lib/i18n";
+import type { SessionType, AvailabilitySlot } from "../../../../lib/api";
+
+const lang = "en";
+const preselectedSession = Astro.url.searchParams.get("session") || undefined;
+
+const now = new Date();
+const currentMonth = now.getMonth() + 1;
+const currentYear = now.getFullYear();
+
+let sessionTypes: SessionType[] = [];
+let initialSlots: AvailabilitySlot[] = [];
+
+try {
+  [sessionTypes, initialSlots] = await Promise.all([
+    getSessionTypes(lang),
+    getAvailability(currentMonth, currentYear),
+  ]);
+} catch {
+  // Fallback: empty data
+}
+
+const apiBase = import.meta.env.PUBLIC_API_URL || "http://localhost:5000";
+
+const pageTitle = `${t(lang, "booking.calendar.title")} — PartlPhoto`;
+const pageDescription = t(lang, "booking.calendar.subtitle");
+
+const translations: Record<string, string> = {
+  "booking.calendar.sessionType": t(lang, "booking.calendar.sessionType"),
+  "booking.calendar.prev": t(lang, "booking.calendar.prev"),
+  "booking.calendar.next": t(lang, "booking.calendar.next"),
+  "booking.calendar.noSlots": t(lang, "booking.calendar.noSlots"),
+  "booking.calendar.selectDay": t(lang, "booking.calendar.selectDay"),
+  "booking.calendar.availableSlots": t(lang, "booking.calendar.availableSlots"),
+  "booking.form.title": t(lang, "booking.form.title"),
+  "booking.form.name": t(lang, "booking.form.name"),
+  "booking.form.email": t(lang, "booking.form.email"),
+  "booking.form.phone": t(lang, "booking.form.phone"),
+  "booking.form.dogCount": t(lang, "booking.form.dogCount"),
+  "booking.form.specialRequests": t(lang, "booking.form.specialRequests"),
+  "booking.form.specialRequestsPlaceholder": t(lang, "booking.form.specialRequestsPlaceholder"),
+  "booking.form.submit": t(lang, "booking.form.submit"),
+  "booking.form.submitting": t(lang, "booking.form.submitting"),
+  "booking.form.required": t(lang, "booking.form.required"),
+  "booking.form.invalidEmail": t(lang, "booking.form.invalidEmail"),
+};
+---
+
+<BaseLayout title={pageTitle} description={pageDescription} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={pageDescription}
+    lang={lang}
+    path="/en/booking/schedule"
+  />
+
+  <div class="booking-page">
+    <h1 class="booking-page__title">{t(lang, "booking.calendar.title")}</h1>
+    <p class="booking-page__subtitle">{t(lang, "booking.calendar.subtitle")}</p>
+
+    <BookingCalendar
+      lang={lang}
+      sessionTypes={sessionTypes}
+      initialSlots={initialSlots}
+      initialMonth={currentMonth}
+      initialYear={currentYear}
+      preselectedSession={preselectedSession}
+      apiBase={apiBase}
+      confirmPath="/en/booking/confirmation"
+      translations={translations}
+    />
+  </div>
+</BaseLayout>
+
+<style lang="scss">
+  @use "../../../../styles/components/booking-calendar";
+</style>

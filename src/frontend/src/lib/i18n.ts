@@ -26,6 +26,25 @@ export function getAlternateUrl(lang: string, path: string): string {
     if (lang === "en" && rest.startsWith("portfolio/collections/")) {
       return `/${altLang}/portfolio/kolekcie/${rest.slice("portfolio/collections/".length)}`;
     }
+    // Booking routes: rezervacia ↔ booking
+    if (lang === "sk" && rest.startsWith("rezervacia/kalendar")) {
+      return `/${altLang}/booking/schedule${rest.slice("rezervacia/kalendar".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("booking/schedule")) {
+      return `/${altLang}/rezervacia/kalendar${rest.slice("booking/schedule".length)}`;
+    }
+    if (lang === "sk" && rest.startsWith("rezervacia/potvrdenie/")) {
+      return `/${altLang}/booking/confirmation/${rest.slice("rezervacia/potvrdenie/".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("booking/confirmation/")) {
+      return `/${altLang}/rezervacia/potvrdenie/${rest.slice("booking/confirmation/".length)}`;
+    }
+    if (lang === "sk" && rest.startsWith("rezervacia")) {
+      return `/${altLang}/booking${rest.slice("rezervacia".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("booking")) {
+      return `/${altLang}/rezervacia${rest.slice("booking".length)}`;
+    }
     return `/${altLang}/${rest}`;
   }
   return `/${altLang}${path}`;
