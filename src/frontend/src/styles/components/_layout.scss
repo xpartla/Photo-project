@@ -2,10 +2,54 @@
 
 .footer {
   text-align: center;
-  padding: 24px;
+  padding: 32px 24px;
   font-family: $font-body;
-  font-weight: 600;
   color: $dark;
   border-top: $outline-width solid $outline;
   background-color: $white;
+
+  &__brand {
+    font-family: $font-heading;
+    font-size: 1.25rem;
+    margin-bottom: 4px;
+  }
+
+  &__tagline {
+    font-size: 0.85rem;
+    font-weight: 400;
+    margin: 0 0 12px;
+    color: lighten($dark, 25%);
+  }
+
+  &__nap {
+    font-style: normal;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+
+  &__nap-divider {
+    color: lighten($dark, 40%);
+  }
+
+  &__nap-link {
+    color: $dark;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__copy {
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin: 0;
+    color: lighten($dark, 30%);
+  }
 }

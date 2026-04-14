@@ -1,0 +1,120 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import { t } from "../../../../lib/i18n";
+
+const lang = "sk";
+const { id } = Astro.params;
+const pageTitle = `${t(lang, "order.title")} — PartlPhoto`;
+const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
+const shopUrl = `/${lang}/obchod`;
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <main class="cart">
+    <div id="order-content" style="text-align:center;padding:48px 24px;">
+      <p>Loading...</p>
+    </div>
+  </main>
+
+  <script define:vars={{ apiBase, orderId: id, lang, shopUrl, labels: {
+    confirmed: t(lang, "order.confirmed"),
+    thankYou: t(lang, "order.thankYou"),
+    number: t(lang, "order.number"),
+    status: t(lang, "order.status"),
+    items: t(lang, "order.items"),
+    edition: t(lang, "order.edition"),
+    total: t(lang, "order.total"),
+    backToShop: t(lang, "order.backToShop"),
+    statusPending: t(lang, "order.status.pending_payment"),
+    statusPaid: t(lang, "order.status.paid"),
+    statusProcessing: t(lang, "order.status.processing"),
+    statusShipped: t(lang, "order.status.shipped"),
+    statusCompleted: t(lang, "order.status.completed"),
+    statusCancelled: t(lang, "order.status.cancelled"),
+    statusRefunded: t(lang, "order.status.refunded"),
+  } }}>
+    const statusLabels = {
+      pending_payment: labels.statusPending,
+      paid: labels.statusPaid,
+      processing: labels.statusProcessing,
+      shipped: labels.statusShipped,
+      completed: labels.statusCompleted,
+      cancelled: labels.statusCancelled,
+      refunded: labels.statusRefunded,
+    };
+
+    const statusColors = {
+      pending_payment: '#F2B880',
+      paid: '#7EAA92',
+      processing: '#B8A0C8',
+      shipped: '#D4896A',
+      completed: '#7EAA92',
+      cancelled: '#D97B8F',
+      refunded: '#D97B8F',
+    };
+
+    async function loadOrder() {
+      const container = document.getElementById('order-content');
+      if (!container) return;
+
+      const token = localStorage.getItem('partlphoto_token');
+
+      try {
+        const res = await fetch(`${apiBase}/api/shop/orders/${orderId}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const order = await res.json();
+
+        const statusLabel = statusLabels[order.status] || order.status;
+        const statusColor = statusColors[order.status] || '#2A2A2A';
+        const isPaid = order.status === 'paid' || order.status === 'processing' || order.status === 'shipped' || order.status === 'completed';
+
+        const itemsHtml = order.items.map(item => {
+          const editionInfo = item.editionNumber ? ` — ${labels.edition} #${item.editionNumber}` : '';
+          return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(42,42,42,0.1);">
+            <span>${item.productTitle}${editionInfo}</span>
+            <span>${item.unitPrice} ${order.currency}</span>
+          </div>`;
+        }).join('');
+
+        container.innerHTML = `
+          <div style="max-width:600px;margin:0 auto;text-align:left;">
+            ${isPaid ? `<h1 style="font-family:'Titan One',cursive;font-size:2rem;text-align:center;margin:0 0 8px;">${labels.confirmed}</h1>
+            <p style="text-align:center;margin:0 0 32px;">${labels.thankYou}</p>` : ''}
+
+            <div style="border:3px solid #2A2A2A;border-radius:12px;background:#FFF8F0;padding:24px;box-shadow:4px 4px 0 #2A2A2A;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <div>
+                  <div style="font-size:0.85rem;opacity:0.7;">${labels.number}</div>
+                  <div style="font-family:'Titan One',cursive;font-size:1.15rem;">#${order.id.slice(0, 8).toUpperCase()}</div>
+                </div>
+                <span style="padding:6px 16px;border:2px solid #2A2A2A;border-radius:20px;background:${statusColor};color:#FFF8F0;font-size:0.8rem;font-weight:700;text-transform:uppercase;">${statusLabel}</span>
+              </div>
+
+              <h3 style="font-size:1rem;margin:16px 0 8px;">${labels.items}</h3>
+              ${itemsHtml}
+
+              <div style="display:flex;justify-content:space-between;padding:16px 0 0;margin-top:8px;border-top:2px solid #2A2A2A;">
+                <span style="font-weight:700;font-size:1.1rem;">${labels.total}</span>
+                <span style="font-family:'Titan One',cursive;font-size:1.25rem;">${order.totalAmount} ${order.currency}</span>
+              </div>
+            </div>
+
+            <div style="text-align:center;margin-top:32px;">
+              <a href="${shopUrl}" style="font-weight:700;color:#2A2A2A;">&larr; ${labels.backToShop}</a>
+            </div>
+          </div>`;
+      } catch (err) {
+        container.innerHTML = `<p>Error loading order: ${err.message}</p>`;
+      }
+    }
+
+    loadOrder();
+  </script>
+</BaseLayout>
+
+<style lang="scss">
+  @use "../../../../styles/components/cart";
+</style>

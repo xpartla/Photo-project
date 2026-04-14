@@ -3,6 +3,7 @@ using DogPhoto.Infrastructure.Auth;
 using DogPhoto.Infrastructure.BlobStorage;
 using DogPhoto.Infrastructure.Email;
 using DogPhoto.Infrastructure.ImagePipeline;
+using DogPhoto.Infrastructure.Payments;
 using DogPhoto.Infrastructure.Persistence.Blog;
 using DogPhoto.Infrastructure.Persistence.Booking;
 using DogPhoto.Infrastructure.Persistence.EShop;
@@ -81,6 +82,10 @@ public static class DependencyInjection
         // Email
         services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
         services.AddScoped<IEmailService, SmtpEmailService>();
+
+        // Payment gateway
+        services.AddSingleton<MockPaymentGateway>();
+        services.AddSingleton<IPaymentGateway>(sp => sp.GetRequiredService<MockPaymentGateway>());
 
         // Image pipeline
         services.AddScoped<IImageProcessor, ImageProcessor>();

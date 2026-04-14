@@ -30,6 +30,11 @@ public class EShopDbContext(DbContextOptions<EShopDbContext> options) : DbContex
             entity.Property(e => e.Price).HasPrecision(10, 2);
             entity.Property(e => e.Currency).IsRequired().HasMaxLength(3).HasDefaultValue("EUR");
             entity.HasQueryFilter(e => e.DeletedAt == null);
+            entity.Property<uint>("xmin")
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
 
         modelBuilder.Entity<Order>(entity =>
@@ -37,9 +42,10 @@ public class EShopDbContext(DbContextOptions<EShopDbContext> options) : DbContex
             entity.ToTable("orders");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
-            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50).HasDefaultValue("pending_payment");
             entity.Property(e => e.TotalAmount).HasPrecision(10, 2);
             entity.Property(e => e.Currency).IsRequired().HasMaxLength(3);
+            entity.Property(e => e.CustomerEmail).HasMaxLength(256);
             entity.Property(e => e.GoPayPaymentId).HasMaxLength(256);
             entity.Property(e => e.ShippingAddressJson).HasColumnType("jsonb");
             entity.Property(e => e.BillingAddressJson).HasColumnType("jsonb");
@@ -96,9 +102,10 @@ public class Order
 {
     public Guid Id { get; set; }
     public Guid? UserId { get; set; }
-    public string Status { get; set; } = "Pending";
+    public string Status { get; set; } = "pending_payment";
     public decimal TotalAmount { get; set; }
     public string Currency { get; set; } = "EUR";
+    public string? CustomerEmail { get; set; }
     public string? GoPayPaymentId { get; set; }
     public string? ShippingAddressJson { get; set; }
     public string? BillingAddressJson { get; set; }

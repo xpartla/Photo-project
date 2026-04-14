@@ -1,5 +1,44 @@
 # Changelog
 
+## Epic 5: Booking Module (2026-04-14)
+
+### Added
+- **Backend API** — 10 booking endpoints: session types (list, detail, admin update), availability (query, create, bulk-generate, update/block), bookings (create, view, cancel, my-bookings)
+- **Booking flow** — Customers browse session types, pick a date/slot from a calendar, fill a validated form, and receive a pending booking with confirmation email
+- **Email notifications** — Branded HTML confirmation email to customer + notification to photographer on every booking (Mailpit locally, production SMTP planned for Epic 9)
+- **Session types** — 3 seeded types: Dog Portrait (60 min, 120 EUR), Action Session (90 min, 150 EUR), Outdoor Session (90 min, 140 EUR)
+- **Availability management** — Admin API for creating individual slots, bulk-generating slots with configurable duration/breaks, blocking/updating slots
+- **Frontend pages** (bilingual SK/EN):
+  - `/sk/rezervacia`, `/en/booking` — Session type cards with pricing, detail modals with FAQ accordion, testimonials, trust signals
+  - `/sk/rezervacia/kalendar`, `/en/booking/schedule` — Interactive calendar with month navigation, day state indicators, slot picker, validated booking form
+  - `/sk/rezervacia/potvrdenie/[id]`, `/en/booking/confirmation/[id]` — Booking confirmation page with summary
+- **BookingCalendar component** — Server-rendered with client-side interactivity: month navigation, available/unavailable/past day states, slot time picker, inline form validation
+- **SCSS** — `_booking.scss` (847 lines), `_booking-calendar.scss` (602 lines)
+- **i18n** — 82 booking + footer keys in both `sk.json` and `en.json`
+- **JSON-LD SEO** — `Service`, `Offer`, and `LocalBusiness` schemas on booking pages
+- **Footer NAP** — Full Name, Address (Bratislava), Phone, Email in site footer across all pages with bilingual support
+- **Booking seed script** — `scripts/seed-booking.sh` for seeding availability slots (Saturdays + weekday afternoons)
+- **Booking utility module** — `src/lib/booking.ts` with pure validation and calendar state functions
+- **Database** — `booking` schema with 3 tables: `session_types`, `availability_slots`, `bookings`
+
+### Testing
+- **Integration tests** — 26 xUnit tests: all booking endpoints (happy path, auth guards, validation failures), email capture via FakeEmailService, slot conflicts, bulk generation with breaks, dog count limits, localization
+- **Architecture tests** — Booking module isolation from EShop/Blog verified
+- **Frontend unit tests** — 22 Vitest tests: form validation (name, email), calendar day state logic, slot filtering
+- **Playwright E2E** — 9 tests: full booking journey (calendar → slot → form → confirmation), form validation errors, session type listing, modal interactions, calendar page load
+- **Accessibility** — axe WCAG 2A/2AA scans on `/sk/rezervacia` and `/sk/rezervacia/kalendar`
+
+### Deferred
+- Recurring availability rules (e.g., "every Saturday 9-16") → Epic 8 (Admin Interface)
+- Session detail pages (`/[slug]`) → replaced by modal-based approach on booking index
+
+### Design Decisions
+- Session detail information shown via modal overlay rather than separate `/[slug]` pages — keeps the booking flow compact
+- Availability managed via individual/bulk slot creation through API; recurring rule engine deferred to admin panel (Epic 8)
+- BookingCalendar uses inline `<script>` with client-side fetch rather than Astro island — sufficient for the calendar's interaction model
+
+---
+
 ## Epic 0: Local Development Environment
 
 ### Task 0.1 — Repository Setup

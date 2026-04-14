@@ -1,6 +1,101 @@
 @use "../variables" as *;
 
-// ── Calendar page layout ──────────────────────────────────────────
+// ── Calendar modal ────────────────────────────────────────────────
+
+.calendar-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1001; // above session modal
+  background: rgba($dark, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity $transition-base, visibility $transition-base;
+
+  &--open {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+.calendar-modal {
+  position: relative;
+  background: $cream;
+  border: $outline-width-thick solid $outline;
+  border-radius: 16px;
+  box-shadow: 6px 6px 0 $outline;
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 28px 24px;
+  transform: scale(0.95) translateY(8px);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  .calendar-modal-overlay--open & {
+    transform: scale(1) translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transform: none;
+    transition: none;
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    padding: 20px 16px;
+  }
+
+  &__close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 36px;
+    height: 36px;
+    background: $white;
+    border: 2px solid $outline;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: $dark;
+    line-height: 1;
+    z-index: 1;
+    transition: transform $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 2px 2px 0 $outline;
+    }
+
+    &:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+  }
+
+  &__title {
+    font-family: $font-heading;
+    font-size: 1.35rem;
+    margin: 0 0 4px;
+    color: $dark;
+    padding-right: 40px;
+  }
+
+  &__subtitle {
+    font-family: $font-body;
+    font-size: 0.9rem;
+    color: $dark;
+    opacity: 0.7;
+    margin: 0 0 20px;
+  }
+}
+
+// ── Calendar page layout (fallback standalone page) ───────────────
 
 .booking-page {
   max-width: 900px;
@@ -28,23 +123,23 @@
 // ── Session type selector ─────────────────────────────────────────
 
 .session-select {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 
   &__label {
     display: block;
     font-family: $font-body;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: $dark;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   &__input {
     width: 100%;
     font-family: $font-body;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     padding: 10px 16px;
     background: $white;
     color: $dark;
@@ -52,6 +147,7 @@
     border-radius: 8px;
     cursor: pointer;
     appearance: none;
+    box-sizing: border-box;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%232A2A2A' stroke-width='2' fill='none'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 16px center;
@@ -70,22 +166,21 @@
   background: $white;
   border: $outline-width solid $outline;
   border-radius: 12px;
-  box-shadow: 4px 4px 0 $outline;
   overflow: hidden;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 
   &__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
+    padding: 14px 16px;
     background: $cream;
     border-bottom: $outline-width solid $outline;
   }
 
   &__month {
     font-family: $font-heading;
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     color: $dark;
   }
 
@@ -93,8 +188,8 @@
     background: $white;
     border: 2px solid $outline;
     border-radius: 8px;
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -132,12 +227,12 @@
 
   &__weekday {
     font-family: $font-body;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     text-align: center;
-    padding: 10px 0;
+    padding: 8px 0;
     color: $dark;
     opacity: 0.5;
   }
@@ -145,58 +240,94 @@
   &__days {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    padding: 8px;
-    gap: 4px;
+    padding: 6px;
+    gap: 3px;
   }
 
   &__day {
     aspect-ratio: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     font-family: $font-body;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 600;
     border-radius: 8px;
+    border: 2px solid transparent;
     cursor: default;
     color: $dark;
-    transition: background $transition-fast, transform $transition-fast;
+    position: relative;
+    transition: all $transition-fast;
 
     &--empty {
-      // Placeholder cell for grid alignment
+      // grid alignment placeholder
     }
 
     &--unavailable {
-      opacity: 0.3;
+      opacity: 0.25;
+    }
+
+    &--past {
+      opacity: 0.15;
     }
 
     &--available {
-      background: rgba($sage, 0.15);
       cursor: pointer;
+      border-color: rgba($sage, 0.4);
+      background: rgba($sage, 0.06);
+
+      // Availability dot
+      &::after {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: $sage;
+        position: absolute;
+        bottom: 4px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
 
       &:hover {
-        background: rgba($sage, 0.3);
-        transform: scale(1.05);
+        background: rgba($sage, 0.2);
+        border-color: $sage;
+        transform: scale(1.08);
+        box-shadow: 0 0 0 3px rgba($sage, 0.15);
       }
     }
 
     &--selected {
       background: $sage;
       color: $white;
+      border-color: $sage;
       cursor: pointer;
+      font-weight: 800;
+      box-shadow: 0 0 0 3px rgba($sage, 0.25);
+
+      &::after {
+        background: $white;
+      }
 
       &:hover {
         background: darken($sage, 5%);
+        transform: none;
+        box-shadow: 0 0 0 3px rgba($sage, 0.25);
       }
-    }
-
-    &--past {
-      opacity: 0.2;
     }
 
     &--today {
       font-weight: 800;
-      box-shadow: inset 0 0 0 2px $peach;
+
+      &::before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        border-radius: 8px;
+        border: 2px solid $peach;
+        pointer-events: none;
+      }
     }
   }
 
@@ -204,56 +335,87 @@
     font-family: $font-body;
     font-size: 0.85rem;
     color: $dark;
-    opacity: 0.6;
+    opacity: 0.5;
     text-align: center;
-    padding: 16px;
+    padding: 12px;
+  }
+}
+
+// ── Available-day pulse (subtle) ──────────────────────────────────
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.calendar__day--available::after {
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+
+.calendar__day--selected::after {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar__day--available::after {
+    animation: none;
   }
 }
 
 // ── Slot picker ───────────────────────────────────────────────────
 
 .slot-picker {
-  margin-bottom: 24px;
+  background: $white;
+  border: $outline-width solid $outline;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+
+  &__header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
 
   &__title {
     font-family: $font-body;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: $dark;
-    margin-bottom: 12px;
+    opacity: 0.6;
   }
 
   &__date {
     font-family: $font-heading;
-    font-size: 1rem;
+    font-size: 1.05rem;
     color: $dark;
-    margin-bottom: 12px;
   }
 
   &__slots {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
   }
 
   &__slot {
-    font-family: $font-body;
-    font-size: 0.85rem;
-    font-weight: 700;
-    padding: 8px 16px;
-    border: 2px solid $outline;
-    border-radius: 20px;
-    background: $white;
-    color: $dark;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 12px;
+    background: $cream;
+    border: $outline-width solid $outline;
+    border-radius: 10px;
     cursor: pointer;
-    transition: background $transition-fast, transform $transition-fast, box-shadow $transition-fast;
+    transition: all $transition-fast;
 
     &:hover {
-      background: rgba($peach, 0.15);
-      transform: translateY(-1px);
-      box-shadow: 2px 2px 0 $outline;
+      background: rgba($peach, 0.2);
+      border-color: $peach;
+      transform: translateY(-2px);
+      box-shadow: 3px 3px 0 $outline;
     }
 
     &:active {
@@ -263,21 +425,55 @@
 
     &--selected {
       background: $peach;
-      box-shadow: 2px 2px 0 $outline;
+      border-color: $outline;
+      box-shadow: 3px 3px 0 $outline;
+
+      .slot-picker__slot-time {
+        color: $dark;
+      }
+
+      .slot-picker__slot-label {
+        color: $dark;
+        opacity: 0.7;
+      }
+
+      &:hover {
+        background: darken($peach, 5%);
+        box-shadow: 3px 3px 0 $outline;
+        transform: none;
+      }
     }
 
     &--booked,
     &--blocked {
-      opacity: 0.3;
+      opacity: 0.25;
       cursor: not-allowed;
-      text-decoration: line-through;
+      background: $white;
 
       &:hover {
         background: $white;
+        border-color: $outline;
         transform: none;
         box-shadow: none;
       }
     }
+  }
+
+  &__slot-time {
+    font-family: $font-heading;
+    font-size: 1rem;
+    color: $dark;
+    white-space: nowrap;
+  }
+
+  &__slot-label {
+    font-family: $font-body;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $sage;
+    margin-top: 2px;
   }
 
   &__empty {
@@ -295,27 +491,26 @@
   background: $white;
   border: $outline-width solid $outline;
   border-radius: 12px;
-  box-shadow: 4px 4px 0 $outline;
-  padding: 28px 24px;
+  padding: 24px 20px;
 
   &__title {
     font-family: $font-heading;
-    font-size: 1.15rem;
-    margin: 0 0 20px;
+    font-size: 1.05rem;
+    margin: 0 0 16px;
     color: $dark;
   }
 
   &__group {
-    margin-bottom: 16px;
+    margin-bottom: 14px;
   }
 
   &__label {
     display: block;
     font-family: $font-body;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 700;
     color: $dark;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
   }
 
   &__input,
@@ -323,8 +518,8 @@
   &__textarea {
     width: 100%;
     font-family: $font-body;
-    font-size: 0.95rem;
-    padding: 10px 14px;
+    font-size: 0.9rem;
+    padding: 9px 12px;
     background: $white;
     color: $dark;
     border: $outline-width solid $outline;
@@ -345,31 +540,31 @@
 
   &__textarea {
     resize: vertical;
-    min-height: 80px;
+    min-height: 70px;
   }
 
   &__error {
     font-family: $font-body;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: $rose;
-    margin-top: 4px;
+    margin-top: 3px;
   }
 
   &__submit {
     width: 100%;
     font-family: $font-body;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 14px 24px;
+    padding: 13px 24px;
     background: $sage;
     color: $white;
     border: $outline-width solid $outline;
     border-radius: 8px;
     box-shadow: 3px 3px 0 $outline;
     cursor: pointer;
-    margin-top: 8px;
+    margin-top: 6px;
     transition: transform $transition-fast, box-shadow $transition-fast, background $transition-fast;
 
     &:hover {
@@ -396,12 +591,12 @@
 
   &__api-error {
     font-family: $font-body;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: $rose;
     background: rgba($rose, 0.08);
     border: 2px solid $rose;
     border-radius: 8px;
-    padding: 12px 16px;
-    margin-bottom: 16px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
   }
 }

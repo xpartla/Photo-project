@@ -1,18 +1,51 @@
 ---
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import SeoMeta from "../../../components/SeoMeta.astro";
-import { getSessionTypes } from "../../../lib/api";
+import BookingCalendar from "../../../components/BookingCalendar.astro";
+import { getSessionTypes, getAvailability } from "../../../lib/api";
 import { t } from "../../../lib/i18n";
-import type { SessionType } from "../../../lib/api";
+import type { SessionType, AvailabilitySlot } from "../../../lib/api";
 
 const lang = "sk";
 
-let sessionTypes: SessionType[];
+let sessionTypes: SessionType[] = [];
+let initialSlots: AvailabilitySlot[] = [];
+const now = new Date();
+const currentMonth = now.getMonth() + 1;
+const currentYear = now.getFullYear();
+
 try {
-  sessionTypes = await getSessionTypes(lang);
+  [sessionTypes, initialSlots] = await Promise.all([
+    getSessionTypes(lang),
+    getAvailability(currentMonth, currentYear),
+  ]);
 } catch {
-  sessionTypes = [];
+  // fallback
 }
+
+// Server-side uses Docker-internal URL; client-side JS needs the host-accessible URL
+const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
+
+const calendarTranslations: Record<string, string> = {
+  "booking.calendar.sessionType": t(lang, "booking.calendar.sessionType"),
+  "booking.calendar.prev": t(lang, "booking.calendar.prev"),
+  "booking.calendar.next": t(lang, "booking.calendar.next"),
+  "booking.calendar.noSlots": t(lang, "booking.calendar.noSlots"),
+  "booking.calendar.selectDay": t(lang, "booking.calendar.selectDay"),
+  "booking.calendar.availableSlots": t(lang, "booking.calendar.availableSlots"),
+  "booking.calendar.slotAvailable": t(lang, "booking.calendar.slotAvailable"),
+  "booking.form.title": t(lang, "booking.form.title"),
+  "booking.form.name": t(lang, "booking.form.name"),
+  "booking.form.email": t(lang, "booking.form.email"),
+  "booking.form.phone": t(lang, "booking.form.phone"),
+  "booking.form.dogCount": t(lang, "booking.form.dogCount"),
+  "booking.form.specialRequests": t(lang, "booking.form.specialRequests"),
+  "booking.form.specialRequestsPlaceholder": t(lang, "booking.form.specialRequestsPlaceholder"),
+  "booking.form.submit": t(lang, "booking.form.submit"),
+  "booking.form.submitting": t(lang, "booking.form.submitting"),
+  "booking.form.required": t(lang, "booking.form.required"),
+  "booking.form.invalidEmail": t(lang, "booking.form.invalidEmail"),
+};
 
 const pageTitle = `${t(lang, "booking.title")} — PartlPhoto`;
 const pageDescription = t(lang, "booking.description");
@@ -67,9 +100,9 @@ const categoryKeys: Record<string, string> = {
     <p class="booking-hero__subtitle">{t(lang, "booking.subtitle")}</p>
   </div>
 
-  <div class="session-grid">
+  <div class="session-grid reveal-stagger">
     {sessionTypes.map((st) => (
-      <div class="session-card">
+      <div class="session-card reveal">
         {st.category && (
           <span class="session-card__category">
             {t(lang, categoryKeys[st.category] || `booking.category.${st.category}`)}
@@ -136,9 +169,9 @@ const categoryKeys: Record<string, string> = {
           </>
         )}
 
-        <a href={`/sk/rezervacia/kalendar?session=${st.slug}`} class="session-modal__cta">
+        <button type="button" class="session-modal__cta" data-open-calendar={st.slug}>
           {t(lang, "booking.bookThisSession")}
-        </a>
+        </button>
 
         <h3 class="session-modal__section-title">{t(lang, "booking.detail.faq")}</h3>
         <div class="booking-faq">
@@ -159,21 +192,40 @@ const categoryKeys: Record<string, string> = {
     </div>
   ))}
 
+  <!-- Calendar modal -->
+  <div class="calendar-modal-overlay" id="calendar-modal" data-modal style="display:none;">
+    <div class="calendar-modal" role="dialog" aria-labelledby="calendar-modal-title">
+      <button type="button" class="calendar-modal__close" data-close-modal aria-label={t(lang, "portfolio.close")}>&times;</button>
+      <h2 class="calendar-modal__title" id="calendar-modal-title">{t(lang, "booking.calendar.title")}</h2>
+      <p class="calendar-modal__subtitle">{t(lang, "booking.calendar.subtitle")}</p>
+      <BookingCalendar
+        lang={lang}
+        sessionTypes={sessionTypes}
+        initialSlots={initialSlots}
+        initialMonth={currentMonth}
+        initialYear={currentYear}
+        apiBase={apiBase}
+        confirmPath="/sk/rezervacia/potvrdenie"
+        translations={calendarTranslations}
+      />
+    </div>
+  </div>
+
   <!-- How it works -->
-  <section class="how-it-works">
+  <section class="how-it-works reveal">
     <h2 class="how-it-works__title">{t(lang, "booking.howItWorks.title")}</h2>
-    <div class="how-it-works__steps">
-      <div class="how-it-works__step">
+    <div class="how-it-works__steps reveal-stagger">
+      <div class="how-it-works__step reveal">
         <div class="how-it-works__number">1</div>
         <h3 class="how-it-works__step-title">{t(lang, "booking.howItWorks.step1.title")}</h3>
         <p class="how-it-works__step-text">{t(lang, "booking.howItWorks.step1.text")}</p>
       </div>
-      <div class="how-it-works__step">
+      <div class="how-it-works__step reveal">
         <div class="how-it-works__number">2</div>
         <h3 class="how-it-works__step-title">{t(lang, "booking.howItWorks.step2.title")}</h3>
         <p class="how-it-works__step-text">{t(lang, "booking.howItWorks.step2.text")}</p>
       </div>
-      <div class="how-it-works__step">
+      <div class="how-it-works__step reveal">
         <div class="how-it-works__number">3</div>
         <h3 class="how-it-works__step-title">{t(lang, "booking.howItWorks.step3.title")}</h3>
         <p class="how-it-works__step-text">{t(lang, "booking.howItWorks.step3.text")}</p>
@@ -182,7 +234,7 @@ const categoryKeys: Record<string, string> = {
   </section>
 
   <!-- Trust signals -->
-  <div class="trust-strip">
+  <div class="trust-strip reveal">
     <div class="trust-strip__item">
       <span class="trust-strip__number">{t(lang, "booking.trust.sessions")}</span>
       <span class="trust-strip__label">{t(lang, "booking.trust.sessionsLabel")}</span>
@@ -198,11 +250,11 @@ const categoryKeys: Record<string, string> = {
   </div>
 
   <!-- Testimonials -->
-  <section class="testimonials">
+  <section class="testimonials reveal">
     <h2 class="testimonials__title">{t(lang, "booking.testimonials.title")}</h2>
-    <div class="testimonials__grid">
+    <div class="testimonials__grid reveal-stagger">
       {[1, 2, 3].map((i) => (
-        <div class="testimonials__card">
+        <div class="testimonials__card reveal">
           <p class="testimonials__quote">{t(lang, `booking.testimonials.${i}.text`)}</p>
           <p class="testimonials__author">{t(lang, `booking.testimonials.${i}.author`)}</p>
           <p class="testimonials__dog">{t(lang, `booking.testimonials.${i}.dog`)}</p>
@@ -212,24 +264,48 @@ const categoryKeys: Record<string, string> = {
   </section>
 
   <!-- About the photographer -->
-  <section class="about-photographer">
+  <section class="about-photographer reveal">
+    <div class="about-photographer__avatar">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+    </div>
     <h2 class="about-photographer__title">{t(lang, "booking.about.title")}</h2>
     <p class="about-photographer__text">{t(lang, "booking.about.text")}</p>
   </section>
 
   <!-- Bottom CTA -->
-  <div class="booking-cta-banner">
+  <div class="booking-cta-banner reveal">
     <h2 class="booking-cta-banner__title">{t(lang, "booking.cta.title")}</h2>
     <p class="booking-cta-banner__text">{t(lang, "booking.cta.text")}</p>
-    <a href="/sk/rezervacia/kalendar" class="booking-cta-banner__button">
+    <button type="button" class="booking-cta-banner__button" id="cta-open-calendar">
       {t(lang, "booking.cta.button")}
-    </a>
+    </button>
   </div>
 </BaseLayout>
 
 <script>
+  function closeAllModals() {
+    document.querySelectorAll<HTMLElement>(".session-modal-overlay--open, .calendar-modal-overlay--open").forEach((el) => {
+      el.classList.remove("session-modal-overlay--open", "calendar-modal-overlay--open");
+      if (el.id === "calendar-modal") {
+        // Hide after transition to prevent blink on page nav
+        el.addEventListener("transitionend", () => { el.style.display = "none"; }, { once: true });
+      }
+    });
+    document.body.style.overflow = "";
+  }
+
+  function closeOverlay(overlay: HTMLElement) {
+    overlay.classList.remove("session-modal-overlay--open", "calendar-modal-overlay--open");
+    if (overlay.id === "calendar-modal") {
+      overlay.addEventListener("transitionend", () => { overlay.style.display = "none"; }, { once: true });
+    }
+    if (!document.querySelector(".session-modal-overlay--open, .calendar-modal-overlay--open")) {
+      document.body.style.overflow = "";
+    }
+  }
+
   function initModals() {
-    // Open modal
+    // Open session detail modal
     document.querySelectorAll<HTMLElement>("[data-open-modal]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const slug = btn.dataset.openModal;
@@ -241,43 +317,93 @@ const categoryKeys: Record<string, string> = {
       });
     });
 
+    // "Book this session" → close session modal, open calendar modal with session pre-selected
+    document.querySelectorAll<HTMLElement>("[data-open-calendar]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const slug = btn.dataset.openCalendar;
+        // Close the session modal
+        closeAllModals();
+
+        // Pre-select the session type in the calendar dropdown
+        const sessionSelect = document.getElementById("session-type-select") as HTMLSelectElement | null;
+        if (sessionSelect && slug) {
+          for (const opt of sessionSelect.options) {
+            if (opt.dataset.slug === slug) {
+              sessionSelect.value = opt.value;
+              sessionSelect.dispatchEvent(new Event("change"));
+              break;
+            }
+          }
+        }
+
+        // Open calendar modal
+        requestAnimationFrame(() => openCalendarModal());
+      });
+    });
+
     // Close via X button
     document.querySelectorAll<HTMLElement>("[data-close-modal]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const overlay = btn.closest("[data-modal]") as HTMLElement | null;
-        if (overlay) {
-          overlay.classList.remove("session-modal-overlay--open");
-          document.body.style.overflow = "";
-        }
+        if (overlay) closeOverlay(overlay);
       });
     });
 
     // Close via backdrop click
     document.querySelectorAll<HTMLElement>("[data-modal]").forEach((overlay) => {
       overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) {
-          overlay.classList.remove("session-modal-overlay--open");
-          document.body.style.overflow = "";
-        }
+        if (e.target === overlay) closeOverlay(overlay);
       });
     });
 
     // Close via Escape key
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        document.querySelectorAll<HTMLElement>(".session-modal-overlay--open").forEach((overlay) => {
-          overlay.classList.remove("session-modal-overlay--open");
-          document.body.style.overflow = "";
-        });
-      }
+      if (e.key === "Escape") closeAllModals();
     });
+
+    // Bottom CTA → open calendar modal
+    document.getElementById("cta-open-calendar")?.addEventListener("click", () => openCalendarModal());
+  }
+
+  function openCalendarModal() {
+    const calModal = document.getElementById("calendar-modal");
+    if (!calModal) return;
+    calModal.style.display = "";
+    // Force reflow so the transition plays from opacity 0
+    void calModal.offsetHeight;
+    calModal.classList.add("calendar-modal-overlay--open");
+    document.body.style.overflow = "hidden";
+  }
+
+  function initReveal() {
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) {
+      document.querySelectorAll(".reveal").forEach((el) => el.classList.add("reveal--visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("reveal--visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+
+    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
   }
 
   // Run on initial load and after Astro SPA navigations
   initModals();
-  document.addEventListener("astro:after-swap", initModals);
+  initReveal();
+  document.addEventListener("astro:after-swap", () => { initModals(); initReveal(); });
 </script>
 
 <style lang="scss">
   @use "../../../styles/components/booking";
+  @use "../../../styles/components/booking-calendar";
 </style>

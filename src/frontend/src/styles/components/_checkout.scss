@@ -1,0 +1,280 @@
+@use "../variables" as *;
+
+.checkout {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 48px 24px;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 32px;
+  align-items: start;
+
+  @media (max-width: $breakpoint-md) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checkout__title {
+  font-family: $font-heading;
+  font-size: 2.25rem;
+  color: $dark;
+  margin: 0 0 32px;
+  grid-column: 1 / -1;
+}
+
+// ── Address form ──────────────────────────────────────────────────
+
+.checkout__form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.checkout__section-title {
+  font-family: $font-heading;
+  font-size: 1.25rem;
+  color: $dark;
+  margin: 0;
+}
+
+.checkout__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checkout__label {
+  font-family: $font-body;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: $dark;
+}
+
+.checkout__input {
+  font-family: $font-body;
+  font-size: 1rem;
+  padding: 10px 14px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $white;
+  color: $dark;
+  transition: border-color $transition-fast, background $transition-fast;
+
+  &:focus {
+    outline: none;
+    border-color: $sage;
+    background: $cream;
+    box-shadow: 0 0 0 3px rgba($sage, 0.2);
+  }
+
+  &--error {
+    border-color: $rose;
+    background: rgba($rose, 0.05);
+  }
+}
+
+.checkout__error {
+  font-family: $font-body;
+  font-size: 0.8rem;
+  color: $rose;
+}
+
+.checkout__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: $font-body;
+  font-size: 0.9rem;
+  cursor: pointer;
+
+  input {
+    width: 18px;
+    height: 18px;
+    accent-color: $sage;
+  }
+}
+
+// ── Order summary sidebar ─────────────────────────────────────────
+
+.checkout__summary {
+  border: $outline-width solid $dark;
+  border-radius: 12px;
+  background: $white;
+  box-shadow: 4px 4px 0 $dark;
+  padding: 24px;
+  position: sticky;
+  top: 96px;
+
+  @media (max-width: $breakpoint-md) {
+    position: static;
+  }
+}
+
+.checkout__summary-title {
+  font-family: $font-heading;
+  font-size: 1.15rem;
+  color: $dark;
+  margin: 0 0 16px;
+}
+
+.checkout__summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-family: $font-body;
+  font-size: 0.9rem;
+  border-bottom: 1px solid rgba($dark, 0.1);
+
+  &:last-of-type {
+    border-bottom: none;
+  }
+}
+
+.checkout__summary-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 0 0;
+  margin-top: 8px;
+  border-top: 2px solid $dark;
+
+  span:first-child {
+    font-family: $font-body;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  span:last-child {
+    font-family: $font-heading;
+    font-size: 1.25rem;
+  }
+}
+
+.checkout__pay-btn {
+  display: block;
+  width: 100%;
+  margin-top: 20px;
+  font-family: $font-body;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 32px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $peach;
+  color: $dark;
+  box-shadow: 3px 3px 0 $dark;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    box-shadow: none;
+    transform: translateY(1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// ── Mock payment page ─────────────────────────────────────────────
+
+.mock-pay {
+  max-width: 480px;
+  margin: 64px auto;
+  padding: 32px;
+  border: $outline-width-thick solid $dark;
+  border-radius: 16px;
+  background: $white;
+  box-shadow: 6px 6px 0 $dark;
+  text-align: center;
+}
+
+.mock-pay__title {
+  font-family: $font-heading;
+  font-size: 1.5rem;
+  color: $dark;
+  margin: 0 0 8px;
+}
+
+.mock-pay__warning {
+  font-family: $font-body;
+  font-size: 0.8rem;
+  color: $rose;
+  margin: 0 0 24px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mock-pay__amount {
+  font-family: $font-heading;
+  font-size: 2.5rem;
+  color: $dark;
+  margin: 0 0 32px;
+}
+
+.mock-pay__actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.mock-pay__confirm {
+  font-family: $font-body;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 32px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $sage;
+  color: $white;
+  box-shadow: 3px 3px 0 $dark;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.mock-pay__cancel {
+  font-family: $font-body;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 32px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $rose;
+  color: $white;
+  box-shadow: 3px 3px 0 $dark;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

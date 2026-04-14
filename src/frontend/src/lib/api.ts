@@ -153,6 +153,91 @@ export interface BookingDetail {
   createdAt: string;
 }
 
+// ── Shop types ───────────────────────────────────────────────────
+
+export interface ShopProduct {
+  id: string;
+  slug: string;
+  photoId?: string;
+  title: string;
+  titleSk: string;
+  titleEn: string;
+  description?: string;
+  format?: string;
+  paperType?: string;
+  price: number;
+  currency: string;
+  editionSize?: number;
+  editionSold: number;
+  editionRemaining?: number;
+  isAvailable: boolean;
+  variants: Variant[];
+}
+
+export interface ShopProductList {
+  items: ShopProduct[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface CartItemResponse {
+  id: string;
+  productId: string;
+  productSlug?: string;
+  title: string;
+  price: number;
+  quantity: number;
+  editionSize?: number;
+  editionSold: number;
+  isAvailable: boolean;
+}
+
+export interface CartResponse {
+  items: CartItemResponse[];
+  total: number;
+}
+
+export interface OrderItemResponse {
+  id: string;
+  productId: string;
+  productSlug?: string;
+  productTitle: string;
+  quantity: number;
+  unitPrice: number;
+  editionNumber?: number;
+}
+
+export interface OrderResponse {
+  id: string;
+  status: string;
+  totalAmount: number;
+  currency: string;
+  shippingAddress?: string;
+  billingAddress?: string;
+  items: OrderItemResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOrderResult {
+  orderId: string;
+  paymentId: string;
+  redirectUrl: string;
+  total: number;
+  currency: string;
+}
+
+export interface MockPaymentInfo {
+  paymentId: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  status: string;
+  returnUrl: string;
+  cancelUrl: string;
+}
+
 // ── Portfolio API ──────────────────────────────────────────────────
 
 export async function getPhotos(params?: {
@@ -225,4 +310,50 @@ export async function createBooking(data: CreateBookingRequest): Promise<Booking
 
 export async function getBooking(id: string): Promise<BookingDetail> {
   return fetchApi(`/api/booking/bookings/${id}`);
+}
+
+// ── Shop API ─────────────────────────────────────────────────────
+
+export async function getProducts(params?: {
+  lang?: string;
+  format?: string;
+  available?: boolean;
+  photoId?: string;
+  page?: number;
+  size?: number;
+}): Promise<ShopProductList> {
+  const qs = new URLSearchParams();
+  if (params?.lang) qs.set("lang", params.lang);
+  if (params?.format) qs.set("format", params.format);
+  if (params?.available !== undefined) qs.set("available", String(params.available));
+  if (params?.photoId) qs.set("photoId", params.photoId);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.size) qs.set("size", String(params.size));
+  const query = qs.toString();
+  return fetchApi(`/api/shop/products${query ? `?${query}` : ""}`);
+}
+
+export async function getProduct(slug: string, lang?: string): Promise<ShopProduct> {
+  const qs = lang ? `?lang=${lang}` : "";
+  return fetchApi(`/api/shop/products/${slug}${qs}`);
+}
+
+export async function getPaymentInfo(paymentId: string): Promise<MockPaymentInfo> {
+  return fetchApi(`/api/shop/payments/${paymentId}`);
+}
+
+export async function getOrder(id: string, token: string): Promise<OrderResponse> {
+  const res = await fetch(`${API_BASE}/api/shop/orders/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json() as Promise<OrderResponse>;
+}
+
+export async function getMyOrders(token: string): Promise<OrderResponse[]> {
+  const res = await fetch(`${API_BASE}/api/shop/my-orders`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json() as Promise<OrderResponse[]>;
 }

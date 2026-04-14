@@ -1,0 +1,186 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../components/SeoMeta.astro";
+import { getProduct } from "../../../lib/api";
+import { t, getAlternateUrl } from "../../../lib/i18n";
+import { buildSrcset, getFallbackUrl } from "../../../lib/imageUrl";
+import type { ShopProduct } from "../../../lib/api";
+
+const lang = "sk";
+const { slug } = Astro.params;
+const pageUrl = Astro.url.pathname;
+const alternateUrl = getAlternateUrl(lang, pageUrl);
+
+let product: ShopProduct | null = null;
+
+try {
+  product = await getProduct(slug!, lang);
+} catch {
+  return Astro.redirect(`/${lang}/obchod`);
+}
+
+if (!product) return Astro.redirect(`/${lang}/obchod`);
+
+const isSoldOut = !product.isAvailable;
+const editionText = product.editionSize
+  ? `${t(lang, "shop.edition")} ${product.editionSold} ${t(lang, "shop.editionOf")} ${product.editionSize} — ${product.editionRemaining} ${t(lang, "shop.remaining")}`
+  : t(lang, "shop.openEdition");
+
+const pageTitle = `${product.title} — ${t(lang, "shop.title")} — PartlPhoto`;
+
+const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={product.description || t(lang, "shop.description")}
+    lang={lang}
+    path={pageUrl}
+  />
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": product.title,
+      "description": product.description,
+      "image": product.variants.length > 0 ? getFallbackUrl(product.variants) : undefined,
+      "offers": {
+        "@type": "Offer",
+        "price": product.price,
+        "priceCurrency": product.currency,
+        "availability": product.isAvailable
+          ? "https://schema.org/InStock"
+          : "https://schema.org/SoldOut",
+        "seller": {
+          "@type": "Organization",
+          "name": "PartlPhoto"
+        }
+      }
+    })} />
+  </Fragment>
+
+  <div class="product-detail">
+    <div class="product-detail__image">
+      {product.variants.length > 0 ? (
+        <picture>
+          <source
+            srcset={buildSrcset(product.variants, "webp")}
+            type="image/webp"
+          />
+          <img
+            src={getFallbackUrl(product.variants)}
+            alt={product.title}
+            loading="eager"
+          />
+        </picture>
+      ) : (
+        <div style="height:400px;background:#eee;display:flex;align-items:center;justify-content:center;">
+          <span>No image</span>
+        </div>
+      )}
+    </div>
+
+    <div class="product-detail__info">
+      <a href={`/${lang}/obchod`} class="product-detail__back">
+        &larr; {t(lang, "shop.backToShop")}
+      </a>
+
+      <h1 class="product-detail__title">{product.title}</h1>
+
+      {product.description && (
+        <p class="product-detail__description">{product.description}</p>
+      )}
+
+      <div class="product-detail__meta">
+        {product.format && (
+          <div class="product-detail__meta-item">
+            <strong>{t(lang, "shop.format")}</strong>
+            {product.format}
+          </div>
+        )}
+        {product.paperType && (
+          <div class="product-detail__meta-item">
+            <strong>{t(lang, "shop.paperType")}</strong>
+            {product.paperType}
+          </div>
+        )}
+      </div>
+
+      <div class={`product-detail__edition ${isSoldOut ? "product-detail__edition--sold-out" : ""}`}>
+        {isSoldOut ? t(lang, "shop.soldOut") : editionText}
+      </div>
+
+      <div class="product-detail__price">
+        {product.price} {product.currency}
+      </div>
+
+      <div class="product-detail__actions">
+        <button
+          class="product-detail__add-btn"
+          id="add-to-cart-btn"
+          data-product-id={product.id}
+          data-product-slug={product.slug}
+          data-product-title={product.title}
+          data-product-price={product.price}
+          data-product-currency={product.currency}
+          data-product-image={product.variants.length > 0 ? getFallbackUrl(product.variants) : ""}
+          data-edition-size={product.editionSize ?? ""}
+          data-edition-sold={product.editionSold}
+          disabled={isSoldOut}
+        >
+          {isSoldOut ? t(lang, "shop.soldOut") : t(lang, "shop.addToCart")}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script define:vars={{ apiBase, lang }}>
+    const btn = document.getElementById('add-to-cart-btn');
+    if (btn && !btn.disabled) {
+      btn.addEventListener('click', () => {
+        const productSlug = btn.dataset.productSlug;
+        const productId = btn.dataset.productId;
+        const title = btn.dataset.productTitle;
+        const price = parseFloat(btn.dataset.productPrice || '0');
+        const currency = btn.dataset.productCurrency || 'EUR';
+        const imageUrl = btn.dataset.productImage || '';
+        const editionSize = btn.dataset.editionSize ? parseInt(btn.dataset.editionSize) : null;
+        const editionSold = parseInt(btn.dataset.editionSold || '0');
+
+        // Add to localStorage cart
+        const CART_KEY = 'partlphoto_cart';
+        const cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+        const existing = cart.find(item => item.productSlug === productSlug);
+        if (existing) {
+          existing.quantity += 1;
+        } else {
+          cart.push({ productSlug, productId, title, price, currency, imageUrl, editionSize, editionSold, quantity: 1 });
+        }
+        localStorage.setItem(CART_KEY, JSON.stringify(cart));
+
+        // Visual feedback
+        const original = btn.textContent;
+        btn.textContent = '✓';
+        btn.disabled = true;
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.disabled = false;
+        }, 1000);
+
+        // Update cart count badge if present
+        const badge = document.getElementById('cart-count-badge');
+        if (badge) {
+          const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+          badge.textContent = String(totalItems);
+          badge.style.display = totalItems > 0 ? '' : 'none';
+        }
+      });
+    }
+  </script>
+</BaseLayout>
+
+<style lang="scss">
+  @use "../../../styles/components/shop";
+</style>

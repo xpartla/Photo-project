@@ -1,7 +1,35 @@
 import { BasePage } from "./BasePage";
-import type { Locator } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 export class BookingPage extends BasePage {
+  calendarNextBtn(): Locator {
+    return this.page.locator("#cal-next");
+  }
+
+  formPhone(): Locator {
+    return this.page.locator("#field-phone");
+  }
+
+  formDogCount(): Locator {
+    return this.page.locator("#field-dogs");
+  }
+
+  formSpecialRequests(): Locator {
+    return this.page.locator("#field-requests");
+  }
+
+  formError(field: string): Locator {
+    return this.page.locator(`#error-${field}`);
+  }
+
+  slotPicker(): Locator {
+    return this.page.locator("#slot-picker");
+  }
+
+  bookingFormContainer(): Locator {
+    return this.page.locator("#booking-form-container");
+  }
+
   sessionCards(): Locator {
     return this.page.locator(".session-card");
   }

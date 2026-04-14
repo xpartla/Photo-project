@@ -13,7 +13,7 @@
 #                                                       alpine frontend image)
 #   - jq, curl on the host                           — for `make seed`
 
-.PHONY: help up down logs seed \
+.PHONY: help up down logs seed seed-shop \
         test test-backend test-backend-unit test-backend-integration \
         test-frontend test-frontend-unit test-e2e \
         playwright-install build-backend build-frontend fix-backend-perms
@@ -25,6 +25,7 @@ help:
 	@echo "  make down                     Stop the local stack"
 	@echo "  make logs                     Tail compose logs"
 	@echo "  make seed                     Run scripts/seed-images.sh against the running stack"
+	@echo "  make seed-shop                Run scripts/seed-shop.sh (create sample products)"
 	@echo ""
 	@echo "  make test                     Run all tests (backend unit+arch+integration, frontend unit, E2E)"
 	@echo "  make test-backend             Backend unit + arch + integration tests"
@@ -51,6 +52,9 @@ logs:
 
 seed:
 	./scripts/seed-images.sh
+
+seed-shop:
+	./scripts/seed-shop.sh
 
 # ── Build ──────────────────────────────────────────────────────────────
 

@@ -1,6 +1,8 @@
+using DogPhoto.SharedKernel.Email;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Testcontainers.Azurite;
 using Testcontainers.PostgreSql;
@@ -54,11 +56,21 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             $"BlobEndpoint=http://127.0.0.1:{blobPort}/{AzuriteAccountName};";
     }
 
+    public FakeEmailService FakeEmail { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Force Development so DependencyInjection.ApplyMigrationsAsync uses
         // EnsureCreated/CreateTables (no migration files exist yet).
         builder.UseEnvironment(Environments.Development);
+
+        builder.ConfigureTestServices(services =>
+        {
+            // Replace SMTP email service with in-memory fake for test assertions
+            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IEmailService));
+            if (descriptor is not null) services.Remove(descriptor);
+            services.AddSingleton<IEmailService>(FakeEmail);
+        });
     }
 
     async Task IAsyncLifetime.InitializeAsync()

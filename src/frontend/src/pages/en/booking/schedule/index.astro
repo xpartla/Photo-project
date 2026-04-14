@@ -25,7 +25,7 @@ try {
   // Fallback: empty data
 }
 
-const apiBase = import.meta.env.PUBLIC_API_URL || "http://localhost:5000";
+const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
 
 const pageTitle = `${t(lang, "booking.calendar.title")} — PartlPhoto`;
 const pageDescription = t(lang, "booking.calendar.subtitle");
@@ -37,6 +37,7 @@ const translations: Record<string, string> = {
   "booking.calendar.noSlots": t(lang, "booking.calendar.noSlots"),
   "booking.calendar.selectDay": t(lang, "booking.calendar.selectDay"),
   "booking.calendar.availableSlots": t(lang, "booking.calendar.availableSlots"),
+  "booking.calendar.slotAvailable": t(lang, "booking.calendar.slotAvailable"),
   "booking.form.title": t(lang, "booking.form.title"),
   "booking.form.name": t(lang, "booking.form.name"),
   "booking.form.email": t(lang, "booking.form.email"),

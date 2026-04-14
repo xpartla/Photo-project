@@ -1,5 +1,35 @@
 @use "../variables" as *;
 
+// ── Scroll reveal animation ───────────────────────────────────────
+
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+
+  &--visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Staggered children (cards, steps)
+.reveal-stagger > .reveal {
+  @for $i from 1 through 6 {
+    &:nth-child(#{$i}) {
+      transition-delay: #{($i - 1) * 0.1}s;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 // ── Session types listing ─────────────────────────────────────────
 
 .booking-hero {
@@ -210,6 +240,12 @@
     font-family: $font-heading;
     font-size: 1.25rem;
     color: $dark;
+    transition: transform $transition-base, box-shadow $transition-base;
+
+    .how-it-works__step:hover & {
+      transform: scale(1.1);
+      box-shadow: 3px 3px 0 $outline;
+    }
   }
 
   &__step-title {
@@ -300,6 +336,17 @@
     border-radius: 12px;
     padding: 24px;
     position: relative;
+    border-left-width: 5px;
+    transition: transform $transition-base, box-shadow $transition-base;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 4px 4px 0 $outline;
+    }
+
+    &:nth-child(1) { border-left-color: $peach; }
+    &:nth-child(2) { border-left-color: $lavender; }
+    &:nth-child(3) { border-left-color: $sage; }
   }
 
   &__quote {
@@ -345,6 +392,24 @@
   margin: 0 auto;
   padding: 0 24px 64px;
   text-align: center;
+
+  &__avatar {
+    width: 96px;
+    height: 96px;
+    background: $cream;
+    border: $outline-width-thick solid $outline;
+    border-radius: 50%;
+    box-shadow: 4px 4px 0 $outline;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    svg {
+      width: 44px;
+      height: 44px;
+      color: $dark;
+    }
+  }
 
   &__title {
     font-family: $font-heading;
@@ -457,6 +522,17 @@
   max-height: calc(100vh - 48px);
   overflow-y: auto;
   padding: 32px 28px;
+  transform: scale(0.95) translateY(8px);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); // cartoon spring
+
+  .session-modal-overlay--open & {
+    transform: scale(1) translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transform: none;
+    transition: none;
+  }
 
   @media (max-width: $breakpoint-sm) {
     padding: 24px 18px;
@@ -665,6 +741,7 @@
   margin: 0 auto;
   padding: 64px 24px;
   text-align: center;
+  min-height: calc(100vh - #{$nav-height} - 200px);
 
   &__card {
     background: $white;
@@ -747,6 +824,10 @@
     background: rgba($peach, 0.2);
     color: $dark;
     margin-bottom: 24px;
+  }
+
+  &__actions {
+    margin-top: 24px;
   }
 
   &__back {

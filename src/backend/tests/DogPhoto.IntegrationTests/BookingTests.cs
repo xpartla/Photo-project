@@ -9,6 +9,32 @@ public sealed class BookingTests : ApiTestBase
 {
     public BookingTests(ApiFactory factory) : base(factory) { }
 
+    /// <summary>
+    /// Helper: create an availability slot and return its ID plus a session type ID.
+    /// Uses unique dates to avoid cross-test collisions.
+    /// </summary>
+    private async Task<(string SlotId, string SessionTypeId)> CreateSlotAndGetSessionTypeAsync(string date)
+    {
+        var admin = await CreateAdminClientAsync();
+        var slotResponse = await admin.PostAsJsonAsync("/api/booking/availability", new
+        {
+            date,
+            startTime = "09:00",
+            endTime = "10:30"
+        });
+        slotResponse.EnsureSuccessStatusCode();
+        var slotBody = await slotResponse.Content.ReadAsStringAsync();
+        using var slotDoc = JsonDocument.Parse(slotBody);
+        var slotId = slotDoc.RootElement.GetProperty("slots").EnumerateArray().First().GetProperty("id").GetString()!;
+
+        var typesResponse = await CreateClient().GetAsync("/api/booking/session-types");
+        var typesBody = await typesResponse.Content.ReadAsStringAsync();
+        using var typesDoc = JsonDocument.Parse(typesBody);
+        var sessionTypeId = typesDoc.RootElement.EnumerateArray().First().GetProperty("id").GetString()!;
+
+        return (slotId, sessionTypeId);
+    }
+
     // ── Session Types ─────────────────────────────────────────────
 
     [Fact]
@@ -353,5 +379,158 @@ public sealed class BookingTests : ApiTestBase
         var cancelBody = await cancelResponse.Content.ReadAsStringAsync();
         using var cancelDoc = JsonDocument.Parse(cancelBody);
         Assert.Equal("Cancelled", cancelDoc.RootElement.GetProperty("status").GetString());
+    }
+
+    // ── Email verification ────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateBooking_SendsConfirmationEmails()
+    {
+        FakeEmail.Clear();
+
+        var (slotId, sessionTypeId) = await CreateSlotAndGetSessionTypeAsync("2027-01-10");
+
+        var client = CreateClient();
+        var response = await client.PostAsJsonAsync("/api/booking/bookings", new
+        {
+            sessionTypeId,
+            slotId,
+            clientName = "Email Test",
+            clientEmail = "emailtest@example.com",
+            dogCount = 1
+        });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        // Should have sent exactly 2 emails: one to customer, one to photographer
+        Assert.Equal(2, FakeEmail.SentEmails.Count);
+
+        var customerEmail = FakeEmail.SentEmails.FirstOrDefault(e => e.To == "emailtest@example.com");
+        Assert.NotNull(customerEmail);
+        Assert.Contains("Booking Confirmation", customerEmail.Subject);
+        Assert.Contains("Email Test", customerEmail.HtmlBody);
+
+        var photographerEmail = FakeEmail.SentEmails.FirstOrDefault(e => e.To == "admin@partlphoto.sk");
+        Assert.NotNull(photographerEmail);
+        Assert.Contains("New Booking", photographerEmail.Subject);
+        Assert.Contains("emailtest@example.com", photographerEmail.HtmlBody);
+    }
+
+    // ── Edge cases ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateBooking_BlockedSlot_Returns400()
+    {
+        var admin = await CreateAdminClientAsync();
+
+        // Create and block a slot
+        var slotResponse = await admin.PostAsJsonAsync("/api/booking/availability", new
+        {
+            date = "2027-02-10",
+            startTime = "09:00",
+            endTime = "10:30",
+            isBlocked = true
+        });
+        slotResponse.EnsureSuccessStatusCode();
+        var slotBody = await slotResponse.Content.ReadAsStringAsync();
+        using var slotDoc = JsonDocument.Parse(slotBody);
+        var slotId = slotDoc.RootElement.GetProperty("slots").EnumerateArray().First().GetProperty("id").GetString();
+
+        var typesResponse = await CreateClient().GetAsync("/api/booking/session-types");
+        var typesBody = await typesResponse.Content.ReadAsStringAsync();
+        using var typesDoc = JsonDocument.Parse(typesBody);
+        var sessionTypeId = typesDoc.RootElement.EnumerateArray().First().GetProperty("id").GetString();
+
+        var client = CreateClient();
+        var response = await client.PostAsJsonAsync("/api/booking/bookings", new
+        {
+            sessionTypeId,
+            slotId,
+            clientName = "Blocked Test",
+            clientEmail = "blocked@example.com"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("blocked", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateBooking_DogCountExceedsMax_Returns400()
+    {
+        // dog-portrait session allows max 2 dogs
+        var (slotId, _) = await CreateSlotAndGetSessionTypeAsync("2027-02-15");
+
+        var client = CreateClient();
+        var typesResponse = await client.GetAsync("/api/booking/session-types/dog-portrait");
+        var typesBody = await typesResponse.Content.ReadAsStringAsync();
+        using var typesDoc = JsonDocument.Parse(typesBody);
+        var sessionTypeId = typesDoc.RootElement.GetProperty("id").GetString();
+        var maxDogs = typesDoc.RootElement.GetProperty("maxDogs").GetInt32();
+
+        var response = await client.PostAsJsonAsync("/api/booking/bookings", new
+        {
+            sessionTypeId,
+            slotId,
+            clientName = "Too Many Dogs",
+            clientEmail = "dogs@example.com",
+            dogCount = maxDogs + 1
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Dog count", body);
+    }
+
+    [Fact]
+    public async Task BulkGeneration_WithBreaks_CreatesCorrectSlotCount()
+    {
+        var admin = await CreateAdminClientAsync();
+
+        // 09:00-15:00, 60-min slots with 30-min breaks
+        // Expected: 09:00-10:00, 10:30-11:30, 12:00-13:00, 13:30-14:30 = 4 slots
+        // (15:00-15:00 boundary: 14:30+0:30=15:00, 15:00+1:00=16:00 > 15:00 → 4 slots)
+        var response = await admin.PostAsJsonAsync("/api/booking/availability", new
+        {
+            date = "2027-03-14",
+            startTime = "09:00",
+            endTime = "15:00",
+            slotDurationMinutes = 60,
+            breakMinutes = 30
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var count = doc.RootElement.GetProperty("count").GetInt32();
+        Assert.Equal(4, count);
+
+        // Verify slot times
+        var slots = doc.RootElement.GetProperty("slots").EnumerateArray().ToList();
+        Assert.Equal("09:00", slots[0].GetProperty("startTime").GetString());
+        Assert.Equal("10:00", slots[0].GetProperty("endTime").GetString());
+        Assert.Equal("10:30", slots[1].GetProperty("startTime").GetString());
+        Assert.Equal("11:30", slots[1].GetProperty("endTime").GetString());
+        Assert.Equal("12:00", slots[2].GetProperty("startTime").GetString());
+        Assert.Equal("13:00", slots[2].GetProperty("endTime").GetString());
+        Assert.Equal("13:30", slots[3].GetProperty("startTime").GetString());
+        Assert.Equal("14:30", slots[3].GetProperty("endTime").GetString());
+    }
+
+    [Fact]
+    public async Task GetSessionTypes_LanguageParameter_ReturnsLocalizedNames()
+    {
+        var client = CreateClient();
+
+        var skResponse = await client.GetAsync("/api/booking/session-types?lang=sk");
+        var skBody = await skResponse.Content.ReadAsStringAsync();
+        using var skDoc = JsonDocument.Parse(skBody);
+        var skName = skDoc.RootElement.EnumerateArray().First().GetProperty("name").GetString();
+
+        var enResponse = await client.GetAsync("/api/booking/session-types?lang=en");
+        var enBody = await enResponse.Content.ReadAsStringAsync();
+        using var enDoc = JsonDocument.Parse(enBody);
+        var enName = enDoc.RootElement.EnumerateArray().First().GetProperty("name").GetString();
+
+        Assert.NotEqual(skName, enName);
     }
 }

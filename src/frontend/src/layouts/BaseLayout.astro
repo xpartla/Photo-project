@@ -1,5 +1,6 @@
 ---
 import Navbar from "../components/Navbar.astro";
+import { t } from "../lib/i18n";
 import "../styles/global.scss";
 
 interface Props {
@@ -31,7 +32,16 @@ const currentPath = Astro.url.pathname;
       <slot />
     </main>
     <footer class="footer">
-      <p>&copy; {new Date().getFullYear()} PartlPhoto</p>
+      <div class="footer__brand">PartlPhoto</div>
+      <p class="footer__tagline">{t(lang, "footer.tagline")}</p>
+      <address class="footer__nap">
+        <span class="footer__nap-item">{t(lang, "footer.address")}</span>
+        <span class="footer__nap-divider" aria-hidden="true">&middot;</span>
+        <a href="tel:+421900123456" class="footer__nap-item footer__nap-link">{t(lang, "footer.phone")}</a>
+        <span class="footer__nap-divider" aria-hidden="true">&middot;</span>
+        <a href="mailto:info@partlphoto.sk" class="footer__nap-item footer__nap-link">info@partlphoto.sk</a>
+      </address>
+      <p class="footer__copy">&copy; {new Date().getFullYear()} PartlPhoto</p>
     </footer>
   </body>
 </html>

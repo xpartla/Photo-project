@@ -13,6 +13,7 @@ namespace DogPhoto.IntegrationTests;
 public abstract class ApiTestBase
 {
     protected ApiFactory Factory { get; }
+    protected FakeEmailService FakeEmail => Factory.FakeEmail;
 
     protected ApiTestBase(ApiFactory factory)
     {

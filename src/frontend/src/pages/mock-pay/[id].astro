@@ -1,0 +1,87 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPaymentInfo } from "../../lib/api";
+import type { MockPaymentInfo } from "../../lib/api";
+
+const { id } = Astro.params;
+const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
+
+let payment: MockPaymentInfo | null = null;
+
+try {
+  payment = await getPaymentInfo(id!);
+} catch {
+  // payment not found
+}
+---
+
+<BaseLayout title="Test Payment — PartlPhoto" lang="en">
+  {payment ? (
+    <div class="mock-pay">
+      <h1 class="mock-pay__title">Test Payment</h1>
+      <p class="mock-pay__warning">Development mode only</p>
+
+      <div class="mock-pay__amount">
+        {payment.amount} {payment.currency}
+      </div>
+
+      <div class="mock-pay__actions">
+        <button class="mock-pay__confirm" id="confirm-btn">
+          Confirm payment
+        </button>
+        <button class="mock-pay__cancel" id="cancel-btn">
+          Cancel payment
+        </button>
+      </div>
+
+      <div id="mock-pay-status" style="margin-top:16px;font-size:0.9rem;"></div>
+    </div>
+  ) : (
+    <div class="mock-pay">
+      <h1 class="mock-pay__title">Payment not found</h1>
+      <p>The payment ID is invalid or has expired.</p>
+    </div>
+  )}
+
+  {payment && (
+    <script define:vars={{ apiBase, paymentId: payment.paymentId, orderId: payment.orderId, returnUrl: payment.returnUrl, cancelUrl: payment.cancelUrl }}>
+      async function submitPayment(status) {
+        const confirmBtn = document.getElementById('confirm-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const statusEl = document.getElementById('mock-pay-status');
+
+        if (confirmBtn) confirmBtn.disabled = true;
+        if (cancelBtn) cancelBtn.disabled = true;
+        if (statusEl) statusEl.textContent = 'Processing...';
+
+        try {
+          const res = await fetch(`${apiBase}/api/shop/webhooks/payment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId, status })
+          });
+
+          const data = await res.json();
+
+          if (status === 'paid') {
+            const orderUrl = returnUrl.replace('ORDER_ID', data.orderId || orderId);
+            window.location.href = orderUrl;
+          } else {
+            window.location.href = cancelUrl;
+          }
+        } catch (err) {
+          if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+          if (confirmBtn) confirmBtn.disabled = false;
+          if (cancelBtn) cancelBtn.disabled = false;
+        }
+      }
+
+      document.getElementById('confirm-btn')?.addEventListener('click', () => submitPayment('paid'));
+      document.getElementById('cancel-btn')?.addEventListener('click', () => submitPayment('cancelled'));
+    </script>
+  )}
+</BaseLayout>
+
+<style lang="scss">
+  @use "../../styles/components/checkout";
+</style>

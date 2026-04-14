@@ -1,0 +1,179 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import { t } from "../../../../lib/i18n";
+
+const lang = "en";
+const pageTitle = `${t(lang, "checkout.title")} — PartlPhoto`;
+const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <div class="checkout">
+    <h1 class="checkout__title">{t(lang, "checkout.title")}</h1>
+
+    <div class="checkout__form" id="checkout-form">
+      <h2 class="checkout__section-title">{t(lang, "checkout.shipping")}</h2>
+
+      <div class="checkout__field">
+        <label class="checkout__label" for="ship-name">{t(lang, "checkout.name")}</label>
+        <input class="checkout__input" id="ship-name" type="text" required />
+      </div>
+      <div class="checkout__field">
+        <label class="checkout__label" for="ship-street">{t(lang, "checkout.street")}</label>
+        <input class="checkout__input" id="ship-street" type="text" required />
+      </div>
+      <div class="checkout__field">
+        <label class="checkout__label" for="ship-city">{t(lang, "checkout.city")}</label>
+        <input class="checkout__input" id="ship-city" type="text" required />
+      </div>
+      <div class="checkout__field">
+        <label class="checkout__label" for="ship-postal">{t(lang, "checkout.postalCode")}</label>
+        <input class="checkout__input" id="ship-postal" type="text" required />
+      </div>
+      <div class="checkout__field">
+        <label class="checkout__label" for="ship-country">{t(lang, "checkout.country")}</label>
+        <input class="checkout__input" id="ship-country" type="text" value="SK" />
+      </div>
+
+      <label class="checkout__checkbox">
+        <input type="checkbox" id="same-billing" checked />
+        {t(lang, "checkout.sameAsShipping")}
+      </label>
+
+      <div id="billing-fields" style="display:none;">
+        <h2 class="checkout__section-title">{t(lang, "checkout.billing")}</h2>
+        <div class="checkout__field">
+          <label class="checkout__label" for="bill-name">{t(lang, "checkout.name")}</label>
+          <input class="checkout__input" id="bill-name" type="text" />
+        </div>
+        <div class="checkout__field">
+          <label class="checkout__label" for="bill-street">{t(lang, "checkout.street")}</label>
+          <input class="checkout__input" id="bill-street" type="text" />
+        </div>
+        <div class="checkout__field">
+          <label class="checkout__label" for="bill-city">{t(lang, "checkout.city")}</label>
+          <input class="checkout__input" id="bill-city" type="text" />
+        </div>
+        <div class="checkout__field">
+          <label class="checkout__label" for="bill-postal">{t(lang, "checkout.postalCode")}</label>
+          <input class="checkout__input" id="bill-postal" type="text" />
+        </div>
+        <div class="checkout__field">
+          <label class="checkout__label" for="bill-country">{t(lang, "checkout.country")}</label>
+          <input class="checkout__input" id="bill-country" type="text" value="SK" />
+        </div>
+      </div>
+    </div>
+
+    <div class="checkout__summary">
+      <h3 class="checkout__summary-title">{t(lang, "checkout.orderSummary")}</h3>
+      <div id="summary-items"></div>
+      <div class="checkout__summary-total">
+        <span>{t(lang, "cart.total")}</span>
+        <span id="summary-total">0 EUR</span>
+      </div>
+      <button class="checkout__pay-btn" id="pay-btn">{t(lang, "checkout.payNow")}</button>
+      <div id="checkout-error" class="checkout__error" style="text-align:center;margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <script define:vars={{ apiBase, lang, processingText: t(lang, "checkout.processing"), requiredText: t(lang, "checkout.required") }}>
+    const CART_KEY = 'partlphoto_cart';
+
+    let cart = [];
+    try { cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch {}
+
+    const summaryEl = document.getElementById('summary-items');
+    const totalEl = document.getElementById('summary-total');
+    if (summaryEl && cart.length > 0) {
+      summaryEl.innerHTML = cart.map(item =>
+        `<div class="checkout__summary-item">
+          <span>${item.title} &times; ${item.quantity}</span>
+          <span>${(item.price * item.quantity).toFixed(2)} EUR</span>
+        </div>`
+      ).join('');
+      const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+      if (totalEl) totalEl.textContent = `${total.toFixed(2)} EUR`;
+    }
+
+    document.getElementById('same-billing')?.addEventListener('change', (e) => {
+      const fields = document.getElementById('billing-fields');
+      if (fields) fields.style.display = e.target.checked ? 'none' : '';
+    });
+
+    document.getElementById('pay-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('pay-btn');
+      const errEl = document.getElementById('checkout-error');
+
+      const name = document.getElementById('ship-name').value.trim();
+      const street = document.getElementById('ship-street').value.trim();
+      const city = document.getElementById('ship-city').value.trim();
+      const postal = document.getElementById('ship-postal').value.trim();
+      const country = document.getElementById('ship-country').value.trim();
+
+      if (!name || !street || !city || !postal) {
+        if (errEl) errEl.textContent = requiredText;
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = processingText;
+      if (errEl) errEl.textContent = '';
+
+      const token = localStorage.getItem('partlphoto_token');
+
+      if (token && cart.length > 0) {
+        try {
+          await fetch(`${apiBase}/api/shop/cart/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ items: cart.map(i => ({ productSlug: i.productSlug, quantity: i.quantity })) })
+          });
+        } catch {}
+      }
+
+      const shippingAddress = { name, street, city, postalCode: postal, country };
+      const sameBilling = document.getElementById('same-billing').checked;
+      const billingAddress = sameBilling ? null : {
+        name: document.getElementById('bill-name')?.value.trim() || name,
+        street: document.getElementById('bill-street')?.value.trim() || street,
+        city: document.getElementById('bill-city')?.value.trim() || city,
+        postalCode: document.getElementById('bill-postal')?.value.trim() || postal,
+        country: document.getElementById('bill-country')?.value.trim() || country,
+      };
+
+      try {
+        const res = await fetch(`${apiBase}/api/shop/orders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            shippingAddress,
+            billingAddress,
+            returnUrl: `/${lang}/shop/orders/ORDER_ID`,
+            cancelUrl: `/${lang}/shop/cart`,
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Error ${res.status}`);
+        }
+
+        const data = await res.json();
+        localStorage.setItem(CART_KEY, '[]');
+        window.location.href = data.redirectUrl;
+      } catch (err) {
+        if (errEl) errEl.textContent = err.message || 'Order failed';
+        btn.disabled = false;
+        btn.textContent = 'Pay now';
+      }
+    });
+  </script>
+</BaseLayout>
+
+<style lang="scss">
+  @use "../../../../styles/components/checkout";
+</style>

@@ -3,6 +3,7 @@ using DogPhoto.Infrastructure;
 using DogPhoto.Infrastructure.Auth;
 using DogPhoto.Infrastructure.BlobStorage;
 using DogPhoto.Infrastructure.Booking;
+using DogPhoto.Infrastructure.EShop;
 using DogPhoto.Infrastructure.ImagePipeline;
 using DogPhoto.Infrastructure.Portfolio;
 using DogPhoto.SharedKernel.Middleware;
@@ -86,6 +87,9 @@ app.MapPortfolioEndpoints();
 
 // Booking endpoints
 app.MapBookingEndpoints();
+
+// E-Shop endpoints
+app.MapEShopEndpoints();
 
 app.MapGet("/", () => "DogPhoto API");
 

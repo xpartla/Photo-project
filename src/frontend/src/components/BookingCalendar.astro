@@ -79,8 +79,10 @@ const monthNames = lang === "sk"
 
   <!-- Slot picker -->
   <div id="slot-picker" class="slot-picker" style="display:none;">
-    <span class="slot-picker__title">{translations["booking.calendar.availableSlots"]}</span>
-    <div class="slot-picker__date" id="slot-date"></div>
+    <div class="slot-picker__header">
+      <span class="slot-picker__title">{translations["booking.calendar.availableSlots"]}</span>
+      <span class="slot-picker__date" id="slot-date"></span>
+    </div>
     <div class="slot-picker__slots" id="slot-list"></div>
   </div>
 
@@ -260,12 +262,20 @@ const monthNames = lang === "sk"
       available.forEach((s: any) => {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.textContent = `${s.startTime} - ${s.endTime}`;
         btn.className = "slot-picker__slot";
+
+        const timeSpan = document.createElement("span");
+        timeSpan.className = "slot-picker__slot-time";
+        timeSpan.textContent = `${s.startTime} - ${s.endTime}`;
+        btn.appendChild(timeSpan);
 
         if (s.isBlocked || s.isBooked) {
           btn.classList.add(s.isBlocked ? "slot-picker__slot--blocked" : "slot-picker__slot--booked");
         } else {
+          const label = document.createElement("span");
+          label.className = "slot-picker__slot-label";
+          label.textContent = tr["booking.calendar.slotAvailable"] || "available";
+          btn.appendChild(label);
           btn.addEventListener("click", () => selectSlot(s.id, btn));
         }
 
@@ -385,7 +395,16 @@ const monthNames = lang === "sk"
 
         if (res.ok) {
           const data = await res.json();
-          window.location.href = `${confirmPath}/${data.id}`;
+          const qs = new URLSearchParams({
+            session: data.sessionType?.name || "",
+            name: data.clientName || "",
+            email: data.clientEmail || "",
+            price: String(data.totalPrice ?? ""),
+            currency: data.currency || "EUR",
+            status: data.status || "Pending",
+            ...(data.slot ? { date: data.slot.date, time: `${data.slot.startTime} - ${data.slot.endTime}` } : {}),
+          });
+          window.location.href = `${confirmPath}/${data.id}?${qs.toString()}`;
         } else {
           const err = await res.json().catch(() => ({}));
           formApiError.textContent = (err as any).error || `Error: ${res.status}`;
@@ -406,6 +425,6 @@ const monthNames = lang === "sk"
   });
 </script>
 
-<style lang="scss">
+<style lang="scss" is:global>
   @use "../styles/components/booking-calendar";
 </style>

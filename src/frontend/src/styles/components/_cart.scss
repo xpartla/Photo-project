@@ -1,0 +1,234 @@
+@use "../variables" as *;
+
+.cart {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.cart__title {
+  font-family: $font-heading;
+  font-size: 2.25rem;
+  color: $dark;
+  margin: 0 0 32px;
+  text-align: center;
+}
+
+// ── Empty state ───────────────────────────────────────────────────
+
+.cart__empty {
+  text-align: center;
+  padding: 64px 24px;
+  border: $outline-width solid $dark;
+  border-radius: 12px;
+  background: $white;
+  box-shadow: 4px 4px 0 $dark;
+}
+
+.cart__empty-text {
+  font-size: 1.1rem;
+  color: $dark;
+  margin: 0 0 24px;
+}
+
+.cart__empty-link {
+  display: inline-block;
+  font-family: $font-body;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 28px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $sage;
+  color: $white;
+  box-shadow: 3px 3px 0 $dark;
+  text-decoration: none;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+}
+
+// ── Cart items ────────────────────────────────────────────────────
+
+.cart__items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.cart-item {
+  display: grid;
+  grid-template-columns: 80px 1fr auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: $outline-width solid $dark;
+  border-radius: 12px;
+  background: $white;
+
+  @media (max-width: $breakpoint-sm) {
+    grid-template-columns: 60px 1fr;
+    gap: 12px;
+  }
+}
+
+.cart-item__image {
+  width: 80px;
+  height: 80px;
+  border: 2px solid $dark;
+  border-radius: 8px;
+  overflow: hidden;
+  object-fit: cover;
+
+  @media (max-width: $breakpoint-sm) {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+.cart-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cart-item__title {
+  font-family: $font-heading;
+  font-size: 1rem;
+  color: $dark;
+  margin: 0;
+}
+
+.cart-item__price {
+  font-family: $font-body;
+  font-size: 0.9rem;
+  color: $dark;
+  opacity: 0.8;
+}
+
+.cart-item__quantity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  @media (max-width: $breakpoint-sm) {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+.cart-item__qty-btn {
+  width: 32px;
+  height: 32px;
+  border: 2px solid $dark;
+  border-radius: 8px;
+  background: $cream;
+  color: $dark;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background $transition-fast;
+
+  &:hover {
+    background: rgba($peach, 0.3);
+  }
+}
+
+.cart-item__qty-value {
+  font-family: $font-body;
+  font-weight: 700;
+  min-width: 24px;
+  text-align: center;
+}
+
+.cart-item__remove {
+  font-family: $font-body;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: $rose;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+
+  @media (max-width: $breakpoint-sm) {
+    grid-column: 1 / -1;
+    text-align: right;
+  }
+}
+
+// ── Cart footer ───────────────────────────────────────────────────
+
+.cart__footer {
+  border: $outline-width solid $dark;
+  border-radius: 12px;
+  background: $white;
+  box-shadow: 4px 4px 0 $dark;
+  padding: 24px;
+}
+
+.cart__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+
+  span:first-child {
+    font-family: $font-body;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  span:last-child {
+    font-family: $font-heading;
+    font-size: 1.5rem;
+    color: $dark;
+  }
+}
+
+.cart__checkout-btn {
+  display: block;
+  width: 100%;
+  font-family: $font-body;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 32px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $peach;
+  color: $dark;
+  box-shadow: 3px 3px 0 $dark;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    box-shadow: none;
+    transform: translateY(1px);
+  }
+}
+
+.cart__login-notice {
+  text-align: center;
+  font-size: 0.9rem;
+  color: $dark;
+  opacity: 0.7;
+  margin-top: 12px;
+}

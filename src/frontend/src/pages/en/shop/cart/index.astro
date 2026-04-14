@@ -1,0 +1,105 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import { t, getAlternateUrl } from "../../../../lib/i18n";
+
+const lang = "en";
+const pageUrl = Astro.url.pathname;
+const alternateUrl = getAlternateUrl(lang, pageUrl);
+const pageTitle = `${t(lang, "cart.title")} — PartlPhoto`;
+const shopUrl = `/${lang}/shop`;
+const checkoutUrl = `/${lang}/shop/checkout`;
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <main class="cart">
+    <h1 class="cart__title">{t(lang, "cart.title")}</h1>
+
+    <div id="cart-content">
+      <div class="cart__empty">
+        <p class="cart__empty-text">{t(lang, "cart.empty")}</p>
+        <a href={shopUrl} class="cart__empty-link">{t(lang, "cart.browseShop")}</a>
+      </div>
+    </div>
+  </main>
+
+  <script define:vars={{ lang, shopUrl, checkoutUrl, labels: {
+    empty: t(lang, "cart.empty"),
+    emptyText: t(lang, "cart.emptyText"),
+    browseShop: t(lang, "cart.browseShop"),
+    quantity: t(lang, "cart.quantity"),
+    remove: t(lang, "cart.remove"),
+    total: t(lang, "cart.total"),
+    checkout: t(lang, "cart.checkout"),
+  } }}>
+    const CART_KEY = 'partlphoto_cart';
+
+    function renderCart() {
+      const container = document.getElementById('cart-content');
+      if (!container) return;
+
+      let cart = [];
+      try { cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch {}
+
+      if (cart.length === 0) {
+        container.innerHTML = `
+          <div class="cart__empty">
+            <p class="cart__empty-text">${labels.empty}</p>
+            <a href="${shopUrl}" class="cart__empty-link">${labels.browseShop}</a>
+          </div>`;
+        return;
+      }
+
+      const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+      const itemsHtml = cart.map(item => `
+        <div class="cart-item" data-slug="${item.productSlug}">
+          ${item.imageUrl
+            ? `<img class="cart-item__image" src="${item.imageUrl}" alt="${item.title}" />`
+            : `<div class="cart-item__image" style="background:#eee"></div>`}
+          <div class="cart-item__info">
+            <h3 class="cart-item__title">${item.title}</h3>
+            <span class="cart-item__price">${item.price} ${item.currency || 'EUR'}</span>
+          </div>
+          <div class="cart-item__quantity">
+            <button class="cart-item__qty-btn" data-action="decrease" data-slug="${item.productSlug}">-</button>
+            <span class="cart-item__qty-value">${item.quantity}</span>
+            <button class="cart-item__qty-btn" data-action="increase" data-slug="${item.productSlug}">+</button>
+          </div>
+          <button class="cart-item__remove" data-action="remove" data-slug="${item.productSlug}">${labels.remove}</button>
+        </div>`).join('');
+
+      container.innerHTML = `
+        <div class="cart__items">${itemsHtml}</div>
+        <div class="cart__footer">
+          <div class="cart__total">
+            <span>${labels.total}</span>
+            <span>${total.toFixed(2)} EUR</span>
+          </div>
+          <a href="${checkoutUrl}" class="cart__checkout-btn">${labels.checkout}</a>
+        </div>`;
+
+      container.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const slug = btn.getAttribute('data-slug');
+          const action = btn.getAttribute('data-action');
+          let cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+          const idx = cart.findIndex(i => i.productSlug === slug);
+          if (idx === -1) return;
+
+          if (action === 'increase') { cart[idx].quantity += 1; }
+          else if (action === 'decrease') { cart[idx].quantity -= 1; if (cart[idx].quantity <= 0) cart.splice(idx, 1); }
+          else if (action === 'remove') { cart.splice(idx, 1); }
+
+          localStorage.setItem(CART_KEY, JSON.stringify(cart));
+          renderCart();
+        });
+      });
+    }
+
+    renderCart();
+  </script>
+</BaseLayout>
+
+<style lang="scss">
+  @use "../../../../styles/components/cart";
+</style>

@@ -45,6 +45,31 @@ export function getAlternateUrl(lang: string, path: string): string {
     if (lang === "en" && rest.startsWith("booking")) {
       return `/${altLang}/rezervacia${rest.slice("booking".length)}`;
     }
+    // Shop routes: obchod ↔ shop
+    if (lang === "sk" && rest.startsWith("obchod/kosik")) {
+      return `/${altLang}/shop/cart${rest.slice("obchod/kosik".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("shop/cart")) {
+      return `/${altLang}/obchod/kosik${rest.slice("shop/cart".length)}`;
+    }
+    if (lang === "sk" && rest.startsWith("obchod/pokladna")) {
+      return `/${altLang}/shop/checkout${rest.slice("obchod/pokladna".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("shop/checkout")) {
+      return `/${altLang}/obchod/pokladna${rest.slice("shop/checkout".length)}`;
+    }
+    if (lang === "sk" && rest.startsWith("obchod/objednavky/")) {
+      return `/${altLang}/shop/orders/${rest.slice("obchod/objednavky/".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("shop/orders/")) {
+      return `/${altLang}/obchod/objednavky/${rest.slice("shop/orders/".length)}`;
+    }
+    if (lang === "sk" && rest.startsWith("obchod")) {
+      return `/${altLang}/shop${rest.slice("obchod".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("shop")) {
+      return `/${altLang}/obchod${rest.slice("shop".length)}`;
+    }
     return `/${altLang}/${rest}`;
   }
   return `/${altLang}${path}`;

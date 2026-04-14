@@ -1,0 +1,344 @@
+@use "../variables" as *;
+
+// ── Shop page ─────────────────────────────────────────────────────
+
+.shop {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.shop__header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.shop__title {
+  font-family: $font-heading;
+  font-size: 2.25rem;
+  color: $dark;
+  margin: 0 0 8px;
+}
+
+.shop__subtitle {
+  font-family: $font-body;
+  font-size: 1.1rem;
+  color: $dark;
+  opacity: 0.8;
+  margin: 0;
+}
+
+// ── Filters ───────────────────────────────────────────────────────
+
+.shop__filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 32px;
+}
+
+.shop__filter-btn {
+  font-family: $font-body;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 20px;
+  border: 2px solid $dark;
+  border-radius: 20px;
+  background: $white;
+  color: $dark;
+  cursor: pointer;
+  transition: all $transition-base;
+
+  &:hover {
+    background: rgba($peach, 0.15);
+  }
+
+  &--active {
+    background: $peach;
+    box-shadow: 2px 2px 0 $dark;
+  }
+}
+
+// ── Product grid ──────────────────────────────────────────────────
+
+.shop__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 32px;
+
+  @media (max-width: $breakpoint-sm) {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+.shop__empty {
+  text-align: center;
+  padding: 64px 24px;
+  font-size: 1.1rem;
+  color: $dark;
+  opacity: 0.7;
+}
+
+// ── Product card ──────────────────────────────────────────────────
+
+.product-card {
+  border: $outline-width solid $dark;
+  border-radius: 12px;
+  background: $white;
+  box-shadow: 4px 4px 0 $dark;
+  overflow: hidden;
+  transition: transform $transition-base, box-shadow $transition-base;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 6px 6px 0 $dark;
+  }
+}
+
+.product-card__image {
+  position: relative;
+  overflow: hidden;
+  border-bottom: $outline-width solid $dark;
+
+  img,
+  picture {
+    display: block;
+    width: 100%;
+    height: 280px;
+    object-fit: cover;
+  }
+}
+
+.product-card__badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-family: $font-body;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 12px;
+  border: 2px solid $dark;
+  border-radius: 20px;
+  background: $peach;
+  color: $dark;
+
+  &--sold-out {
+    background: $rose;
+    color: $white;
+  }
+}
+
+.product-card__body {
+  padding: 20px;
+}
+
+.product-card__title {
+  font-family: $font-heading;
+  font-size: 1.15rem;
+  color: $dark;
+  margin: 0 0 4px;
+}
+
+.product-card__format {
+  font-family: $font-body;
+  font-size: 0.85rem;
+  color: $dark;
+  opacity: 0.7;
+  margin: 0 0 12px;
+}
+
+.product-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.product-card__price {
+  font-family: $font-heading;
+  font-size: 1.25rem;
+  color: $dark;
+}
+
+.product-card__cta {
+  font-family: $font-body;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 20px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $peach;
+  color: $dark;
+  box-shadow: 3px 3px 0 $dark;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    box-shadow: none;
+    transform: translateY(1px);
+  }
+}
+
+// ── Product detail ────────────────────────────────────────────────
+
+.product-detail {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: start;
+
+  @media (max-width: $breakpoint-md) {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+.product-detail__image {
+  border: $outline-width-thick solid $dark;
+  border-radius: 0; // print preview style — sharp corners
+  box-shadow: 5px 5px 0 $dark;
+  overflow: hidden;
+
+  img,
+  picture {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+.product-detail__info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.product-detail__back {
+  font-family: $font-body;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: $dark;
+  text-decoration: none;
+
+  &:hover {
+    color: $terracotta;
+  }
+}
+
+.product-detail__title {
+  font-family: $font-heading;
+  font-size: 2rem;
+  color: $dark;
+  margin: 0;
+}
+
+.product-detail__description {
+  font-family: $font-body;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: $dark;
+  margin: 0;
+}
+
+.product-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.product-detail__meta-item {
+  font-family: $font-body;
+  font-size: 0.85rem;
+  color: $dark;
+  padding: 8px 16px;
+  border: 2px solid $dark;
+  border-radius: 8px;
+  background: rgba($terracotta, 0.08);
+
+  strong {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+    opacity: 0.7;
+  }
+}
+
+.product-detail__edition {
+  font-family: $font-body;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 12px 16px;
+  border: 2px solid $dark;
+  border-radius: 8px;
+  background: rgba($peach, 0.15);
+
+  &--sold-out {
+    background: rgba($rose, 0.15);
+  }
+}
+
+.product-detail__price {
+  font-family: $font-heading;
+  font-size: 2rem;
+  color: $dark;
+}
+
+.product-detail__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.product-detail__add-btn {
+  font-family: $font-body;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 32px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $peach;
+  color: $dark;
+  box-shadow: 3px 3px 0 $dark;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    box-shadow: none;
+    transform: translateY(1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+
+    &:hover {
+      box-shadow: 3px 3px 0 $dark;
+      transform: none;
+    }
+  }
+}

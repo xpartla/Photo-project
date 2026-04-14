@@ -1,0 +1,131 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../components/SeoMeta.astro";
+import { getProducts } from "../../../lib/api";
+import { t, getAlternateUrl } from "../../../lib/i18n";
+import { buildSrcset, getFallbackUrl } from "../../../lib/imageUrl";
+import type { ShopProduct } from "../../../lib/api";
+
+const lang = "sk";
+const pageUrl = Astro.url.pathname;
+const alternateUrl = getAlternateUrl(lang, pageUrl);
+
+let products: ShopProduct[] = [];
+let total = 0;
+
+try {
+  const result = await getProducts({ lang, size: 50 });
+  products = result.items;
+  total = result.total;
+} catch {
+  // fallback
+}
+
+const pageTitle = `${t(lang, "shop.title")} — PartlPhoto`;
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={t(lang, "shop.description")}
+    lang={lang}
+    path={pageUrl}
+  />
+
+  <main class="shop">
+    <div class="shop__header">
+      <h1 class="shop__title">{t(lang, "shop.title")}</h1>
+      <p class="shop__subtitle">{t(lang, "shop.subtitle")}</p>
+    </div>
+
+    <div class="shop__filters">
+      <button class="shop__filter-btn shop__filter-btn--active" data-filter="all">
+        {t(lang, "shop.filter.all")}
+      </button>
+      <button class="shop__filter-btn" data-filter="available">
+        {t(lang, "shop.filter.available")}
+      </button>
+      <button class="shop__filter-btn" data-filter="sold-out">
+        {t(lang, "shop.filter.soldOut")}
+      </button>
+    </div>
+
+    {products.length === 0 ? (
+      <p class="shop__empty">{t(lang, "shop.noProducts")}</p>
+    ) : (
+      <div class="shop__grid" id="product-grid">
+        {products.map((product) => {
+          const editionRemaining = product.editionRemaining;
+          const isSoldOut = !product.isAvailable;
+          const badgeText = isSoldOut
+            ? t(lang, "shop.soldOut")
+            : product.editionSize
+              ? `${editionRemaining} ${t(lang, "shop.remaining")}`
+              : t(lang, "shop.openEdition");
+          const badgeClass = isSoldOut ? "product-card__badge--sold-out" : "";
+
+          return (
+            <a href={`/${lang}/obchod/${product.slug}`} class="product-card" data-available={product.isAvailable ? "true" : "false"}>
+              <div class="product-card__image">
+                {product.variants.length > 0 ? (
+                  <picture>
+                    <source
+                      srcset={buildSrcset(product.variants, "webp")}
+                      type="image/webp"
+                    />
+                    <img
+                      src={getFallbackUrl(product.variants)}
+                      alt={product.title}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </picture>
+                ) : (
+                  <div style="height:280px;background:#eee;display:flex;align-items:center;justify-content:center;">
+                    <span>No image</span>
+                  </div>
+                )}
+                <span class={`product-card__badge ${badgeClass}`}>
+                  {badgeText}
+                </span>
+              </div>
+              <div class="product-card__body">
+                <h3 class="product-card__title">{product.title}</h3>
+                {product.format && (
+                  <p class="product-card__format">{product.format}</p>
+                )}
+                <div class="product-card__footer">
+                  <span class="product-card__price">{product.price} {product.currency}</span>
+                  <span class="product-card__cta">{t(lang, "shop.viewDetail")}</span>
+                </div>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    )}
+  </main>
+
+  <script>
+    document.querySelectorAll('.shop__filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.shop__filter-btn').forEach(b => b.classList.remove('shop__filter-btn--active'));
+        btn.classList.add('shop__filter-btn--active');
+
+        const filter = btn.getAttribute('data-filter');
+        document.querySelectorAll('.product-card').forEach(card => {
+          const el = card;
+          const isAvailable = el.getAttribute('data-available') === 'true';
+          if (filter === 'all') { el.style.display = ''; }
+          else if (filter === 'available') { el.style.display = isAvailable ? '' : 'none'; }
+          else if (filter === 'sold-out') { el.style.display = !isAvailable ? '' : 'none'; }
+        });
+      });
+    });
+  </script>
+</BaseLayout>
+
+<style lang="scss">
+  @use "../../../styles/components/shop";
+</style>
