@@ -1,0 +1,119 @@
+@use "../variables" as *;
+
+.login {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - #{$nav-height} - 200px);
+  padding: 48px 24px;
+}
+
+.login__card {
+  width: 100%;
+  max-width: 420px;
+  border: $outline-width solid $dark;
+  border-radius: 16px;
+  background: $white;
+  box-shadow: 6px 6px 0 $dark;
+  padding: 40px 32px;
+}
+
+.login__title {
+  font-family: $font-heading;
+  font-size: 1.75rem;
+  color: $dark;
+  text-align: center;
+  margin: 0 0 32px;
+}
+
+.login__form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.login__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.login__label {
+  font-family: $font-body;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: $dark;
+}
+
+.login__input {
+  font-family: $font-body;
+  font-size: 1rem;
+  padding: 12px 14px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $white;
+  color: $dark;
+  transition: border-color $transition-fast, background $transition-fast;
+
+  &:focus {
+    outline: none;
+    border-color: $sage;
+    background: $cream;
+    box-shadow: 0 0 0 3px rgba($sage, 0.2);
+  }
+}
+
+.login__error {
+  font-family: $font-body;
+  font-size: 0.85rem;
+  color: $rose;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+.login__submit {
+  font-family: $font-body;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 32px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $sage;
+  color: $white;
+  box-shadow: 3px 3px 0 $dark;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    box-shadow: none;
+    transform: translateY(1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.login__register-link {
+  font-family: $font-body;
+  font-size: 0.9rem;
+  text-align: center;
+  margin-top: 24px;
+  color: $dark;
+
+  a {
+    color: $sage;
+    font-weight: 700;
+    text-decoration: underline;
+  }
+}

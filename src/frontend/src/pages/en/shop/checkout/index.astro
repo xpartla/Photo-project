@@ -80,6 +80,12 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
   <script define:vars={{ apiBase, lang, processingText: t(lang, "checkout.processing"), requiredText: t(lang, "checkout.required") }}>
     const CART_KEY = 'partlphoto_cart';
 
+    // Redirect to login if not authenticated
+    if (!localStorage.getItem('partlphoto_token')) {
+      window.location.href = '/' + lang + '/login?return=/' + lang + '/shop/checkout';
+      throw new Error('redirect');
+    }
+
     let cart = [];
     try { cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch {}
 
@@ -124,11 +130,16 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
 
       if (token && cart.length > 0) {
         try {
-          await fetch(`${apiBase}/api/shop/cart/sync`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ items: cart.map(i => ({ productSlug: i.productSlug, quantity: i.quantity })) })
-          });
+          const serverCart = await fetch(`${apiBase}/api/shop/cart`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }).then(r => r.json());
+          if (!serverCart.items || serverCart.items.length === 0) {
+            await fetch(`${apiBase}/api/shop/cart/sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ items: cart.map(i => ({ productSlug: i.productSlug, quantity: i.quantity })) })
+            });
+          }
         } catch {}
       }
 

@@ -102,7 +102,12 @@ const shopUrl = `/${lang}/shop`;
               </div>
             </div>
 
-            <div style="text-align:center;margin-top:32px;">
+            ${order.status === 'pending_payment' && order.paymentId ? `
+            <div style="text-align:center;margin-top:24px;">
+              <a href="/mock-pay/${order.paymentId}" style="display:inline-block;font-family:'Nunito',sans-serif;font-size:0.95rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:14px 32px;border:3px solid #2A2A2A;border-radius:8px;background:#F2B880;color:#2A2A2A;box-shadow:3px 3px 0 #2A2A2A;text-decoration:none;">Pay now</a>
+            </div>` : ''}
+
+            <div style="text-align:center;margin-top:24px;">
               <a href="${shopUrl}" style="font-weight:700;color:#2A2A2A;">&larr; ${labels.backToShop}</a>
             </div>
           </div>`;
@@ -115,6 +120,6 @@ const shopUrl = `/${lang}/shop`;
   </script>
 </BaseLayout>
 
-<style lang="scss">
+<style lang="scss" is:global>
   @use "../../../../styles/components/cart";
 </style>

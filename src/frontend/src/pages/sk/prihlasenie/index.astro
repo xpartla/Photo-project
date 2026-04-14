@@ -1,0 +1,105 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { t } from "../../../lib/i18n";
+
+const lang = "sk";
+const pageTitle = `${t(lang, "nav.login")} — PartlPhoto`;
+const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <main class="login">
+    <div class="login__card">
+      <h1 class="login__title">{t(lang, "nav.login")}</h1>
+
+      <form class="login__form" id="login-form">
+        <div class="login__field">
+          <label class="login__label" for="email">Email</label>
+          <input class="login__input" id="email" type="email" required autocomplete="email" />
+        </div>
+
+        <div class="login__field">
+          <label class="login__label" for="password">{t(lang, "login.password")}</label>
+          <input class="login__input" id="password" type="password" required autocomplete="current-password" />
+        </div>
+
+        <div id="login-error" class="login__error"></div>
+
+        <button class="login__submit" type="submit" id="login-btn">
+          {t(lang, "nav.login")}
+        </button>
+      </form>
+
+      <p class="login__register-link">
+        {t(lang, "login.noAccount")}
+        <a href={`/${lang}/registracia`}>{t(lang, "login.register")}</a>
+      </p>
+    </div>
+  </main>
+
+  <script define:vars={{ apiBase, lang }}>
+    const form = document.getElementById('login-form');
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const btn = document.getElementById('login-btn');
+      const errEl = document.getElementById('login-error');
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      btn.disabled = true;
+      btn.textContent = '...';
+      errEl.textContent = '';
+
+      try {
+        const res = await fetch(apiBase + '/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(function() { return {}; });
+          throw new Error(err.error || 'Login failed');
+        }
+
+        const data = await res.json();
+        localStorage.setItem('partlphoto_token', data.accessToken);
+        localStorage.setItem('partlphoto_user', JSON.stringify({
+          id: data.userId, email: data.email, role: data.role
+        }));
+
+        // Sync localStorage cart to server
+        const CART_KEY = 'partlphoto_cart';
+        const localCart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+        if (localCart.length > 0) {
+          try {
+            await fetch(apiBase + '/api/shop/cart/sync', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + data.accessToken
+              },
+              body: JSON.stringify({
+                items: localCart.map(function(i) { return { productSlug: i.productSlug, quantity: i.quantity }; })
+              })
+            });
+            localStorage.setItem(CART_KEY, '[]');
+          } catch(e) { /* sync failed, keep local cart */ }
+        }
+
+        // Redirect to return URL or home
+        const params = new URLSearchParams(window.location.search);
+        const returnUrl = params.get('return') || '/' + lang;
+        window.location.href = returnUrl;
+      } catch (err) {
+        errEl.textContent = err.message;
+        btn.disabled = false;
+        btn.textContent = 'Prihlásiť';
+      }
+    });
+  </script>
+</BaseLayout>
+
+<style lang="scss">
+  @use "../../../styles/components/login";
+</style>

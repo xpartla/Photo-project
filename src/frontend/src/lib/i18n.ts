@@ -45,6 +45,13 @@ export function getAlternateUrl(lang: string, path: string): string {
     if (lang === "en" && rest.startsWith("booking")) {
       return `/${altLang}/rezervacia${rest.slice("booking".length)}`;
     }
+    // Login routes: prihlasenie ↔ login
+    if (lang === "sk" && rest.startsWith("prihlasenie")) {
+      return `/${altLang}/login${rest.slice("prihlasenie".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("login")) {
+      return `/${altLang}/prihlasenie${rest.slice("login".length)}`;
+    }
     // Shop routes: obchod ↔ shop
     if (lang === "sk" && rest.startsWith("obchod/kosik")) {
       return `/${altLang}/shop/cart${rest.slice("obchod/kosik".length)}`;

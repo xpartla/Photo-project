@@ -80,6 +80,12 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
   <script define:vars={{ apiBase, lang, processingText: t(lang, "checkout.processing"), requiredText: t(lang, "checkout.required") }}>
     const CART_KEY = 'partlphoto_cart';
 
+    // Redirect to login if not authenticated
+    if (!localStorage.getItem('partlphoto_token')) {
+      window.location.href = '/' + lang + '/prihlasenie?return=/' + lang + '/obchod/pokladna';
+      throw new Error('redirect');
+    }
+
     // Render summary from localStorage
     let cart = [];
     try { cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch {}
@@ -124,17 +130,22 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
       btn.textContent = processingText;
       if (errEl) errEl.textContent = '';
 
-      // Get auth token from cookie/localStorage
       const token = localStorage.getItem('partlphoto_token');
 
-      // First sync cart if authenticated
+      // Sync localStorage cart to server (only if not already synced at login)
+      // Check if server cart has items; if not, push local cart
       if (token && cart.length > 0) {
         try {
-          await fetch(`${apiBase}/api/shop/cart/sync`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ items: cart.map(i => ({ productSlug: i.productSlug, quantity: i.quantity })) })
-          });
+          const serverCart = await fetch(`${apiBase}/api/shop/cart`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }).then(r => r.json());
+          if (!serverCart.items || serverCart.items.length === 0) {
+            await fetch(`${apiBase}/api/shop/cart/sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ items: cart.map(i => ({ productSlug: i.productSlug, quantity: i.quantity })) })
+            });
+          }
         } catch {}
       }
 

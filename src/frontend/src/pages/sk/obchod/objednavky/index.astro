@@ -1,0 +1,105 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import { t } from "../../../../lib/i18n";
+
+const lang = "sk";
+const pageTitle = `${t(lang, "order.myOrders")} — PartlPhoto`;
+const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <main class="cart">
+    <h1 class="cart__title">{t(lang, "order.myOrders")}</h1>
+    <div id="orders-content" style="text-align:center;padding:24px;">
+      <p>Loading...</p>
+    </div>
+  </main>
+
+  <script define:vars={{ apiBase, lang, labels: {
+    noOrders: "Zatiaľ žiadne objednávky.",
+    backToShop: t(lang, "order.backToShop"),
+    status: t(lang, "order.status"),
+    total: t(lang, "order.total"),
+    statusPending: t(lang, "order.status.pending_payment"),
+    statusPaid: t(lang, "order.status.paid"),
+    statusProcessing: t(lang, "order.status.processing"),
+    statusShipped: t(lang, "order.status.shipped"),
+    statusCompleted: t(lang, "order.status.completed"),
+    statusCancelled: t(lang, "order.status.cancelled"),
+    statusRefunded: t(lang, "order.status.refunded"),
+  } }}>
+    const statusLabels = {
+      pending_payment: labels.statusPending,
+      paid: labels.statusPaid,
+      processing: labels.statusProcessing,
+      shipped: labels.statusShipped,
+      completed: labels.statusCompleted,
+      cancelled: labels.statusCancelled,
+      refunded: labels.statusRefunded,
+    };
+
+    const statusColors = {
+      pending_payment: '#F2B880',
+      paid: '#7EAA92',
+      processing: '#B8A0C8',
+      shipped: '#D4896A',
+      completed: '#7EAA92',
+      cancelled: '#D97B8F',
+      refunded: '#D97B8F',
+    };
+
+    async function loadOrders() {
+      const container = document.getElementById('orders-content');
+      if (!container) return;
+
+      const token = localStorage.getItem('partlphoto_token');
+      if (!token) {
+        window.location.href = '/' + lang + '/prihlasenie?return=/' + lang + '/obchod/objednavky';
+        return;
+      }
+
+      try {
+        const res = await fetch(apiBase + '/api/shop/my-orders', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Error ' + res.status);
+        const orders = await res.json();
+
+        if (orders.length === 0) {
+          container.innerHTML = '<div class="cart__empty"><p class="cart__empty-text">' + labels.noOrders + '</p><a href="/' + lang + '/obchod" class="cart__empty-link">' + labels.backToShop + '</a></div>';
+          return;
+        }
+
+        const html = orders.map(function(order) {
+          const statusLabel = statusLabels[order.status] || order.status;
+          const statusColor = statusColors[order.status] || '#2A2A2A';
+          const date = new Date(order.createdAt).toLocaleDateString('sk-SK');
+          const itemCount = order.items.length;
+
+          return '<a href="/' + lang + '/obchod/objednavky/' + order.id + '" class="cart-item" style="text-decoration:none;cursor:pointer;">' +
+            '<div class="cart-item__info" style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;width:100%;">' +
+              '<div>' +
+                '<h3 class="cart-item__title">#' + order.id.slice(0, 8).toUpperCase() + '</h3>' +
+                '<span class="cart-item__price">' + date + ' — ' + itemCount + ' ' + (itemCount === 1 ? 'item' : 'items') + '</span>' +
+              '</div>' +
+              '<div style="display:flex;align-items:center;gap:12px;">' +
+                '<span style="padding:4px 12px;border:2px solid #2A2A2A;border-radius:20px;background:' + statusColor + ';color:#FFF8F0;font-size:0.75rem;font-weight:700;text-transform:uppercase;">' + statusLabel + '</span>' +
+                '<span class="cart-item__title">' + order.totalAmount + ' ' + order.currency + '</span>' +
+              '</div>' +
+            '</div>' +
+          '</a>';
+        }).join('');
+
+        container.innerHTML = '<div class="cart__items">' + html + '</div>';
+      } catch (err) {
+        container.innerHTML = '<p>Error: ' + err.message + '</p>';
+      }
+    }
+
+    loadOrders();
+  </script>
+</BaseLayout>
+
+<style lang="scss" is:global>
+  @use "../../../../styles/components/cart";
+</style>

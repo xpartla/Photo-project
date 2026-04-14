@@ -61,77 +61,123 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
     })} />
   </Fragment>
 
-  <div class="product-detail">
-    <div class="product-detail__image">
-      {product.variants.length > 0 ? (
-        <picture>
-          <source
-            srcset={buildSrcset(product.variants, "webp")}
-            type="image/webp"
-          />
-          <img
-            src={getFallbackUrl(product.variants)}
-            alt={product.title}
-            loading="eager"
-          />
-        </picture>
-      ) : (
-        <div style="height:400px;background:#eee;display:flex;align-items:center;justify-content:center;">
-          <span>No image</span>
+  <div class="product-detail-page">
+    <!-- Decorative background blobs -->
+    <div class="product-detail-page__decor product-detail-page__decor--1"></div>
+    <div class="product-detail-page__decor product-detail-page__decor--2"></div>
+    <div class="product-detail-page__decor product-detail-page__decor--3"></div>
+
+    <div class="product-detail">
+      <!-- Framed print -->
+      <div class="product-detail__frame">
+        <div class="product-detail__mat">
+          <div class="product-detail__image">
+            {product.variants.length > 0 ? (
+              <picture>
+                <source
+                  srcset={buildSrcset(product.variants, "webp")}
+                  type="image/webp"
+                />
+                <img
+                  src={getFallbackUrl(product.variants)}
+                  alt={product.title}
+                  loading="eager"
+                />
+              </picture>
+            ) : (
+              <div style="height:400px;background:#eee;display:flex;align-items:center;justify-content:center;">
+                <span>No image</span>
+              </div>
+            )}
+          </div>
+          {product.editionSize ? (
+            <span class={`product-detail__stamp product-detail__stamp--limited ${isSoldOut ? "product-detail__stamp--sold-out" : ""}`}>
+              {isSoldOut ? t(lang, "shop.soldOut") : `${product.editionRemaining}/${product.editionSize}`}
+            </span>
+          ) : (
+            <span class="product-detail__stamp">
+              {t(lang, "shop.openEdition")}
+            </span>
+          )}
         </div>
-      )}
+      </div>
+
+      <!-- Info panel -->
+      <div class="product-detail__info">
+        <a href={`/${lang}/obchod`} class="product-detail__back product-detail__reveal">
+          &larr; {t(lang, "shop.backToShop")}
+        </a>
+
+        <h1 class="product-detail__title product-detail__reveal">{product.title}</h1>
+
+        <hr class="product-detail__divider product-detail__reveal" />
+
+        {product.description && (
+          <p class="product-detail__description product-detail__reveal">{product.description}</p>
+        )}
+
+        <div class="product-detail__meta product-detail__reveal">
+          {product.format && (
+            <div class="product-detail__meta-item">
+              <strong>{t(lang, "shop.format")}</strong>
+              {product.format}
+            </div>
+          )}
+          {product.paperType && (
+            <div class="product-detail__meta-item">
+              <strong>{t(lang, "shop.paperType")}</strong>
+              {product.paperType}
+            </div>
+          )}
+        </div>
+
+        <div class={`product-detail__edition product-detail__reveal ${isSoldOut ? "product-detail__edition--sold-out" : ""}`}>
+          <span class="product-detail__edition-dot"></span>
+          {isSoldOut ? t(lang, "shop.soldOut") : editionText}
+        </div>
+
+        <div class="product-detail__price-row product-detail__reveal">
+          <span class="product-detail__price">{product.price}</span>
+          <span class="product-detail__currency">{product.currency}</span>
+        </div>
+
+        <div class="product-detail__actions product-detail__reveal">
+          <button
+            class="product-detail__add-btn"
+            id="add-to-cart-btn"
+            data-product-id={product.id}
+            data-product-slug={product.slug}
+            data-product-title={product.title}
+            data-product-price={product.price}
+            data-product-currency={product.currency}
+            data-product-image={product.variants.length > 0 ? getFallbackUrl(product.variants) : ""}
+            data-edition-size={product.editionSize ?? ""}
+            data-edition-sold={product.editionSold}
+            disabled={isSoldOut}
+          >
+            {isSoldOut ? t(lang, "shop.soldOut") : t(lang, "shop.addToCart")}
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div class="product-detail__info">
-      <a href={`/${lang}/obchod`} class="product-detail__back">
-        &larr; {t(lang, "shop.backToShop")}
-      </a>
-
-      <h1 class="product-detail__title">{product.title}</h1>
-
-      {product.description && (
-        <p class="product-detail__description">{product.description}</p>
-      )}
-
-      <div class="product-detail__meta">
-        {product.format && (
-          <div class="product-detail__meta-item">
-            <strong>{t(lang, "shop.format")}</strong>
-            {product.format}
-          </div>
-        )}
-        {product.paperType && (
-          <div class="product-detail__meta-item">
-            <strong>{t(lang, "shop.paperType")}</strong>
-            {product.paperType}
-          </div>
-        )}
+    <!-- Quality trust strip -->
+    <div class="product-quality">
+      <div class="product-quality__item">
+        <div class="product-quality__icon">&#9733;</div>
+        <div class="product-quality__label">Fine Art Tlač</div>
       </div>
-
-      <div class={`product-detail__edition ${isSoldOut ? "product-detail__edition--sold-out" : ""}`}>
-        {isSoldOut ? t(lang, "shop.soldOut") : editionText}
+      <div class="product-quality__item">
+        <div class="product-quality__icon">&#9883;</div>
+        <div class="product-quality__label">Archívny papier</div>
       </div>
-
-      <div class="product-detail__price">
-        {product.price} {product.currency}
+      <div class="product-quality__item">
+        <div class="product-quality__icon">&#10003;</div>
+        <div class="product-quality__label">Certifikát pravosti</div>
       </div>
-
-      <div class="product-detail__actions">
-        <button
-          class="product-detail__add-btn"
-          id="add-to-cart-btn"
-          data-product-id={product.id}
-          data-product-slug={product.slug}
-          data-product-title={product.title}
-          data-product-price={product.price}
-          data-product-currency={product.currency}
-          data-product-image={product.variants.length > 0 ? getFallbackUrl(product.variants) : ""}
-          data-edition-size={product.editionSize ?? ""}
-          data-edition-sold={product.editionSold}
-          disabled={isSoldOut}
-        >
-          {isSoldOut ? t(lang, "shop.soldOut") : t(lang, "shop.addToCart")}
-        </button>
+      <div class="product-quality__item">
+        <div class="product-quality__icon">&#9993;</div>
+        <div class="product-quality__label">Bezpečné doručenie</div>
       </div>
     </div>
   </div>
@@ -181,6 +227,6 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
   </script>
 </BaseLayout>
 
-<style lang="scss">
+<style lang="scss" is:global>
   @use "../../../styles/components/shop";
 </style>

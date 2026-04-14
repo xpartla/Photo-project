@@ -707,6 +707,7 @@ public static class EShopEndpoints
         {
             id = order.Id,
             status = order.Status,
+            paymentId = order.GoPayPaymentId,
             totalAmount = order.TotalAmount,
             currency = order.Currency,
             shippingAddress = order.ShippingAddressJson,

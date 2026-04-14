@@ -100,6 +100,43 @@
     }
   }
 
+  // ── Cart button ───────────────────────
+  &__cart-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: $outline-width solid transparent;
+    color: $dark;
+    transition: all $transition-base;
+
+    &:hover {
+      border-color: $outline;
+      background-color: rgba($peach, 0.2);
+    }
+  }
+
+  &__cart-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    border: 2px solid $dark;
+    background-color: $rose;
+    color: $white;
+    font-family: $font-body;
+    font-size: 0.7rem;
+    font-weight: 800;
+    line-height: 16px;
+    text-align: center;
+  }
+
   // ── Language button ───────────────────
   &__lang-btn {
     font-family: $font-body;
