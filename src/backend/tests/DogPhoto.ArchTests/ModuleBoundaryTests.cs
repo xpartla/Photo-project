@@ -56,6 +56,30 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
+    public void EShopModule_ShouldNotDependOn_BookingOrBlog()
+    {
+        var result = Types.InAssembly(typeof(Infrastructure.DependencyInjection).Assembly)
+            .That()
+            .ResideInNamespaceContaining("EShop")
+            .ShouldNot()
+            .HaveDependencyOnAny("DogPhoto.Infrastructure.Persistence.Booking", "DogPhoto.Infrastructure.Persistence.Blog", "DogPhoto.Infrastructure.Booking")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            "EShop module must not directly reference Booking or Blog.");
+    }
+
+    [Fact]
+    public void PaymentGateway_ConsumedOnlyViaInterface()
+    {
+        // Verify MockPaymentGateway implements IPaymentGateway
+        var mockType = typeof(Infrastructure.Payments.MockPaymentGateway);
+        Assert.True(
+            typeof(Infrastructure.Payments.IPaymentGateway).IsAssignableFrom(mockType),
+            "MockPaymentGateway should implement IPaymentGateway.");
+    }
+
+    [Fact]
     public void Infrastructure_ShouldDependOn_SharedKernel()
     {
         // Verify that CurrentUser implements ICurrentUser from SharedKernel

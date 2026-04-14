@@ -1,5 +1,46 @@
 # Changelog
 
+## Epic 6: E-Shop Module (2026-04-14)
+
+### Added
+- **Payment gateway abstraction** — `IPaymentGateway` interface with `CreatePayment`, `GetPaymentStatus`, `RefundPayment` + `MockPaymentGateway` that simulates the full GoPay flow (in-memory state, fake redirect URLs to `/mock-pay/[id]`). Real `GoPayClient` drops in behind the same interface in Epic 9.
+- **Backend API** — 14 shop endpoints: products (list, detail, admin create/update), cart (get, add, update qty, remove, sync from localStorage), orders (create, detail, my-orders, admin status update), payment webhook, payment info for mock page
+- **Order workflow** — Full status state machine: `pending_payment` → `paid` → `processing` → `shipped` → `completed`, plus `cancelled` and `refunded`. Validated transitions prevent invalid state changes. Admin status update endpoint with email notification on each transition.
+- **Limited edition logic** — `edition_size` + `edition_sold` tracking per product with PostgreSQL `xmin` concurrency token. Edition numbers assigned sequentially on order creation. Auto-unavailable when sold out. Concurrency conflicts caught and reported.
+- **Hybrid cart** — localStorage cart for anonymous users, server-side cart for authenticated. On login, localStorage cart syncs to server via `POST /api/shop/cart/sync` (merges items, increments quantity for duplicates). Checkout checks server cart before syncing to prevent double-counting.
+- **Email notifications** — 3 branded HTML email templates: customer order confirmation (with edition numbers), photographer order notification (with fulfillment details), order status update. Same Cuphead styling as booking emails.
+- **Frontend pages** (bilingual SK/EN):
+  - `/sk/obchod`, `/en/shop` — Product grid with Cuphead-styled cards, edition badges ("3 remaining" / "Sold out" / "Open edition"), price in Titan One, availability filter pills
+  - `/sk/obchod/[slug]`, `/en/shop/[slug]` — Product detail with framed print effect (mat/passepartout, thick borders, hover-lift shadow), animated floating background blobs, staggered reveal animations, edition stamp overlay, pulsing availability dot, quality trust strip (Fine Art Print, Archival Paper, Certificate of Authenticity, Safe Delivery)
+  - `/sk/obchod/kosik`, `/en/shop/cart` — Cart page with quantity +/- controls, item removal, running total, checkout button. Renders from localStorage via client-side JS.
+  - `/sk/obchod/pokladna`, `/en/shop/checkout` — Checkout with shipping/billing address forms (same-as-shipping toggle), order summary sidebar, inline validation. Redirects to login if not authenticated.
+  - `/sk/obchod/objednavky`, `/en/shop/orders` — My orders listing with status badges, dates, totals. Each links to order detail.
+  - `/sk/obchod/objednavky/[id]`, `/en/shop/orders/[id]` — Order confirmation/detail with status badge, line items with edition numbers, total. "Pay now" button for orders stuck in `pending_payment`.
+  - `/mock-pay/[id]` — Mock payment page with Confirm/Cancel buttons, redirects to webhook
+- **Login pages** — `/sk/prihlasenie`, `/en/login` with email/password form, JWT stored in localStorage, automatic cart sync on login, `?return=` URL parameter for redirect after auth
+- **Navbar enhancements** — Cart icon (SVG) with badge counter (reads from localStorage, updates on add), auth state management (checks JWT in localStorage, toggles login button vs account dropdown), logout handler, my-orders link in account dropdown
+- **SCSS** — `_shop.scss` (product grid, product detail with animations and decorative blobs), `_cart.scss` (cart items, footer, empty state), `_checkout.scss` (address forms, order summary, mock payment page), `_login.scss` (centered card layout)
+- **i18n** — 70+ shop/cart/checkout/order/login keys in both `sk.json` and `en.json`. Route mapping for `obchod` ↔ `shop` (including sub-routes: `kosik` ↔ `cart`, `pokladna` ↔ `checkout`, `objednavky` ↔ `orders`, `prihlasenie` ↔ `login`)
+- **JSON-LD SEO** — `Product` + `Offer` schemas on product detail pages (price, availability, seller)
+- **Shop seed script** — `scripts/seed-shop.sh` creates 4 products from existing seeded portfolio photos (3 limited editions, 1 open edition), idempotent
+- **Database** — `eshop` schema enhanced: `customer_email` column on `orders`, `xmin` concurrency token on `products`, `pending_payment` default status
+
+### Testing
+- **Integration tests** — 10 xUnit tests: product CRUD (admin create, duplicate slug conflict, public list/detail, bilingual content, auth guard), cart flow (add + get, sync merge), full checkout flow (cart → order → webhook → paid + email), edition number assignment (sequential across two customers), order status invalid transition, auth guards on cart/orders
+- **Architecture tests** — EShop module isolation from Booking/Blog verified; `MockPaymentGateway` implements `IPaymentGateway` verified
+- **Frontend unit tests** — 14 Vitest tests: localStorage cart operations (add, increment, remove, update quantity, clear), cart total calculation, edition badge formatting ("3 remaining", "Sold out", "Open edition")
+- **Playwright E2E** — 10 tests: product listing (SK + EN), filter buttons, product detail page (title, price, edition, quality strip), add to cart + badge update, empty cart state, cart with items, accessibility scans on `/sk/obchod`, product detail, and cart pages
+- **Accessibility** — axe WCAG 2A/2AA scans on shop listing, product detail, and cart
+
+### Design Decisions
+- Hybrid cart (localStorage + server sync) chosen over server-only to reduce auth friction — anonymous users can browse and add to cart freely, items merge on login
+- Full order status pipeline (7 states) built upfront rather than minimal — avoids refactoring when admin panel (Epic 8) adds status management
+- Product detail uses framed "print preview" aesthetic (mat/passepartout + thick borders) rather than standard card — reinforces that these are physical art prints
+- Mock payment page lives in frontend (`/mock-pay/[id]`) rather than backend — consistent with Astro routing, GoPay will handle its own redirect page in production
+- Login pages created as part of this epic (not originally planned) — checkout flow requires authentication, no login UI existed
+
+---
+
 ## Epic 5: Booking Module (2026-04-14)
 
 ### Added
