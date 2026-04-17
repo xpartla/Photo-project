@@ -70,6 +70,24 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
+    public void BlogModule_ShouldNotDependOn_EShopOrBooking()
+    {
+        var result = Types.InAssembly(typeof(Infrastructure.DependencyInjection).Assembly)
+            .That()
+            .ResideInNamespaceContaining("DogPhoto.Infrastructure.Blog")
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "DogPhoto.Infrastructure.Persistence.EShop",
+                "DogPhoto.Infrastructure.Persistence.Booking",
+                "DogPhoto.Infrastructure.EShop",
+                "DogPhoto.Infrastructure.Booking")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            "Blog module must not directly reference EShop or Booking.");
+    }
+
+    [Fact]
     public void PaymentGateway_ConsumedOnlyViaInterface()
     {
         // Verify MockPaymentGateway implements IPaymentGateway

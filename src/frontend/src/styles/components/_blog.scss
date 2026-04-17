@@ -1,0 +1,415 @@
+@use "../variables" as *;
+
+.blog {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+
+  &__header {
+    text-align: center;
+    margin-bottom: 40px;
+    position: relative;
+  }
+
+  &__eyebrow {
+    font-family: $font-body;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.8rem;
+    color: $terracotta;
+    margin-bottom: 8px;
+  }
+
+  &__title {
+    font-family: $font-heading;
+    font-size: 3.5rem;
+    color: $dark;
+    margin: 0 0 8px;
+  }
+
+  &__subtitle {
+    font-family: $font-body;
+    font-size: 1.05rem;
+    color: rgba($dark, 0.75);
+    margin: 0 0 16px;
+  }
+
+  &__back-link {
+    display: inline-block;
+    margin-top: 8px;
+    font-family: $font-body;
+    font-weight: 700;
+    color: $terracotta;
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+
+  &__rss {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-family: $font-body;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $dark;
+    background: $peach;
+    padding: 6px 14px;
+    border: 2px solid $outline;
+    border-radius: 20px;
+    text-decoration: none;
+    box-shadow: 2px 2px 0 $outline;
+    transition: transform $transition-fast, box-shadow $transition-fast;
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 3px 3px 0 $outline;
+    }
+  }
+
+  @media (max-width: $breakpoint-md) {
+    padding: 32px 16px 64px;
+    &__title { font-size: 2.5rem; }
+  }
+}
+
+// ── Filters ─────────────────────────────────────────────────────────
+
+.blog-filters-wrap {
+  max-width: 1040px;
+  margin: 0 auto 32px;
+  background: $white;
+  border: $outline-width solid $outline;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 $outline;
+  overflow: hidden;
+
+  &__summary {
+    padding: 14px 20px;
+    font-family: $font-body;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $dark;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    list-style: none;
+
+    &::-webkit-details-marker { display: none; }
+  }
+
+  &__summary-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: $peach;
+    color: $dark;
+    border: 2px solid $outline;
+    border-radius: 999px;
+    font-size: 0.75rem;
+  }
+
+  &__count {
+    font-size: 0.85rem;
+    color: rgba($dark, 0.7);
+  }
+}
+
+.blog-filters {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 16px;
+  padding: 16px 20px 20px;
+  border-top: 2px solid rgba($dark, 0.1);
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  &__field--search {
+    grid-column: span 1;
+  }
+
+  &__label {
+    font-family: $font-body;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $dark;
+  }
+
+  &__input, &__select {
+    font-family: $font-body;
+    font-size: 0.95rem;
+    padding: 10px 12px;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    background: $white;
+    color: $dark;
+
+    &:focus {
+      outline: none;
+      background: $cream;
+      border-color: $sage;
+      box-shadow: 0 0 0 3px rgba($sage, 0.25);
+    }
+  }
+
+  &__actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  &__submit {
+    font-family: $font-body;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 22px;
+    background: $peach;
+    color: $dark;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    box-shadow: 3px 3px 0 $outline;
+    cursor: pointer;
+    transition: transform $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 4px 4px 0 $outline;
+    }
+    &:active {
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+  }
+
+  &__reset {
+    font-family: $font-body;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    padding: 10px 18px;
+    color: $dark;
+    background: transparent;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background $transition-fast;
+    &:hover { background: $cream; }
+  }
+
+  @media (max-width: $breakpoint-md) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// ── Post cards ──────────────────────────────────────────────────────
+
+.blog-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+.blog-card {
+  background: $white;
+  border: $outline-width solid $outline;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 $outline;
+  overflow: hidden;
+  transition: transform $transition-base, box-shadow $transition-base;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 6px 6px 0 $outline;
+  }
+
+  &__link {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    text-decoration: none;
+    color: $dark;
+
+    @media (max-width: $breakpoint-md) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__image {
+    background: $cream;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+  }
+
+  &__body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  &__category {
+    font-family: $font-body;
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $dark;
+    background: rgba($peach, 0.3);
+    padding: 3px 10px;
+    border: 2px solid $outline;
+    border-radius: 999px;
+  }
+
+  &__title {
+    font-family: $font-heading;
+    font-size: 1.75rem;
+    color: $dark;
+    margin: 0;
+    line-height: 1.1;
+  }
+
+  &__excerpt {
+    font-family: $font-body;
+    font-size: 1rem;
+    color: rgba($dark, 0.8);
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-family: $font-body;
+    font-size: 0.85rem;
+    color: rgba($dark, 0.65);
+  }
+
+  &__author {
+    font-weight: 600;
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  &__tag {
+    font-family: $font-body;
+    font-size: 0.78rem;
+    color: rgba($dark, 0.7);
+    background: rgba($lavender, 0.25);
+    border: 2px solid $outline;
+    border-radius: 999px;
+    padding: 2px 9px;
+  }
+
+  &__cta {
+    font-family: $font-body;
+    font-weight: 700;
+    color: $terracotta;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.85rem;
+    margin-top: 4px;
+  }
+}
+
+.blog-empty {
+  max-width: 560px;
+  margin: 48px auto;
+  text-align: center;
+  padding: 32px 24px;
+  background: $white;
+  border: $outline-width dashed $outline;
+  border-radius: 12px;
+
+  &__title {
+    font-family: $font-heading;
+    font-size: 1.5rem;
+    margin: 0 0 8px;
+  }
+
+  &__hint {
+    font-family: $font-body;
+    color: rgba($dark, 0.7);
+    margin: 0;
+  }
+}
+
+// ── Pagination ──────────────────────────────────────────────────────
+
+.blog-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 48px;
+  font-family: $font-body;
+  font-weight: 700;
+
+  &__link {
+    padding: 10px 18px;
+    background: $white;
+    color: $dark;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    box-shadow: 3px 3px 0 $outline;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.9rem;
+    transition: transform $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 4px 4px 0 $outline;
+    }
+  }
+
+  &__info {
+    font-size: 0.9rem;
+    color: rgba($dark, 0.75);
+  }
+}

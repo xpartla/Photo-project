@@ -52,6 +52,22 @@ export function getAlternateUrl(lang: string, path: string): string {
     if (lang === "en" && rest.startsWith("login")) {
       return `/${altLang}/prihlasenie${rest.slice("login".length)}`;
     }
+    // Blog routes: kategoria ↔ category
+    if (lang === "sk" && rest.startsWith("blog/kategoria/")) {
+      return `/${altLang}/blog/category/${rest.slice("blog/kategoria/".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("blog/category/")) {
+      return `/${altLang}/blog/kategoria/${rest.slice("blog/category/".length)}`;
+    }
+    // Admin routes
+    if (rest.startsWith("admin/blog/novy") || rest.startsWith("admin/blog/new")) {
+      const suffix = rest.startsWith("admin/blog/novy") ? rest.slice("admin/blog/novy".length) : rest.slice("admin/blog/new".length);
+      return altLang === "sk" ? `/${altLang}/admin/blog/novy${suffix}` : `/${altLang}/admin/blog/new${suffix}`;
+    }
+    if (rest.startsWith("admin/blog/upravit/") || rest.startsWith("admin/blog/edit/")) {
+      const rest2 = rest.startsWith("admin/blog/upravit/") ? rest.slice("admin/blog/upravit/".length) : rest.slice("admin/blog/edit/".length);
+      return altLang === "sk" ? `/${altLang}/admin/blog/upravit/${rest2}` : `/${altLang}/admin/blog/edit/${rest2}`;
+    }
     // Shop routes: obchod ↔ shop
     if (lang === "sk" && rest.startsWith("obchod/kosik")) {
       return `/${altLang}/shop/cart${rest.slice("obchod/kosik".length)}`;

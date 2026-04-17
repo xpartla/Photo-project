@@ -439,3 +439,158 @@ export async function getMyOrders(token: string): Promise<OrderResponse[]> {
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json() as Promise<OrderResponse[]>;
 }
+
+// ── Blog types ────────────────────────────────────────────────────
+
+export interface BlogCategoryRef {
+  slug: string;
+  name: string;
+}
+
+export interface BlogTagRef {
+  slug: string;
+  name: string;
+}
+
+export interface BlogPostSummary {
+  id: string;
+  slug: string;
+  title: string;
+  titleSk: string;
+  titleEn: string;
+  excerpt?: string;
+  featuredImageUrl?: string;
+  author?: string;
+  status: string;
+  publishedAt?: string;
+  createdAt: string;
+  categories: BlogCategoryRef[];
+  tags: BlogTagRef[];
+}
+
+export interface BlogPostDetail {
+  id: string;
+  slug: string;
+  title: string;
+  titleSk: string;
+  titleEn: string;
+  excerpt?: string;
+  excerptSk?: string;
+  excerptEn?: string;
+  contentHtml?: string;
+  contentHtmlSk?: string;
+  contentHtmlEn?: string;
+  featuredImageUrl?: string;
+  author?: string;
+  status: string;
+  publishedAt?: string;
+  readingMinutes: number;
+  metaTitle?: string;
+  metaDescription?: string;
+  categories: BlogCategoryRef[];
+  tags: BlogTagRef[];
+  relatedPosts: {
+    slug: string;
+    title: string;
+    excerpt?: string;
+    featuredImageUrl?: string;
+    publishedAt?: string;
+  }[];
+}
+
+export interface BlogCategory {
+  slug: string;
+  name: string;
+  nameSk: string;
+  nameEn: string;
+  postCount: number;
+}
+
+export interface BlogTag {
+  slug: string;
+  name: string;
+  nameSk: string;
+  nameEn: string;
+  postCount: number;
+}
+
+export interface BlogAdminPost {
+  id: string;
+  slug: string;
+  titleSk: string;
+  titleEn: string;
+  excerptSk?: string;
+  excerptEn?: string;
+  contentMarkdownSk?: string;
+  contentMarkdownEn?: string;
+  featuredImageUrl?: string;
+  author?: string;
+  status: string;
+  publishedAt?: string;
+  metaTitleSk?: string;
+  metaTitleEn?: string;
+  metaDescriptionSk?: string;
+  metaDescriptionEn?: string;
+  categorySlugs: string[];
+  tagSlugs: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Blog API ────────────────────────────────────────────────────
+
+export async function getBlogPosts(params?: {
+  lang?: string;
+  page?: number;
+  size?: number;
+  category?: string;
+  tag?: string;
+  q?: string;
+  includeDrafts?: boolean;
+  token?: string;
+}): Promise<PaginatedResult<BlogPostSummary>> {
+  const qs = new URLSearchParams();
+  if (params?.lang) qs.set("lang", params.lang);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.size) qs.set("size", String(params.size));
+  if (params?.category) qs.set("category", params.category);
+  if (params?.tag) qs.set("tag", params.tag);
+  if (params?.q) qs.set("q", params.q);
+  if (params?.includeDrafts) qs.set("includeDrafts", "true");
+  const query = qs.toString();
+
+  const headers: Record<string, string> = {};
+  if (params?.token) headers.Authorization = `Bearer ${params.token}`;
+
+  const res = await fetch(`${API_BASE}/api/blog/posts${query ? `?${query}` : ""}`, { headers });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json() as Promise<PaginatedResult<BlogPostSummary>>;
+}
+
+export async function getBlogPost(slug: string, lang?: string, token?: string): Promise<BlogPostDetail> {
+  const qs = lang ? `?lang=${lang}` : "";
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/api/blog/posts/${slug}${qs}`, { headers });
+  if (res.status === 404) throw new Error("Not found");
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json() as Promise<BlogPostDetail>;
+}
+
+export async function getBlogCategories(lang?: string): Promise<BlogCategory[]> {
+  const qs = lang ? `?lang=${lang}` : "";
+  return fetchApi(`/api/blog/categories${qs}`);
+}
+
+export async function getBlogTags(lang?: string): Promise<BlogTag[]> {
+  const qs = lang ? `?lang=${lang}` : "";
+  return fetchApi(`/api/blog/tags${qs}`);
+}
+
+export async function getBlogAdminPost(id: string, token: string): Promise<BlogAdminPost> {
+  const res = await fetch(`${API_BASE}/api/blog/posts/by-id/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json() as Promise<BlogAdminPost>;
+}

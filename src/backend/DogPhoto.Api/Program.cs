@@ -2,6 +2,7 @@ using System.Threading.RateLimiting;
 using DogPhoto.Infrastructure;
 using DogPhoto.Infrastructure.Auth;
 using DogPhoto.Infrastructure.BlobStorage;
+using DogPhoto.Infrastructure.Blog;
 using DogPhoto.Infrastructure.Booking;
 using DogPhoto.Infrastructure.EShop;
 using DogPhoto.Infrastructure.ImagePipeline;
@@ -90,6 +91,9 @@ app.MapBookingEndpoints();
 
 // E-Shop endpoints
 app.MapEShopEndpoints();
+
+// Blog endpoints
+app.MapBlogEndpoints();
 
 app.MapGet("/", () => "DogPhoto API");
 

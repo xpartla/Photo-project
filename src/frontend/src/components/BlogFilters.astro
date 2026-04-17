@@ -1,0 +1,85 @@
+---
+import { t } from "../lib/i18n";
+import type { BlogCategory, BlogTag } from "../lib/api";
+
+interface Props {
+  lang: "sk" | "en";
+  action: string;
+  active: {
+    q?: string;
+    category?: string;
+    tag?: string;
+  };
+  categories: BlogCategory[];
+  tags: BlogTag[];
+  totalCount: number;
+}
+
+const { lang, action, active, categories, tags, totalCount } = Astro.props;
+
+const activeCount = [active.q, active.category, active.tag].filter((v) => v != null && v !== "").length;
+const hasActive = activeCount > 0;
+---
+
+<details class="blog-filters-wrap" open={hasActive}>
+  <summary class="blog-filters-wrap__summary">
+    <span class="blog-filters-wrap__summary-label">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="4" y1="6" x2="20" y2="6" />
+        <line x1="7" y1="12" x2="17" y2="12" />
+        <line x1="10" y1="18" x2="14" y2="18" />
+      </svg>
+      {t(lang, "blog.filter.apply")} &amp; {t(lang, "blog.search.label").toLowerCase()}
+      {hasActive && <span class="blog-filters-wrap__badge">{activeCount}</span>}
+    </span>
+    <span class="blog-filters-wrap__count">{totalCount}</span>
+  </summary>
+
+  <form class="blog-filters" action={action} method="get" role="search">
+    <label class="blog-filters__field blog-filters__field--search">
+      <span class="blog-filters__label">{t(lang, "blog.search.label")}</span>
+      <input
+        type="search"
+        name="q"
+        value={active.q ?? ""}
+        placeholder={t(lang, "blog.search.placeholder")}
+        class="blog-filters__input"
+      />
+    </label>
+
+    {categories.length > 0 && (
+      <label class="blog-filters__field">
+        <span class="blog-filters__label">{t(lang, "blog.filter.category")}</span>
+        <select name="category" class="blog-filters__select">
+          <option value="">{t(lang, "blog.filter.allCategories")}</option>
+          {categories.map((c) => (
+            <option value={c.slug} selected={active.category === c.slug}>
+              {c.name} ({c.postCount})
+            </option>
+          ))}
+        </select>
+      </label>
+    )}
+
+    {tags.length > 0 && (
+      <label class="blog-filters__field">
+        <span class="blog-filters__label">{t(lang, "blog.filter.tag")}</span>
+        <select name="tag" class="blog-filters__select">
+          <option value="">{t(lang, "blog.filter.allTags")}</option>
+          {tags.map((tg) => (
+            <option value={tg.slug} selected={active.tag === tg.slug}>
+              {tg.name} ({tg.postCount})
+            </option>
+          ))}
+        </select>
+      </label>
+    )}
+
+    <div class="blog-filters__actions">
+      <button type="submit" class="blog-filters__submit">{t(lang, "blog.filter.apply")}</button>
+      {hasActive && (
+        <a href={action} class="blog-filters__reset">{t(lang, "blog.filter.reset")}</a>
+      )}
+    </div>
+  </form>
+</details>

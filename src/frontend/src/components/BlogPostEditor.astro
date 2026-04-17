@@ -1,0 +1,292 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props {
+  lang: "sk" | "en";
+  mode: "create" | "edit";
+  postId?: string;
+}
+
+const { lang, mode, postId } = Astro.props;
+const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
+---
+
+<div class="admin-editor" data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/blog`} class="admin__back">← {t(lang, "admin.blog.backToList")}</a>
+    <h1 class="admin__title">
+      {mode === "create" ? t(lang, "admin.blog.newPost") : t(lang, "admin.blog.editPost")}
+    </h1>
+  </header>
+
+  <form id="post-form" class="admin-form">
+    <div class="admin-form__row admin-form__row--split">
+      <label class="admin-form__field">
+        <span class="admin-form__label">{t(lang, "admin.blog.titleSk")} *</span>
+        <input name="titleSk" type="text" class="admin-form__input" required />
+      </label>
+      <label class="admin-form__field">
+        <span class="admin-form__label">{t(lang, "admin.blog.titleEn")} *</span>
+        <input name="titleEn" type="text" class="admin-form__input" required />
+      </label>
+    </div>
+
+    <label class="admin-form__field">
+      <span class="admin-form__label">{t(lang, "admin.blog.slug")} *</span>
+      <input name="slug" type="text" class="admin-form__input" pattern="[a-z0-9-]+" required />
+      <span class="admin-form__hint">{t(lang, "admin.blog.slugHint")}</span>
+    </label>
+
+    <div class="admin-form__row admin-form__row--split">
+      <label class="admin-form__field">
+        <span class="admin-form__label">{t(lang, "admin.blog.excerptSk")}</span>
+        <textarea name="excerptSk" rows="2" class="admin-form__input"></textarea>
+      </label>
+      <label class="admin-form__field">
+        <span class="admin-form__label">{t(lang, "admin.blog.excerptEn")}</span>
+        <textarea name="excerptEn" rows="2" class="admin-form__input"></textarea>
+      </label>
+    </div>
+
+    <label class="admin-form__field">
+      <span class="admin-form__label">{t(lang, "admin.blog.contentSk")} *</span>
+      <textarea name="contentMarkdownSk" id="editor-sk" class="admin-form__input admin-form__editor"></textarea>
+    </label>
+
+    <label class="admin-form__field">
+      <span class="admin-form__label">{t(lang, "admin.blog.contentEn")} *</span>
+      <textarea name="contentMarkdownEn" id="editor-en" class="admin-form__input admin-form__editor"></textarea>
+    </label>
+
+    <div class="admin-form__row admin-form__row--split">
+      <label class="admin-form__field">
+        <span class="admin-form__label">{t(lang, "admin.blog.featuredImage")}</span>
+        <input name="featuredImageUrl" type="url" class="admin-form__input" />
+      </label>
+      <label class="admin-form__field">
+        <span class="admin-form__label">{t(lang, "admin.blog.author")}</span>
+        <input name="author" type="text" class="admin-form__input" value="Adam Partl" />
+      </label>
+    </div>
+
+    <div class="admin-form__row admin-form__row--split">
+      <label class="admin-form__field">
+        <span class="admin-form__label">{t(lang, "admin.blog.status")}</span>
+        <select name="status" class="admin-form__input" id="status-select">
+          <option value="Draft">{t(lang, "blog.status.draft")}</option>
+          <option value="Published">{t(lang, "blog.status.published")}</option>
+          <option value="Scheduled">{t(lang, "blog.status.scheduled")}</option>
+        </select>
+      </label>
+      <label class="admin-form__field">
+        <span class="admin-form__label">{t(lang, "admin.blog.publishedAt")}</span>
+        <input name="publishedAt" type="datetime-local" class="admin-form__input" />
+        <span class="admin-form__hint">{t(lang, "admin.blog.publishedAtHint")}</span>
+      </label>
+    </div>
+
+    <div class="admin-form__row admin-form__row--split">
+      <fieldset class="admin-form__field">
+        <legend class="admin-form__label">{t(lang, "admin.blog.categories")}</legend>
+        <div id="categories-box" class="admin-form__checkboxes"></div>
+      </fieldset>
+      <fieldset class="admin-form__field">
+        <legend class="admin-form__label">{t(lang, "admin.blog.tags")}</legend>
+        <div id="tags-box" class="admin-form__checkboxes"></div>
+      </fieldset>
+    </div>
+
+    <details class="admin-form__details">
+      <summary>SEO</summary>
+      <div class="admin-form__row admin-form__row--split">
+        <label class="admin-form__field">
+          <span class="admin-form__label">{t(lang, "admin.blog.metaTitleSk")}</span>
+          <input name="metaTitleSk" type="text" class="admin-form__input" />
+        </label>
+        <label class="admin-form__field">
+          <span class="admin-form__label">{t(lang, "admin.blog.metaTitleEn")}</span>
+          <input name="metaTitleEn" type="text" class="admin-form__input" />
+        </label>
+      </div>
+      <div class="admin-form__row admin-form__row--split">
+        <label class="admin-form__field">
+          <span class="admin-form__label">{t(lang, "admin.blog.metaDescriptionSk")}</span>
+          <textarea name="metaDescriptionSk" rows="2" class="admin-form__input"></textarea>
+        </label>
+        <label class="admin-form__field">
+          <span class="admin-form__label">{t(lang, "admin.blog.metaDescriptionEn")}</span>
+          <textarea name="metaDescriptionEn" rows="2" class="admin-form__input"></textarea>
+        </label>
+      </div>
+    </details>
+
+    <div id="form-error" class="admin-form__error"></div>
+
+    <div class="admin-form__actions">
+      <button type="submit" class="admin__primary-btn" id="save-btn">{t(lang, "admin.blog.save")}</button>
+    </div>
+  </form>
+</div>
+
+<script id="admin-editor-config" type="application/json" set:html={JSON.stringify({
+  apiBase, lang, mode, postId,
+  savingLabel: t(lang, "admin.blog.saving"),
+  saveLabel: t(lang, "admin.blog.save"),
+})}></script>
+
+<script>
+  import EasyMDE from "easymde";
+  import "easymde/dist/easymde.min.css";
+  import { requireAdmin } from "../lib/admin";
+
+  const cfg = JSON.parse(document.getElementById("admin-editor-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const form = document.getElementById("post-form") as HTMLFormElement;
+  const errEl = document.getElementById("form-error") as HTMLElement;
+  const saveBtn = document.getElementById("save-btn") as HTMLButtonElement;
+  const categoriesBox = document.getElementById("categories-box") as HTMLElement;
+  const tagsBox = document.getElementById("tags-box") as HTMLElement;
+
+  const editorSk = new EasyMDE({
+    element: document.getElementById("editor-sk") as HTMLTextAreaElement,
+    spellChecker: false,
+    autosave: { enabled: false, uniqueId: "blog-editor-sk" },
+    minHeight: "320px",
+    status: ["lines", "words"],
+    toolbar: [
+      "bold", "italic", "strikethrough", "|",
+      "heading-1", "heading-2", "heading-3", "|",
+      "quote", "code", "unordered-list", "ordered-list", "|",
+      "link", "image", "table", "horizontal-rule", "|",
+      "preview", "side-by-side", "fullscreen", "|",
+      "guide",
+    ],
+  });
+  const editorEn = new EasyMDE({
+    element: document.getElementById("editor-en") as HTMLTextAreaElement,
+    spellChecker: false,
+    autosave: { enabled: false, uniqueId: "blog-editor-en" },
+    minHeight: "320px",
+    status: ["lines", "words"],
+    toolbar: [
+      "bold", "italic", "strikethrough", "|",
+      "heading-1", "heading-2", "heading-3", "|",
+      "quote", "code", "unordered-list", "ordered-list", "|",
+      "link", "image", "table", "horizontal-rule", "|",
+      "preview", "side-by-side", "fullscreen", "|",
+      "guide",
+    ],
+  });
+
+  async function loadTaxonomy() {
+    const [cats, tags] = await Promise.all([
+      fetch(`${cfg.apiBase}/api/blog/categories?lang=${cfg.lang}`).then((r) => r.json()),
+      fetch(`${cfg.apiBase}/api/blog/tags?lang=${cfg.lang}`).then((r) => r.json()).catch(() => []),
+    ]);
+    categoriesBox.innerHTML = (cats as any[])
+      .map((c) => `<label class="admin-form__checkbox"><input type="checkbox" name="categorySlugs" value="${c.slug}"/> ${c.name}</label>`)
+      .join("");
+    tagsBox.innerHTML = (tags as any[])
+      .map((t) => `<label class="admin-form__checkbox"><input type="checkbox" name="tagSlugs" value="${t.slug}"/> ${t.name}</label>`)
+      .join("") || '<span class="admin-form__hint">No tags yet — create them from the API for now.</span>';
+  }
+
+  async function loadPost(id: string) {
+    const res = await fetch(`${cfg.apiBase}/api/blog/posts/by-id/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) { errEl.textContent = `Failed to load post (${res.status})`; return; }
+    const p = await res.json();
+
+    (form.elements.namedItem("titleSk") as HTMLInputElement).value = p.titleSk ?? "";
+    (form.elements.namedItem("titleEn") as HTMLInputElement).value = p.titleEn ?? "";
+    (form.elements.namedItem("slug") as HTMLInputElement).value = p.slug ?? "";
+    (form.elements.namedItem("excerptSk") as HTMLTextAreaElement).value = p.excerptSk ?? "";
+    (form.elements.namedItem("excerptEn") as HTMLTextAreaElement).value = p.excerptEn ?? "";
+    editorSk.value(p.contentMarkdownSk ?? "");
+    editorEn.value(p.contentMarkdownEn ?? "");
+    (form.elements.namedItem("featuredImageUrl") as HTMLInputElement).value = p.featuredImageUrl ?? "";
+    (form.elements.namedItem("author") as HTMLInputElement).value = p.author ?? "";
+    (form.elements.namedItem("status") as HTMLSelectElement).value = p.status ?? "Draft";
+    if (p.publishedAt) {
+      const d = new Date(p.publishedAt);
+      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      (form.elements.namedItem("publishedAt") as HTMLInputElement).value = local;
+    }
+    (form.elements.namedItem("metaTitleSk") as HTMLInputElement).value = p.metaTitleSk ?? "";
+    (form.elements.namedItem("metaTitleEn") as HTMLInputElement).value = p.metaTitleEn ?? "";
+    (form.elements.namedItem("metaDescriptionSk") as HTMLTextAreaElement).value = p.metaDescriptionSk ?? "";
+    (form.elements.namedItem("metaDescriptionEn") as HTMLTextAreaElement).value = p.metaDescriptionEn ?? "";
+
+    // Check the selected categories/tags
+    (p.categorySlugs ?? []).forEach((s: string) => {
+      const cb = categoriesBox.querySelector<HTMLInputElement>(`input[value="${CSS.escape(s)}"]`);
+      if (cb) cb.checked = true;
+    });
+    (p.tagSlugs ?? []).forEach((s: string) => {
+      const cb = tagsBox.querySelector<HTMLInputElement>(`input[value="${CSS.escape(s)}"]`);
+      if (cb) cb.checked = true;
+    });
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errEl.textContent = "";
+    saveBtn.disabled = true;
+    saveBtn.textContent = cfg.savingLabel;
+
+    const formData = new FormData(form);
+    const publishedAtValue = (formData.get("publishedAt") as string) || null;
+    const payload: any = {
+      slug: formData.get("slug"),
+      titleSk: formData.get("titleSk"),
+      titleEn: formData.get("titleEn"),
+      excerptSk: formData.get("excerptSk") || null,
+      excerptEn: formData.get("excerptEn") || null,
+      contentMarkdownSk: editorSk.value(),
+      contentMarkdownEn: editorEn.value(),
+      featuredImageUrl: formData.get("featuredImageUrl") || null,
+      author: formData.get("author") || null,
+      status: formData.get("status"),
+      publishedAt: publishedAtValue ? new Date(publishedAtValue).toISOString() : null,
+      metaTitleSk: formData.get("metaTitleSk") || null,
+      metaTitleEn: formData.get("metaTitleEn") || null,
+      metaDescriptionSk: formData.get("metaDescriptionSk") || null,
+      metaDescriptionEn: formData.get("metaDescriptionEn") || null,
+      categorySlugs: formData.getAll("categorySlugs"),
+      tagSlugs: formData.getAll("tagSlugs"),
+    };
+
+    const url = cfg.mode === "create"
+      ? `${cfg.apiBase}/api/blog/posts`
+      : `${cfg.apiBase}/api/blog/posts/${cfg.postId}`;
+    const method = cfg.mode === "create" ? "POST" : "PUT";
+
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      errEl.textContent = err.error || `Failed (${res.status})`;
+      saveBtn.disabled = false;
+      saveBtn.textContent = cfg.saveLabel;
+      return;
+    }
+
+    // Redirect to list
+    window.location.href = `/${cfg.lang}/admin/blog`;
+  });
+
+  await loadTaxonomy();
+  if (cfg.mode === "edit" && cfg.postId) {
+    await loadPost(cfg.postId);
+  }
+</script>

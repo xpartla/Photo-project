@@ -1,0 +1,42 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../components/SeoMeta.astro";
+import BlogList from "../../../components/BlogList.astro";
+import { t } from "../../../lib/i18n";
+
+const lang = "en";
+const pageUrl = Astro.url.pathname;
+const pageTitle = `${t(lang, "blog.title")} — PartlPhoto`;
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={t(lang, "blog.description")}
+    lang={lang}
+    path={pageUrl}
+  />
+  <link slot="head" rel="alternate" type="application/rss+xml" title="PartlPhoto Blog" href="/rss.xml" />
+
+  <main class="blog">
+    <header class="blog__header">
+      <h1 class="blog__title">{t(lang, "blog.title")}</h1>
+      <p class="blog__subtitle">{t(lang, "blog.subtitle")}</p>
+      <a href="/rss.xml" class="blog__rss" rel="alternate" type="application/rss+xml">
+        {t(lang, "blog.rss")}
+      </a>
+    </header>
+
+    <BlogList
+      lang={lang}
+      blogBaseUrl={`/${lang}/blog`}
+      categoryBaseUrl={`/${lang}/blog/category`}
+      tagBaseUrl={`/${lang}/blog/tag`}
+    />
+  </main>
+</BaseLayout>
+
+<style lang="scss" is:global>
+  @use "../../../styles/components/blog";
+</style>

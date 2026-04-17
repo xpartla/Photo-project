@@ -19,6 +19,7 @@
     <PackageReference Include="Azure.Storage.Blobs" Version="12.*" />
     <PackageReference Include="MailKit" Version="4.*" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.*" />
+    <PackageReference Include="Markdig" Version="0.37.*" />
   </ItemGroup>
 
   <ItemGroup>

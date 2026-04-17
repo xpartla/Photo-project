@@ -1,0 +1,402 @@
+@use "../variables" as *;
+
+.admin {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 24px 96px;
+
+  &__notice {
+    text-align: center;
+    padding: 32px;
+    font-family: $font-body;
+    color: rgba($dark, 0.7);
+  }
+
+  &__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  &__eyebrow {
+    font-family: $font-body;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.8rem;
+    color: $terracotta;
+    margin: 0 0 4px;
+  }
+
+  &__title {
+    font-family: $font-heading;
+    font-size: 2.5rem;
+    margin: 0;
+    color: $dark;
+    flex: 1;
+  }
+
+  &__subtitle {
+    flex-basis: 100%;
+    font-family: $font-body;
+    color: rgba($dark, 0.75);
+    margin: 0;
+  }
+
+  &__back {
+    font-family: $font-body;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.85rem;
+    color: $terracotta;
+    text-decoration: none;
+    margin-right: 16px;
+    &:hover { text-decoration: underline; }
+  }
+
+  &__primary-btn {
+    font-family: $font-body;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.9rem;
+    padding: 10px 20px;
+    background: $peach;
+    color: $dark;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    box-shadow: 3px 3px 0 $outline;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 4px 4px 0 $outline;
+    }
+    &:active {
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: 3px 3px 0 $outline;
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+  }
+
+  &__card {
+    background: $white;
+    border: $outline-width solid $outline;
+    border-radius: 12px;
+    box-shadow: 4px 4px 0 $outline;
+    padding: 24px;
+    text-decoration: none;
+    color: $dark;
+    transition: transform $transition-base, box-shadow $transition-base;
+    position: relative;
+
+    &--primary {
+      background: rgba($peach, 0.15);
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 6px 6px 0 $outline;
+      }
+    }
+
+    &--disabled {
+      opacity: 0.55;
+      pointer-events: none;
+    }
+  }
+
+  &__card-title {
+    font-family: $font-heading;
+    font-size: 1.5rem;
+    margin: 0 0 8px;
+  }
+
+  &__card-desc {
+    font-family: $font-body;
+    color: rgba($dark, 0.75);
+    margin: 0;
+  }
+
+  &__card-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-family: $font-body;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border: 2px solid $outline;
+    border-radius: 999px;
+    background: $lavender;
+  }
+}
+
+// ── Admin post list ─────────────────────────────────────────────────
+
+.admin-list {
+  &__items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  &__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: $white;
+    border: $outline-width solid $outline;
+    border-radius: 12px;
+    box-shadow: 3px 3px 0 $outline;
+
+    @media (max-width: $breakpoint-md) {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+
+  &__main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    font-family: $font-heading;
+    font-size: 1.2rem;
+    color: $dark;
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+
+  &__status {
+    display: inline-block;
+    font-family: $font-body;
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 10px;
+    margin-right: 8px;
+    border: 2px solid $outline;
+    border-radius: 999px;
+
+    &.is-published { background: rgba($sage, 0.3); }
+    &.is-draft { background: rgba($lavender, 0.3); }
+    &.is-scheduled { background: rgba($peach, 0.3); }
+  }
+
+  &__meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 6px;
+    font-family: $font-body;
+    font-size: 0.85rem;
+    color: rgba($dark, 0.6);
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  &__btn {
+    font-family: $font-body;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 14px;
+    background: $white;
+    color: $dark;
+    border: 2px solid $outline;
+    border-radius: 8px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:hover { background: $cream; }
+
+    &--ghost { background: transparent; }
+    &--danger {
+      background: $rose;
+      color: $white;
+      &:hover { background: color-mix(in srgb, $rose 85%, $dark); }
+    }
+  }
+
+  &__empty {
+    text-align: center;
+    padding: 32px 16px;
+    p { margin-bottom: 16px; }
+  }
+
+  &__error {
+    color: $rose;
+    font-family: $font-body;
+    font-weight: 700;
+  }
+}
+
+// ── Admin form + editor ─────────────────────────────────────────────
+
+.admin-editor {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  &__row {
+    display: flex;
+    gap: 20px;
+    &--split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      @media (max-width: $breakpoint-md) {
+        grid-template-columns: 1fr;
+      }
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border: none;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+  }
+
+  &__label {
+    font-family: $font-body;
+    font-weight: 700;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $dark;
+    padding: 0;
+  }
+
+  &__input {
+    font-family: $font-body;
+    font-size: 1rem;
+    padding: 10px 12px;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    background: $white;
+    color: $dark;
+
+    &:focus {
+      outline: none;
+      background: $cream;
+      border-color: $sage;
+      box-shadow: 0 0 0 3px rgba($sage, 0.25);
+    }
+  }
+
+  &__hint {
+    font-family: $font-body;
+    font-size: 0.78rem;
+    color: rgba($dark, 0.65);
+  }
+
+  &__editor {
+    min-height: 320px;
+  }
+
+  &__checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 10px 12px;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    background: $white;
+  }
+
+  &__checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: $font-body;
+    font-size: 0.9rem;
+    cursor: pointer;
+
+    input { margin: 0; }
+  }
+
+  &__details {
+    background: $white;
+    border: $outline-width solid $outline;
+    border-radius: 8px;
+    padding: 10px 14px;
+
+    summary {
+      font-family: $font-body;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+
+    .admin-form__row { margin-top: 14px; }
+  }
+
+  &__error {
+    color: $rose;
+    font-family: $font-body;
+    font-weight: 700;
+    min-height: 1em;
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+}
+
+/* EasyMDE customisations — apply outline styling to the toolbar + preview. */
+.EasyMDEContainer {
+  .editor-toolbar {
+    border: $outline-width solid $outline;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    background: $cream;
+  }
+  .CodeMirror {
+    border: $outline-width solid $outline;
+    border-radius: 0 0 8px 8px;
+    font-family: "SFMono-Regular", ui-monospace, Menlo, monospace;
+    font-size: 0.95rem;
+  }
+}

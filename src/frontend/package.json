@@ -20,6 +20,7 @@
     "@astrojs/check": "^0.9.7",
     "@astrojs/node": "^10.0.0",
     "astro": "^6.0.4",
+    "easymde": "^2.20.0",
     "gsap": "^3.12.7",
     "sass": "^1.86.0",
     "typescript": "^5.9.3"

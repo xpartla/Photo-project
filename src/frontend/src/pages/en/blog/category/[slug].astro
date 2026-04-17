@@ -1,0 +1,85 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../../components/SeoMeta.astro";
+import { t } from "../../../../lib/i18n";
+import {
+  getBlogPosts,
+  getBlogCategories,
+  type BlogPostSummary,
+  type BlogCategory,
+} from "../../../../lib/api";
+
+const lang = "en";
+const { slug } = Astro.params;
+const pageUrl = Astro.url.pathname;
+
+let categories: BlogCategory[] = [];
+let posts: BlogPostSummary[] = [];
+let totalCount = 0;
+let category: BlogCategory | undefined;
+
+try {
+  categories = await getBlogCategories(lang);
+  category = categories.find((c) => c.slug === slug);
+  if (!category) return Astro.redirect(`/${lang}/blog`, 302);
+
+  const list = await getBlogPosts({ lang, size: 20, category: slug });
+  posts = list.items;
+  totalCount = list.totalCount;
+} catch {
+  return Astro.redirect(`/${lang}/blog`, 302);
+}
+
+function formatDate(iso?: string): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US",
+    { year: "numeric", month: "long", day: "numeric" });
+}
+
+const pageTitle = `${category.name} — ${t(lang, "blog.categoryArchive")} — PartlPhoto`;
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={t(lang, "blog.description")}
+    lang={lang}
+    path={pageUrl}
+  />
+
+  <main class="blog">
+    <header class="blog__header">
+      <p class="blog__eyebrow">{t(lang, "blog.categoryArchive")}</p>
+      <h1 class="blog__title">{category.name}</h1>
+      <p class="blog__subtitle">{totalCount} {t(lang, "blog.postsInCategory")}</p>
+      <a href={`/${lang}/blog`} class="blog__back-link">← {t(lang, "blog.backToBlog")}</a>
+    </header>
+
+    {posts.length === 0 ? (
+      <p class="blog-empty__title">{t(lang, "blog.noResults")}</p>
+    ) : (
+      <ul class="blog-list">
+        {posts.map((post) => (
+          <li class="blog-card">
+            <a href={`/${lang}/blog/${post.slug}`} class="blog-card__link">
+              <div class="blog-card__body">
+                <h2 class="blog-card__title">{post.title}</h2>
+                {post.excerpt && <p class="blog-card__excerpt">{post.excerpt}</p>}
+                <div class="blog-card__meta">
+                  {post.author && <span class="blog-card__author">{t(lang, "blog.byAuthor")} {post.author}</span>}
+                  <time class="blog-card__date" datetime={post.publishedAt}>{formatDate(post.publishedAt ?? post.createdAt)}</time>
+                </div>
+                <span class="blog-card__cta">{t(lang, "blog.readMore")} →</span>
+              </div>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+  </main>
+</BaseLayout>
+
+<style lang="scss" is:global>
+  @use "../../../../styles/components/blog";
+</style>

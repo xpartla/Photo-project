@@ -1,0 +1,86 @@
+---
+import { t } from "../lib/i18n";
+import type { BlogPostDetail } from "../lib/api";
+
+interface Props {
+  lang: "sk" | "en";
+  post: BlogPostDetail;
+  blogBaseUrl: string;
+  categoryBaseUrl: string;
+  tagBaseUrl: string;
+}
+
+const { lang, post, blogBaseUrl, categoryBaseUrl, tagBaseUrl } = Astro.props;
+
+function formatDate(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", {
+    year: "numeric", month: "long", day: "numeric",
+  });
+}
+
+const dateText = formatDate(post.publishedAt);
+---
+
+<article class="blog-detail">
+  <a href={blogBaseUrl} class="blog-detail__back">← {t(lang, "blog.backToBlog")}</a>
+
+  <header class="blog-detail__header">
+    {post.categories.length > 0 && (
+      <div class="blog-detail__categories">
+        {post.categories.map((c) => (
+          <a class="blog-detail__category" href={`${categoryBaseUrl}/${c.slug}`}>{c.name}</a>
+        ))}
+      </div>
+    )}
+    <h1 class="blog-detail__title">{post.title}</h1>
+    {post.excerpt && <p class="blog-detail__excerpt">{post.excerpt}</p>}
+    <div class="blog-detail__meta">
+      {post.author && (
+        <span class="blog-detail__meta-item">
+          {t(lang, "blog.byAuthor")} <strong>{post.author}</strong>
+        </span>
+      )}
+      {dateText && <time class="blog-detail__meta-item" datetime={post.publishedAt}>{dateText}</time>}
+      <span class="blog-detail__meta-item">{post.readingMinutes} {t(lang, "blog.readingTime")}</span>
+    </div>
+  </header>
+
+  {post.featuredImageUrl && (
+    <figure class="blog-detail__featured">
+      <img src={post.featuredImageUrl} alt={post.title} />
+    </figure>
+  )}
+
+  <div class="blog-detail__content" set:html={post.contentHtml ?? ""} />
+
+  {post.tags.length > 0 && (
+    <footer class="blog-detail__footer">
+      <span class="blog-detail__tags-label">{t(lang, "blog.tagsHeading")}:</span>
+      <ul class="blog-detail__tags">
+        {post.tags.map((tg) => (
+          <li>
+            <a class="blog-detail__tag" href={`${tagBaseUrl}/${tg.slug}`}>#{tg.name}</a>
+          </li>
+        ))}
+      </ul>
+    </footer>
+  )}
+
+  {post.relatedPosts.length > 0 && (
+    <aside class="blog-related">
+      <h2 class="blog-related__title">{t(lang, "blog.relatedPosts")}</h2>
+      <ul class="blog-related__list">
+        {post.relatedPosts.map((r) => (
+          <li class="blog-related__item">
+            <a href={`${blogBaseUrl}/${r.slug}`} class="blog-related__link">
+              <h3 class="blog-related__post-title">{r.title}</h3>
+              {r.excerpt && <p class="blog-related__excerpt">{r.excerpt}</p>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  )}
+</article>

@@ -1,0 +1,55 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { t } from "../../../lib/i18n";
+
+const lang = "en";
+const pageTitle = `${t(lang, "admin.title")} — PartlPhoto`;
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <main class="admin admin--guarded" data-admin-root hidden>
+    <header class="admin__header">
+      <p class="admin__eyebrow">{t(lang, "admin.title")}</p>
+      <h1 class="admin__title">{t(lang, "admin.welcome")}</h1>
+      <p class="admin__subtitle">{t(lang, "admin.welcomeDescription")}</p>
+    </header>
+
+    <section class="admin__grid">
+      <a class="admin__card admin__card--primary" href={`/${lang}/admin/blog`}>
+        <h2 class="admin__card-title">{t(lang, "admin.blog")}</h2>
+        <p class="admin__card-desc">{t(lang, "admin.blog.description")}</p>
+      </a>
+
+      <div class="admin__card admin__card--disabled">
+        <h2 class="admin__card-title">{t(lang, "admin.portfolio")}</h2>
+        <p class="admin__card-desc">{t(lang, "admin.portfolio.description")}</p>
+        <span class="admin__card-badge">{t(lang, "admin.comingSoon")}</span>
+      </div>
+      <div class="admin__card admin__card--disabled">
+        <h2 class="admin__card-title">{t(lang, "admin.shop")}</h2>
+        <p class="admin__card-desc">{t(lang, "admin.shop.description")}</p>
+        <span class="admin__card-badge">{t(lang, "admin.comingSoon")}</span>
+      </div>
+      <div class="admin__card admin__card--disabled">
+        <h2 class="admin__card-title">{t(lang, "admin.booking")}</h2>
+        <p class="admin__card-desc">{t(lang, "admin.booking.description")}</p>
+        <span class="admin__card-badge">{t(lang, "admin.comingSoon")}</span>
+      </div>
+    </section>
+  </main>
+
+  <p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+  <script>
+    import { requireAdmin } from "../../../lib/admin";
+    const token = requireAdmin("en");
+    if (token) {
+      const root = document.querySelector("[data-admin-root]") as HTMLElement | null;
+      if (root) root.hidden = false;
+    }
+  </script>
+</BaseLayout>
+
+<style lang="scss" is:global>
+  @use "../../../styles/components/admin";
+</style>

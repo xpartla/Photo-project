@@ -1,0 +1,139 @@
+---
+import BlogFilters from "./BlogFilters.astro";
+import { t } from "../lib/i18n";
+import {
+  getBlogPosts,
+  getBlogCategories,
+  getBlogTags,
+  type BlogPostSummary,
+  type BlogCategory,
+  type BlogTag,
+} from "../lib/api";
+
+interface Props {
+  lang: "sk" | "en";
+  blogBaseUrl: string;       // e.g. /sk/blog or /en/blog
+  categoryBaseUrl: string;   // e.g. /sk/blog/kategoria or /en/blog/category
+  tagBaseUrl: string;        // e.g. /sk/blog/tag or /en/blog/tag
+}
+
+const { lang, blogBaseUrl, categoryBaseUrl, tagBaseUrl } = Astro.props;
+
+const params = Astro.url.searchParams;
+const active = {
+  q: params.get("q") ?? undefined,
+  category: params.get("category") ?? undefined,
+  tag: params.get("tag") ?? undefined,
+};
+const page = Math.max(1, Number(params.get("page") ?? 1) || 1);
+const size = 10;
+
+let posts: BlogPostSummary[] = [];
+let totalCount = 0;
+let totalPages = 0;
+let categories: BlogCategory[] = [];
+let tags: BlogTag[] = [];
+
+try {
+  const [list, cats, tagList] = await Promise.all([
+    getBlogPosts({ lang, page, size, ...active }),
+    getBlogCategories(lang),
+    getBlogTags(lang),
+  ]);
+  posts = list.items;
+  totalCount = list.totalCount;
+  totalPages = list.totalPages;
+  categories = cats;
+  tags = tagList;
+} catch {
+  // fallback — empty state rendered below
+}
+
+function formatDate(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString(lang === "sk" ? "sk-SK" : "en-US", {
+    year: "numeric", month: "long", day: "numeric",
+  });
+}
+
+function pageUrl(p: number): string {
+  const qs = new URLSearchParams();
+  if (active.q) qs.set("q", active.q);
+  if (active.category) qs.set("category", active.category);
+  if (active.tag) qs.set("tag", active.tag);
+  if (p > 1) qs.set("page", String(p));
+  const s = qs.toString();
+  return s ? `${blogBaseUrl}?${s}` : blogBaseUrl;
+}
+---
+
+<BlogFilters
+  lang={lang}
+  action={blogBaseUrl}
+  active={active}
+  categories={categories}
+  tags={tags}
+  totalCount={totalCount}
+/>
+
+{posts.length === 0 ? (
+  <div class="blog-empty">
+    <p class="blog-empty__title">{t(lang, "blog.noResults")}</p>
+    <p class="blog-empty__hint">{t(lang, "blog.noResultsHint")}</p>
+  </div>
+) : (
+  <ul class="blog-list">
+    {posts.map((post) => {
+      const dateText = formatDate(post.publishedAt ?? post.createdAt);
+      return (
+        <li class="blog-card">
+          <a href={`${blogBaseUrl}/${post.slug}`} class="blog-card__link">
+            {post.featuredImageUrl && (
+              <div class="blog-card__image">
+                <img src={post.featuredImageUrl} alt={post.title} loading="lazy" decoding="async" />
+              </div>
+            )}
+            <div class="blog-card__body">
+              {post.categories.length > 0 && (
+                <div class="blog-card__categories">
+                  {post.categories.map((c) => (
+                    <span class="blog-card__category">{c.name}</span>
+                  ))}
+                </div>
+              )}
+              <h2 class="blog-card__title">{post.title}</h2>
+              {post.excerpt && <p class="blog-card__excerpt">{post.excerpt}</p>}
+              <div class="blog-card__meta">
+                {post.author && <span class="blog-card__author">{t(lang, "blog.byAuthor")} {post.author}</span>}
+                {dateText && <time class="blog-card__date" datetime={post.publishedAt}>{dateText}</time>}
+              </div>
+              {post.tags.length > 0 && (
+                <div class="blog-card__tags">
+                  {post.tags.slice(0, 4).map((tg) => (
+                    <span class="blog-card__tag">#{tg.name}</span>
+                  ))}
+                </div>
+              )}
+              <span class="blog-card__cta">{t(lang, "blog.readMore")} →</span>
+            </div>
+          </a>
+        </li>
+      );
+    })}
+  </ul>
+)}
+
+{totalPages > 1 && (
+  <nav class="blog-pagination" aria-label={t(lang, "blog.pagination.page")}>
+    {page > 1 && (
+      <a href={pageUrl(page - 1)} class="blog-pagination__link" rel="prev">← {t(lang, "blog.pagination.prev")}</a>
+    )}
+    <span class="blog-pagination__info">
+      {t(lang, "blog.pagination.page")} {page} {t(lang, "blog.pagination.of")} {totalPages}
+    </span>
+    {page < totalPages && (
+      <a href={pageUrl(page + 1)} class="blog-pagination__link" rel="next">{t(lang, "blog.pagination.next")} →</a>
+    )}
+  </nav>
+)}

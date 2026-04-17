@@ -268,5 +268,18 @@ public static class DependencyInjection
             });
             await identityDb.SaveChangesAsync();
         }
+
+        // Seed regular customer (for local testing — exercises the Customer role)
+        if (!await identityDb.Users.AnyAsync(u => u.Email == "customer@dogphoto.sk"))
+        {
+            identityDb.Users.Add(new User
+            {
+                Email = "customer@dogphoto.sk",
+                DisplayName = "Customer",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("customer123"),
+                Role = "Customer"
+            });
+            await identityDb.SaveChangesAsync();
+        }
     }
 }

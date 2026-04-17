@@ -78,8 +78,12 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>
+            <span class="navbar__admin-chip" data-admin-chip hidden>{t(lang, "nav.admin")}</span>
           </button>
           <div class="navbar__dropdown" data-dropdown>
+            <a href={`/${lang}/admin`} class="navbar__dropdown-item navbar__dropdown-item--admin" data-admin-link hidden>
+              {t(lang, "nav.admin")}
+            </a>
             <a href={`/${lang === "sk" ? "sk/obchod/objednavky" : "en/shop/orders"}`} class="navbar__dropdown-item">
               {t(lang, "order.myOrders")}
             </a>
@@ -162,6 +166,11 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
         </a>
       </li>
       <li>
+        <a href={`/${lang}/admin`} class="navbar__mobile-link navbar__mobile-link--admin" data-mobile-admin-link hidden>
+          {t(lang, "nav.admin")}
+        </a>
+      </li>
+      <li>
         <a href={langSwitchHref} class="navbar__mobile-link navbar__mobile-link--lang">
           {langSwitchLabel}
         </a>
@@ -197,9 +206,15 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
 
     // ── Auth state ──────────────────────────────────────────────
     const token = localStorage.getItem("partlphoto_token");
+    const userRaw = localStorage.getItem("partlphoto_user");
+    const user = userRaw ? JSON.parse(userRaw) as { role?: string } : null;
+    const isAdmin = user?.role === "Admin";
     const loginBtn = navbar.querySelector("[data-login-btn]") as HTMLElement | null;
     const accountMenu = navbar.querySelector("[data-account-menu]") as HTMLElement | null;
     const mobileLoginBtn = navbar.querySelector("[data-mobile-login-btn]") as HTMLElement | null;
+    const adminLink = navbar.querySelector("[data-admin-link]") as HTMLElement | null;
+    const adminChip = navbar.querySelector("[data-admin-chip]") as HTMLElement | null;
+    const mobileAdminLink = navbar.querySelector("[data-mobile-admin-link]") as HTMLElement | null;
 
     // Mobile account icon redirects straight to "my orders" when logged in
     // (no dropdown on mobile) — otherwise to the login page.
@@ -207,16 +222,23 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
     const lang = document.documentElement.lang === "sk" ? "sk" : "en";
     const ordersHref = lang === "sk" ? "/sk/obchod/objednavky" : "/en/shop/orders";
     const loginHref = lang === "sk" ? "/sk/prihlasenie" : "/en/login";
+    const adminHref = lang === "sk" ? "/sk/admin" : "/en/admin";
 
     if (token) {
       if (loginBtn) loginBtn.style.display = "none";
       if (accountMenu) accountMenu.hidden = false;
       if (mobileLoginBtn) mobileLoginBtn.textContent = "Account";
-      if (mobileAccount) mobileAccount.href = ordersHref;
+      if (mobileAccount) mobileAccount.href = isAdmin ? adminHref : ordersHref;
+      if (adminLink) adminLink.hidden = !isAdmin;
+      if (adminChip) adminChip.hidden = !isAdmin;
+      if (mobileAdminLink) mobileAdminLink.hidden = !isAdmin;
     } else {
       if (loginBtn) loginBtn.style.display = "";
       if (accountMenu) accountMenu.hidden = true;
       if (mobileAccount) mobileAccount.href = loginHref;
+      if (adminLink) adminLink.hidden = true;
+      if (adminChip) adminChip.hidden = true;
+      if (mobileAdminLink) mobileAdminLink.hidden = true;
     }
 
     // ── Cart badge ──────────────────────────────────────────────

@@ -1,5 +1,54 @@
 # Changelog
 
+## Epic 7: Blog Module (2026-04-17)
+
+### Added
+- **Backend API** — `BlogEndpoints.cs` registers under `/api/blog`:
+  - Public: `GET /posts` (paginated, filters by `category`, `tag`, `q` full-text search; bilingual SK/EN), `GET /posts/{slug}` (post detail with related posts + reading-time), `GET /categories`, `GET /tags`
+  - Admin: `POST /posts`, `PUT /posts/{id}`, `DELETE /posts/{id}` (soft delete), `GET /posts/by-id/{id}` (returns raw Markdown + draft/scheduled posts for the editor), `POST /categories`, `POST /tags`
+  - RSS: `GET /rss.xml` (backend-generated, proxied by an Astro route)
+- **Markdown rendering** — `Markdig 0.37.*` pipeline with `UseAdvancedExtensions` + `UseSoftlineBreakAsHardlineBreak`. Markdown is stored as-is in `content_markdown_sk/en` and HTML is rendered once at save time into `content_html_sk/en`, so the public read path serves static HTML with no per-request parsing.
+- **Full-text search (`?q=`)** — PostgreSQL `ILIKE '%…%'` across `title_sk/en`, `excerpt_sk/en`, and `content_markdown_sk/en`. Same ~15-line approach taken in Epic 6.2 for shop search. `tsvector`/GIN index is documented as the upgrade path if the post catalog grows past ~500 entries.
+- **Draft/scheduled/published workflow** — `status` is one of `Draft`/`Scheduled`/`Published`. Public listing and detail endpoints hide everything except `status == Published && publishedAt <= now`. Admins can see drafts + scheduled posts by passing `?includeDrafts=true` (listing) or by visiting the post — `RequireAuthorization` + `ICurrentUser.IsAdmin` on the admin-by-id helper.
+- **Admin vs Customer differentiation (frontend)** — the backend already enforced admin via JWT role claims and `ICurrentUser.IsAdmin` on endpoint handlers. Epic 7 wires this into the UI:
+  - Navbar reads `localStorage.partlphoto_user.role`. Admins see an "Admin" dropdown link + a small "Admin" chip on the account button. Non-admins and anonymous users see neither.
+  - All admin pages use a `requireAdmin()` client-side guard (`src/lib/admin.ts`) that redirects unauthorized visitors to `?return=`-aware login. The backend check remains authoritative — the client-side redirect is just UX.
+- **Regular user seed on startup** — `DependencyInjection.SeedDataAsync` now seeds a `customer@dogphoto.sk` / `customer123` user alongside the admin, so manual testing of authenticated-but-non-admin flows works out of the box.
+- **Admin CMS (blog only — portfolio/shop/booking wiring lands in Epic 8)**:
+  - `/sk/admin`, `/en/admin` — dashboard with cards for each future admin section (the other three are marked "Coming in Epic 8")
+  - `/sk/admin/blog`, `/en/admin/blog` — post list including drafts + scheduled, with status badges, View/Edit/Delete actions
+  - `/sk/admin/blog/novy`, `/en/admin/blog/new` — create post
+  - `/sk/admin/blog/upravit/[id]`, `/en/admin/blog/edit/[id]` — edit post
+  - **Full Markdown editor** via `EasyMDE` (toolbar, live preview, side-by-side, fullscreen, table/link/image/guide) with bilingual SK + EN panes, category + tag checkbox lists, status dropdown, scheduled-publish datetime, SEO meta fields in a collapsed `<details>`, and a featured-image URL field
+- **Public blog pages (bilingual SK/EN)**:
+  - `/sk/blog`, `/en/blog` — listing with `<BlogFilters>` (URL-backed `<form method="get">` exposing search, category `<select>`, tag `<select>`), empty state, pagination, and an RSS badge
+  - `/sk/blog/[slug]`, `/en/blog/[slug]` — detail with rendered HTML, author + published date + reading-time, category pills, tag pills, related posts, `BlogPosting` + `BreadcrumbList` JSON-LD
+  - `/sk/blog/kategoria/[slug]`, `/en/blog/category/[slug]` — category archive
+  - `/sk/blog/tag/[slug]`, `/en/blog/tag/[slug]` — tag archive
+- **SCSS** — `_blog.scss` (listing, cards, filters, pagination, empty state), `_blog-detail.scss` (article rendering with typographic defaults for headings/lists/blockquote/code/images), `_admin.scss` (dashboard cards, post list, form layout + EasyMDE outline-styled toolbar)
+- **i18n** — 60+ blog/admin keys added to both `sk.json` and `en.json`. Route mapping: `kategoria ↔ category`, `novy ↔ new`, `upravit ↔ edit` in `lib/i18n.ts` so the language switcher lands on the right URL.
+- **Seeding** — `scripts/seed-blog.sh` (idempotent, via `curl` + `jq`) creates 6 tags (`film`, `35mm`, `dogs`, `portrait`, `bratislava`, `tips`) and 3 bilingual SK/EN Markdown posts: "Why I Shoot on 35mm Film" (behind-the-scenes), "Dog Portraits: Five Tips for First-Timers" (photography-tips), "Best Photo Spots in Bratislava" (locations). `make seed-blog` target added.
+- **EasyMDE dependency** — `"easymde": "^2.20.0"` added to `src/frontend/package.json`
+
+### Fixed
+- `src/lib/admin.ts` initial JSDoc comment contained `*/*` (an API path), which esbuild's parser took as end-of-comment — broke Vitest collection. Rewrote as `//` line comments.
+
+### Testing
+- **Backend integration tests (15 new)** — `BlogTests.cs` covers listing + empty state, draft/published visibility (public vs admin with `includeDrafts=true`), public 404 on drafts, Markdown rendering, reading-time from word count, filters by category and tag, full-text search matching title / excerpt / content, auth rejection (401 + 403), duplicate-slug 409, update re-renders HTML, soft-delete hides from public, RSS XML shape + content-type, and `customer@dogphoto.sk` seeded-can-login. Total integration: 64 tests, all passing.
+- **Arch tests (1 new)** — `BlogModule_ShouldNotDependOn_EShopOrBooking` added to `ModuleBoundaryTests.cs`; total 8, all passing.
+- **Frontend unit tests (4 new)** — `admin.test.ts` covers `getStoredUser`/`isAdmin`/`isAuthenticated` with anonymous, Customer, Admin, and malformed-JSON states. Total unit: 56 tests.
+- **Playwright E2E (9 new)** — `blog.spec.ts` covers listing render, URL-backed search filter narrowing results, post detail page render, EN listing render, RSS XML response, non-admin redirect off `/sk/admin`, admin `localStorage`-primed visit to `/sk/admin/blog` seeing seeded posts, and axe scans on listing + detail. `BlogPage` page object added. Total E2E: 32 tests.
+
+### Design Decisions
+- **Markdown rendered at save time, not per request** — keeps the hot read path trivial (serve pre-rendered HTML) and lets content editors preview exactly what the site will render. The few cases that need the raw Markdown (editor) read `content_markdown_*` directly from the admin endpoint.
+- **`ILIKE` again for search** — consistent with the Epic 6.2 shop search decision. With ~10 blog posts it's sub-millisecond; GIN + `tsvector` is documented as the future upgrade path.
+- **Client-side admin guard is UX only** — every admin endpoint still enforces `ICurrentUser.IsAdmin` on the backend. The client-side `requireAdmin()` redirect prevents an unauthorized visitor from seeing a blank page, but cannot be relied on for security.
+- **Admin dashboard stubs the other modules intentionally** — Epic 7 is scoped to *blog* CMS. The dashboard shows disabled "coming in Epic 8" cards for portfolio/shop/booking so the shape of the admin area is visible without implying those flows work yet.
+- **EasyMDE over a custom textarea+preview** — user asked for the full editor (it will be reused in Epic 8 for blog management inside the admin panel). EasyMDE ships toolbar, preview, side-by-side, fullscreen, table/link/image/guide actions in ~300KB; replacing it with something smaller later is straightforward since the editor is isolated behind a single Astro component.
+- **Regular user seeded on startup rather than in the blog seed script** — keeps it idempotent and available even without running any seed scripts. Symmetric with the existing admin seed.
+
+---
+
 ## Epic 6.2: Shop Collections, Filtering & Search (2026-04-17)
 
 ### Added
