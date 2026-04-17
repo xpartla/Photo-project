@@ -98,10 +98,38 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
             <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
           </svg>
-          <span class="navbar__cart-badge" id="cart-count-badge" style="display:none;">0</span>
+          <span class="navbar__cart-badge" id="cart-count-badge" data-cart-badge style="display:none;">0</span>
         </a>
       </li>
     </ul>
+
+    <!-- Mobile-only action bar: cart + account always reachable without opening the menu. -->
+    <div class="navbar__mobile-actions">
+      <a
+        href={`/${lang === "sk" ? "sk/obchod/kosik" : "en/shop/cart"}`}
+        class="navbar__mobile-cart"
+        data-cart-link
+        aria-label={t(lang, "nav.cart")}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+        </svg>
+        <span class="navbar__cart-badge" data-cart-badge style="display:none;">0</span>
+      </a>
+
+      <a
+        href={`/${lang === "sk" ? "sk/prihlasenie" : "en/login"}`}
+        class="navbar__mobile-account"
+        data-mobile-account
+        aria-label={t(lang, "nav.login")}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      </a>
+    </div>
 
     <!-- Mobile hamburger -->
     <button class="navbar__hamburger" data-hamburger aria-label="Menu" aria-expanded="false">
@@ -143,41 +171,57 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
 </nav>
 
 <script>
+  import { getCartCount } from "../lib/cart";
+
+  async function refreshCartBadge() {
+    const badges = document.querySelectorAll<HTMLElement>("[data-cart-badge]");
+    const cartLinks = document.querySelectorAll<HTMLElement>("[data-cart-link]");
+    if (badges.length === 0) return;
+    try {
+      const count = await getCartCount();
+      badges.forEach((b) => {
+        b.textContent = String(count);
+        b.style.display = count > 0 ? "" : "none";
+      });
+      // Toggle an "active" state on cart buttons so the mobile icon draws
+      // attention when there's something to check out.
+      cartLinks.forEach((a) => a.classList.toggle("navbar__cart-btn--active", count > 0));
+    } catch {
+      badges.forEach((b) => (b.style.display = "none"));
+    }
+  }
+
   function initNavbar() {
-    const navbar = document.querySelector("[data-navbar]");
+    const navbar = document.querySelector("[data-navbar]") as HTMLElement | null;
     if (!navbar) return;
 
     // ── Auth state ──────────────────────────────────────────────
     const token = localStorage.getItem("partlphoto_token");
-    const loginBtn = navbar.querySelector("[data-login-btn]");
-    const accountMenu = navbar.querySelector("[data-account-menu]");
-    const mobileLoginBtn = navbar.querySelector("[data-mobile-login-btn]");
+    const loginBtn = navbar.querySelector("[data-login-btn]") as HTMLElement | null;
+    const accountMenu = navbar.querySelector("[data-account-menu]") as HTMLElement | null;
+    const mobileLoginBtn = navbar.querySelector("[data-mobile-login-btn]") as HTMLElement | null;
+
+    // Mobile account icon redirects straight to "my orders" when logged in
+    // (no dropdown on mobile) — otherwise to the login page.
+    const mobileAccount = navbar.querySelector("[data-mobile-account]") as HTMLAnchorElement | null;
+    const lang = document.documentElement.lang === "sk" ? "sk" : "en";
+    const ordersHref = lang === "sk" ? "/sk/obchod/objednavky" : "/en/shop/orders";
+    const loginHref = lang === "sk" ? "/sk/prihlasenie" : "/en/login";
 
     if (token) {
       if (loginBtn) loginBtn.style.display = "none";
       if (accountMenu) accountMenu.hidden = false;
-      if (mobileLoginBtn) {
-        mobileLoginBtn.textContent = mobileLoginBtn.textContent.replace(
-          mobileLoginBtn.textContent, "Account"
-        );
-      }
+      if (mobileLoginBtn) mobileLoginBtn.textContent = "Account";
+      if (mobileAccount) mobileAccount.href = ordersHref;
     } else {
       if (loginBtn) loginBtn.style.display = "";
       if (accountMenu) accountMenu.hidden = true;
+      if (mobileAccount) mobileAccount.href = loginHref;
     }
 
     // ── Cart badge ──────────────────────────────────────────────
-    const badge = document.getElementById("cart-count-badge");
-    if (badge) {
-      try {
-        const cart = JSON.parse(localStorage.getItem("partlphoto_cart") || "[]");
-        const count = cart.reduce(function(sum, item) { return sum + item.quantity; }, 0);
-        badge.textContent = String(count);
-        badge.style.display = count > 0 ? "" : "none";
-      } catch(e) {
-        badge.style.display = "none";
-      }
-    }
+    refreshCartBadge();
+    window.addEventListener("cart:changed", refreshCartBadge);
 
     // ── Account dropdown toggle ─────────────────────────────────
     const accountToggle = navbar.querySelector("[data-account-toggle]");

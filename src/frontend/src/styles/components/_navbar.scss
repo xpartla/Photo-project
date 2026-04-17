@@ -117,6 +117,23 @@
       border-color: $outline;
       background-color: rgba($peach, 0.2);
     }
+
+    // Non-empty cart: fill with peach + outline, and pulse the badge so it's
+    // the most eye-catching thing in the navbar.
+    &--active {
+      border-color: $outline;
+      background-color: $peach;
+      box-shadow: 2px 2px 0 $outline;
+
+      .navbar__cart-badge {
+        animation: cart-pulse 1.4s ease-in-out infinite;
+      }
+    }
+  }
+
+  @keyframes cart-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.15); }
   }
 
   &__cart-badge {
@@ -234,6 +251,48 @@
     border: none;
     border-top: 2px solid color.adjust($dark, $lightness: 70%);
     margin: 4px 16px;
+  }
+
+  // ── Mobile actions (cart + account, always visible on mobile) ──
+  &__mobile-actions {
+    display: none;
+    align-items: center;
+    gap: 8px;
+
+    @media (max-width: $breakpoint-md) {
+      display: flex;
+    }
+  }
+
+  &__mobile-cart,
+  &__mobile-account {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: $outline-width solid transparent;
+    color: $dark;
+    transition: all $transition-base;
+
+    &:hover {
+      border-color: $outline;
+      background-color: rgba($peach, 0.2);
+    }
+  }
+
+  // Share the same active treatment as the desktop cart button so the pulse
+  // animation applies whether the cart is mounted on mobile or desktop.
+  &__mobile-cart.navbar__cart-btn--active {
+    border-color: $outline;
+    background-color: $peach;
+    box-shadow: 2px 2px 0 $outline;
+
+    .navbar__cart-badge {
+      animation: cart-pulse 1.4s ease-in-out infinite;
+    }
   }
 
   // ── Hamburger (mobile) ────────────────

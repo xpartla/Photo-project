@@ -121,8 +121,9 @@
 
 .checkout__summary-item {
   display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
   font-family: $font-body;
   font-size: 0.9rem;
   border-bottom: 1px solid rgba($dark, 0.1);
@@ -130,6 +131,80 @@
   &:last-of-type {
     border-bottom: none;
   }
+
+  @media (max-width: $breakpoint-sm) {
+    gap: 10px;
+    padding: 10px 0;
+  }
+}
+
+.checkout__summary-thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border: 2px solid $dark;
+  border-radius: 6px;
+  background: $cream;
+
+  &--placeholder {
+    background: $cream;
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+.checkout__summary-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checkout__summary-item-title {
+  font-weight: 600;
+  color: $dark;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @media (max-width: $breakpoint-sm) {
+    white-space: normal;
+  }
+}
+
+.checkout__summary-qty {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.checkout__summary-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.checkout__summary-spec {
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: $dark;
+  padding: 2px 8px;
+  border: 1.5px solid $dark;
+  border-radius: 999px;
+  background: rgba($cream, 0.8);
+  white-space: nowrap;
+}
+
+.checkout__summary-item-price {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: $dark;
+  white-space: nowrap;
 }
 
 .checkout__summary-total {

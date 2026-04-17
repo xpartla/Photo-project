@@ -1,0 +1,71 @@
+@use "../variables" as *;
+
+.collection-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.collection-page__back {
+  display: inline-block;
+  font-family: $font-body;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: $dark;
+  margin-bottom: 16px;
+  text-decoration: none;
+
+  &:hover {
+    color: $terracotta;
+  }
+}
+
+.collection-page__hero {
+  margin: 0 0 32px;
+  border: $outline-width solid $dark;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 4px 4px 0 $dark;
+  background: $cream;
+
+  picture,
+  img {
+    display: block;
+    width: 100%;
+  }
+
+  img {
+    max-height: 420px;
+    object-fit: cover;
+  }
+
+  @media (max-width: $breakpoint-md) {
+    img { max-height: 300px; }
+  }
+}
+
+.collection-page__header {
+  text-align: center;
+  margin: 0 auto 40px;
+  max-width: 720px;
+}
+
+.collection-page__title {
+  font-family: $font-heading;
+  font-size: 2.25rem;
+  color: $dark;
+  margin: 0 0 12px;
+
+  @media (max-width: $breakpoint-sm) {
+    font-size: 1.75rem;
+  }
+}
+
+.collection-page__description {
+  font-family: $font-body;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: $dark;
+  opacity: 0.85;
+  margin: 0;
+}

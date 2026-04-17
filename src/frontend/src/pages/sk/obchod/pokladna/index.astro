@@ -60,7 +60,7 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
         </div>
         <div class="checkout__field">
           <label class="checkout__label" for="bill-country">{t(lang, "checkout.country")}</label>
-          <input class="checkout__input" id="bill-country" type="text" value="SK" />
+          <input class="checkout__input" id="bill-country" type="text" />
         </div>
       </div>
     </div>
@@ -77,101 +77,117 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
     </div>
   </div>
 
-  <script define:vars={{ apiBase, lang, processingText: t(lang, "checkout.processing"), requiredText: t(lang, "checkout.required") }}>
-    const CART_KEY = 'partlphoto_cart';
+  <script id="checkout-config" type="application/json" set:html={JSON.stringify({
+    apiBase,
+    lang,
+    loginUrl: `/${lang}/prihlasenie?return=/${lang}/obchod/pokladna`,
+    returnUrlTemplate: `/${lang}/obchod/objednavky/ORDER_ID`,
+    cancelUrl: `/${lang}/obchod/kosik`,
+    processingText: t(lang, "checkout.processing"),
+    requiredText: t(lang, "checkout.required"),
+    payText: t(lang, "checkout.payNow"),
+  })}></script>
 
-    // Redirect to login if not authenticated
-    if (!localStorage.getItem('partlphoto_token')) {
-      window.location.href = '/' + lang + '/prihlasenie?return=/' + lang + '/obchod/pokladna';
-      throw new Error('redirect');
+  <script>
+    import { getCart } from "../../../../lib/cart";
+
+    const cfg = JSON.parse(document.getElementById("checkout-config")!.textContent!);
+
+    const token = localStorage.getItem("partlphoto_token");
+    if (!token) {
+      window.location.href = cfg.loginUrl;
+      throw new Error("redirect");
     }
 
-    // Render summary from localStorage
-    let cart = [];
-    try { cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch {}
+    const summaryEl = document.getElementById("summary-items");
+    const totalEl = document.getElementById("summary-total");
+    const payBtn = document.getElementById("pay-btn") as HTMLButtonElement | null;
 
-    const summaryEl = document.getElementById('summary-items');
-    const totalEl = document.getElementById('summary-total');
-    if (summaryEl && cart.length > 0) {
-      summaryEl.innerHTML = cart.map(item =>
-        `<div class="checkout__summary-item">
-          <span>${item.title} &times; ${item.quantity}</span>
-          <span>${(item.price * item.quantity).toFixed(2)} EUR</span>
-        </div>`
-      ).join('');
-      const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-      if (totalEl) totalEl.textContent = `${total.toFixed(2)} EUR`;
+    async function renderSummary() {
+      const snapshot = await getCart();
+      if (snapshot.lines.length === 0) {
+        if (summaryEl) summaryEl.innerHTML = "<p>Košík je prázdny.</p>";
+        if (totalEl) totalEl.textContent = "0 EUR";
+        if (payBtn) payBtn.disabled = true;
+        return;
+      }
+      if (summaryEl) {
+        summaryEl.innerHTML = snapshot.lines
+          .map((item) => {
+            const pills = [item.formatName, item.paperTypeName]
+              .filter(Boolean)
+              .map((p) => `<span class="checkout__summary-spec">${escape(p as string)}</span>`)
+              .join("");
+            const thumb = item.imageUrl
+              ? `<img class="checkout__summary-thumb" src="${escape(item.imageUrl)}" alt="${escape(item.title)}" loading="lazy" />`
+              : `<div class="checkout__summary-thumb checkout__summary-thumb--placeholder"></div>`;
+            return `<div class="checkout__summary-item">
+              ${thumb}
+              <div class="checkout__summary-info">
+                <div class="checkout__summary-item-title">${escape(item.title)} <span class="checkout__summary-qty">&times; ${item.quantity}</span></div>
+                ${pills ? `<div class="checkout__summary-specs">${pills}</div>` : ""}
+              </div>
+              <div class="checkout__summary-item-price">${(item.price * item.quantity).toFixed(2)} EUR</div>
+            </div>`;
+          })
+          .join("");
+      }
+      if (totalEl) totalEl.textContent = `${snapshot.total.toFixed(2)} EUR`;
+      if (payBtn) payBtn.disabled = false;
     }
 
-    // Billing toggle
-    document.getElementById('same-billing')?.addEventListener('change', (e) => {
-      const fields = document.getElementById('billing-fields');
-      if (fields) fields.style.display = e.target.checked ? 'none' : '';
+    function escape(s: string) {
+      return s.replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c] as string),
+      );
+    }
+
+    renderSummary();
+
+    document.getElementById("same-billing")?.addEventListener("change", (e) => {
+      const fields = document.getElementById("billing-fields");
+      if (fields) fields.style.display = (e.target as HTMLInputElement).checked ? "none" : "";
     });
 
-    // Pay button
-    document.getElementById('pay-btn')?.addEventListener('click', async () => {
-      const btn = document.getElementById('pay-btn');
-      const errEl = document.getElementById('checkout-error');
-
-      // Validate required fields
-      const name = document.getElementById('ship-name').value.trim();
-      const street = document.getElementById('ship-street').value.trim();
-      const city = document.getElementById('ship-city').value.trim();
-      const postal = document.getElementById('ship-postal').value.trim();
-      const country = document.getElementById('ship-country').value.trim();
+    payBtn?.addEventListener("click", async () => {
+      const errEl = document.getElementById("checkout-error");
+      const name = (document.getElementById("ship-name") as HTMLInputElement).value.trim();
+      const street = (document.getElementById("ship-street") as HTMLInputElement).value.trim();
+      const city = (document.getElementById("ship-city") as HTMLInputElement).value.trim();
+      const postal = (document.getElementById("ship-postal") as HTMLInputElement).value.trim();
+      const country = (document.getElementById("ship-country") as HTMLInputElement).value.trim();
 
       if (!name || !street || !city || !postal) {
-        if (errEl) errEl.textContent = requiredText;
+        if (errEl) errEl.textContent = cfg.requiredText;
         return;
       }
 
-      btn.disabled = true;
-      btn.textContent = processingText;
-      if (errEl) errEl.textContent = '';
+      payBtn.disabled = true;
+      payBtn.textContent = cfg.processingText;
+      if (errEl) errEl.textContent = "";
 
-      const token = localStorage.getItem('partlphoto_token');
-
-      // Sync localStorage cart to server (only if not already synced at login)
-      // Check if server cart has items; if not, push local cart
-      if (token && cart.length > 0) {
-        try {
-          const serverCart = await fetch(`${apiBase}/api/shop/cart`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          }).then(r => r.json());
-          if (!serverCart.items || serverCart.items.length === 0) {
-            await fetch(`${apiBase}/api/shop/cart/sync`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-              body: JSON.stringify({ items: cart.map(i => ({ productSlug: i.productSlug, quantity: i.quantity })) })
-            });
-          }
-        } catch {}
-      }
-
-      const shippingAddress = { name, street, city, postalCode: postal, country };
-      const sameBilling = document.getElementById('same-billing').checked;
+      const sameBilling = (document.getElementById("same-billing") as HTMLInputElement).checked;
       const billingAddress = sameBilling ? null : {
-        name: document.getElementById('bill-name')?.value.trim() || name,
-        street: document.getElementById('bill-street')?.value.trim() || street,
-        city: document.getElementById('bill-city')?.value.trim() || city,
-        postalCode: document.getElementById('bill-postal')?.value.trim() || postal,
-        country: document.getElementById('bill-country')?.value.trim() || country,
+        name: (document.getElementById("bill-name") as HTMLInputElement).value.trim() || name,
+        street: (document.getElementById("bill-street") as HTMLInputElement).value.trim() || street,
+        city: (document.getElementById("bill-city") as HTMLInputElement).value.trim() || city,
+        postalCode: (document.getElementById("bill-postal") as HTMLInputElement).value.trim() || postal,
+        country: (document.getElementById("bill-country") as HTMLInputElement).value.trim() || country,
       };
 
       try {
-        const res = await fetch(`${apiBase}/api/shop/orders`, {
-          method: 'POST',
+        const res = await fetch(`${cfg.apiBase}/api/shop/orders`, {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("partlphoto_token")}`,
           },
           body: JSON.stringify({
-            shippingAddress,
+            shippingAddress: { name, street, city, postalCode: postal, country },
             billingAddress,
-            returnUrl: `/${lang}/obchod/objednavky/ORDER_ID`,
-            cancelUrl: `/${lang}/obchod/kosik`,
-          })
+            returnUrl: cfg.returnUrlTemplate,
+            cancelUrl: cfg.cancelUrl,
+          }),
         });
 
         if (!res.ok) {
@@ -180,17 +196,17 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
         }
 
         const data = await res.json();
-        localStorage.setItem(CART_KEY, '[]');
+        window.dispatchEvent(new CustomEvent("cart:changed"));
         window.location.href = data.redirectUrl;
-      } catch (err) {
-        if (errEl) errEl.textContent = err.message || 'Order failed';
-        btn.disabled = false;
-        btn.textContent = 'Zaplatiť';
+      } catch (err: any) {
+        if (errEl) errEl.textContent = err.message || "Objednávka zlyhala";
+        payBtn.disabled = false;
+        payBtn.textContent = cfg.payText;
       }
     });
   </script>
 </BaseLayout>
 
-<style lang="scss">
+<style lang="scss" is:global>
   @use "../../../../styles/components/checkout";
 </style>

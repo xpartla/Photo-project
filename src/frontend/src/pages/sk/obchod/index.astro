@@ -1,22 +1,58 @@
 ---
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import SeoMeta from "../../../components/SeoMeta.astro";
-import { getProducts } from "../../../lib/api";
+import ShopFilters from "../../../components/ShopFilters.astro";
+import {
+  getProducts,
+  getShopCollections,
+  getShopTags,
+  fetchApi,
+} from "../../../lib/api";
 import { t, getAlternateUrl } from "../../../lib/i18n";
 import { buildSrcset, getFallbackUrl } from "../../../lib/imageUrl";
-import type { ShopProduct } from "../../../lib/api";
+import type {
+  ShopProduct,
+  ShopCollectionSummary,
+  ShopTagSummary,
+  ShopFormat,
+  ShopPaperType,
+} from "../../../lib/api";
 
 const lang = "sk";
 const pageUrl = Astro.url.pathname;
 const alternateUrl = getAlternateUrl(lang, pageUrl);
 
+const params = Astro.url.searchParams;
+const active = {
+  collection: params.get("collection") ?? undefined,
+  tag: params.get("tag") ?? undefined,
+  format: params.get("format") ?? undefined,
+  paperType: params.get("paperType") ?? undefined,
+  q: params.get("q") ?? undefined,
+  available: params.get("available") ?? undefined,
+};
+
 let products: ShopProduct[] = [];
 let total = 0;
+let collections: ShopCollectionSummary[] = [];
+let tags: ShopTagSummary[] = [];
+let formats: ShopFormat[] = [];
+let paperTypes: ShopPaperType[] = [];
 
 try {
-  const result = await getProducts({ lang, size: 50 });
-  products = result.items;
-  total = result.total;
+  const [list, cols, tagList, fmts, papers] = await Promise.all([
+    getProducts({ lang, size: 50, ...active }),
+    getShopCollections(lang),
+    getShopTags(lang),
+    fetchApi<ShopFormat[]>("/api/shop/formats"),
+    fetchApi<ShopPaperType[]>("/api/shop/paper-types"),
+  ]);
+  products = list.items;
+  total = list.total;
+  collections = cols;
+  tags = tagList;
+  formats = fmts;
+  paperTypes = papers;
 } catch {
   // fallback
 }
@@ -39,17 +75,16 @@ const pageTitle = `${t(lang, "shop.title")} — PartlPhoto`;
       <p class="shop__subtitle">{t(lang, "shop.subtitle")}</p>
     </div>
 
-    <div class="shop__filters">
-      <button class="shop__filter-btn shop__filter-btn--active" data-filter="all">
-        {t(lang, "shop.filter.all")}
-      </button>
-      <button class="shop__filter-btn" data-filter="available">
-        {t(lang, "shop.filter.available")}
-      </button>
-      <button class="shop__filter-btn" data-filter="sold-out">
-        {t(lang, "shop.filter.soldOut")}
-      </button>
-    </div>
+    <ShopFilters
+      lang={lang}
+      action={`/${lang}/obchod`}
+      active={active}
+      collections={collections}
+      tags={tags}
+      formats={formats}
+      paperTypes={paperTypes}
+      totalCount={total}
+    />
 
     {products.length === 0 ? (
       <p class="shop__empty">{t(lang, "shop.noProducts")}</p>
@@ -64,6 +99,11 @@ const pageTitle = `${t(lang, "shop.title")} — PartlPhoto`;
               ? `${editionRemaining} ${t(lang, "shop.remaining")}`
               : t(lang, "shop.openEdition");
           const badgeClass = isSoldOut ? "product-card__badge--sold-out" : "";
+
+          const variants = product.productVariants ?? [];
+          const specs = product.isLimitedEdition && variants.length > 0
+            ? [variants[0].formatName, variants[0].paperTypeName].filter(Boolean)
+            : Array.from(new Set(variants.map((v) => v.formatName))).slice(0, 3);
 
           return (
             <a href={`/${lang}/obchod/${product.slug}`} class="product-card" data-available={product.isAvailable ? "true" : "false"}>
@@ -92,11 +132,27 @@ const pageTitle = `${t(lang, "shop.title")} — PartlPhoto`;
               </div>
               <div class="product-card__body">
                 <h3 class="product-card__title">{product.title}</h3>
-                {product.format && (
-                  <p class="product-card__format">{product.format}</p>
+                {specs.length > 0 && (
+                  <div class="product-card__specs">
+                    {specs.map((s) => (
+                      <span class="product-card__spec">{s}</span>
+                    ))}
+                  </div>
+                )}
+                {product.tags?.length > 0 && (
+                  <div class="product-card__specs product-card__specs--tags">
+                    {product.tags.map((tg) => (
+                      <span class="product-card__spec product-card__spec--tag">#{tg.name}</span>
+                    ))}
+                  </div>
                 )}
                 <div class="product-card__footer">
-                  <span class="product-card__price">{product.price} {product.currency}</span>
+                  <span class="product-card__price">
+                    {!product.isLimitedEdition && product.minPrice !== product.maxPrice && (
+                      <span class="product-card__price-prefix">{t(lang, "shop.fromPrice")} </span>
+                    )}
+                    {product.minPrice ?? 0} {product.currency}
+                  </span>
                   <span class="product-card__cta">{t(lang, "shop.viewDetail")}</span>
                 </div>
               </div>
@@ -106,26 +162,8 @@ const pageTitle = `${t(lang, "shop.title")} — PartlPhoto`;
       </div>
     )}
   </main>
-
-  <script>
-    document.querySelectorAll('.shop__filter-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.shop__filter-btn').forEach(b => b.classList.remove('shop__filter-btn--active'));
-        btn.classList.add('shop__filter-btn--active');
-
-        const filter = btn.getAttribute('data-filter');
-        document.querySelectorAll('.product-card').forEach(card => {
-          const el = card;
-          const isAvailable = el.getAttribute('data-available') === 'true';
-          if (filter === 'all') { el.style.display = ''; }
-          else if (filter === 'available') { el.style.display = isAvailable ? '' : 'none'; }
-          else if (filter === 'sold-out') { el.style.display = !isAvailable ? '' : 'none'; }
-        });
-      });
-    });
-  </script>
 </BaseLayout>
 
-<style lang="scss">
+<style lang="scss" is:global>
   @use "../../../styles/components/shop";
 </style>

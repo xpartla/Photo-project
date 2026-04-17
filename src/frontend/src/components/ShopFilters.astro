@@ -1,0 +1,135 @@
+---
+import { t } from "../lib/i18n";
+import type { ShopCollectionSummary, ShopFormat, ShopPaperType, ShopTagSummary } from "../lib/api";
+
+interface Props {
+  lang: "sk" | "en";
+  action: string;
+  active: {
+    collection?: string;
+    tag?: string;
+    format?: string;
+    paperType?: string;
+    q?: string;
+    available?: string;
+  };
+  collections: ShopCollectionSummary[];
+  tags: ShopTagSummary[];
+  formats: ShopFormat[];
+  paperTypes: ShopPaperType[];
+  totalCount: number;
+  lockedCollection?: boolean;
+}
+
+const { lang, action, active, collections, tags, formats, paperTypes, totalCount, lockedCollection } = Astro.props;
+
+// Count how many filters are actually narrowing results so the collapsed
+// summary can surface that state without the user having to expand.
+const activeCount = [active.collection, active.tag, active.format, active.paperType, active.q]
+  .filter((v) => v != null && v !== "").length;
+const hasActive = activeCount > 0;
+---
+
+<details class="shop-filters-wrap" open={hasActive}>
+  <summary class="shop-filters-wrap__summary">
+    <span class="shop-filters-wrap__summary-label">
+      <svg class="shop-filters-wrap__summary-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="4" y1="6" x2="20" y2="6" />
+        <line x1="7" y1="12" x2="17" y2="12" />
+        <line x1="10" y1="18" x2="14" y2="18" />
+      </svg>
+      {t(lang, "shop.filters.apply")} &amp; {t(lang, "shop.filters.search").toLowerCase()}
+      {hasActive && (
+        <span class="shop-filters-wrap__badge">{activeCount}</span>
+      )}
+    </span>
+    <span class="shop-filters-wrap__summary-meta">
+      <span class="shop-filters-wrap__summary-count">
+        {totalCount} {t(lang, "shop.filters.resultLabel")}
+      </span>
+      <svg class="shop-filters-wrap__summary-chevron" width="14" height="14" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M1 1l5 5 5-5" />
+      </svg>
+    </span>
+  </summary>
+
+  <form class="shop-filters" action={action} method="get" role="search">
+    <div class="shop-filters__row">
+      <label class="shop-filters__field">
+        <span class="shop-filters__label">{t(lang, "shop.filters.search")}</span>
+        <input
+          type="search"
+          name="q"
+          value={active.q ?? ""}
+          placeholder={t(lang, "shop.filters.searchPlaceholder")}
+          class="shop-filters__input"
+        />
+      </label>
+
+      {!lockedCollection && (
+        <label class="shop-filters__field">
+          <span class="shop-filters__label">{t(lang, "shop.filters.collection")}</span>
+          <select name="collection" class="shop-filters__select">
+            <option value="">{t(lang, "shop.filters.collectionAll")}</option>
+            {collections.map((c) => (
+              <option value={c.slug} selected={active.collection === c.slug}>
+                {c.name} ({c.productCount})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {tags.length > 0 && (
+        <label class="shop-filters__field">
+          <span class="shop-filters__label">{t(lang, "shop.filters.tag")}</span>
+          <select name="tag" class="shop-filters__select">
+            <option value="">{t(lang, "shop.filters.tagAll")}</option>
+            {tags.map((tg) => (
+              <option value={tg.slug} selected={active.tag === tg.slug}>
+                {tg.name} ({tg.productCount})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      <label class="shop-filters__field">
+        <span class="shop-filters__label">{t(lang, "shop.filters.format")}</span>
+        <select name="format" class="shop-filters__select">
+          <option value="">{t(lang, "shop.filters.formatAll")}</option>
+          {formats.map((f) => (
+            <option value={f.code} selected={active.format === f.code}>
+              {lang === "en" ? f.nameEn : f.nameSk}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label class="shop-filters__field">
+        <span class="shop-filters__label">{t(lang, "shop.filters.paper")}</span>
+        <select name="paperType" class="shop-filters__select">
+          <option value="">{t(lang, "shop.filters.paperAll")}</option>
+          {paperTypes.map((p) => (
+            <option value={p.code} selected={active.paperType === p.code}>
+              {lang === "en" ? p.nameEn : p.nameSk}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+
+    {lockedCollection && active.collection && (
+      <input type="hidden" name="collection" value={active.collection} />
+    )}
+
+    <div class="shop-filters__actions">
+      <button type="submit" class="shop-filters__submit">{t(lang, "shop.filters.apply")}</button>
+      {hasActive && (
+        <a href={lockedCollection && active.collection ? `${action}?collection=${active.collection}` : action} class="shop-filters__reset">
+          {t(lang, "shop.filters.reset")}
+        </a>
+      )}
+    </div>
+  </form>
+</details>

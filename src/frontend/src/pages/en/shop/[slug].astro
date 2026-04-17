@@ -21,13 +21,19 @@ try {
 
 if (!product) return Astro.redirect(`/${lang}/shop`);
 
-const isSoldOut = !product.isAvailable;
+const variants = (product.productVariants || []).filter((v) => v.isAvailable);
+const defaultVariant = variants[0] ?? product.productVariants?.[0];
+const isSoldOut = !product.isAvailable || variants.length === 0;
+
 const editionText = product.editionSize
   ? `${t(lang, "shop.edition")} ${product.editionSold} ${t(lang, "shop.editionOf")} ${product.editionSize} — ${product.editionRemaining} ${t(lang, "shop.remaining")}`
   : t(lang, "shop.openEdition");
 
-const pageTitle = `${product.title} — ${t(lang, "shop.title")} — PartlPhoto`;
+// Unique format and paper options for the selectors.
+const formats = Array.from(new Map(variants.map((v) => [v.formatCode, { code: v.formatCode, name: v.formatName }])).values());
+const papers = Array.from(new Map(variants.map((v) => [v.paperTypeCode, { code: v.paperTypeCode, name: v.paperTypeName }])).values());
 
+const pageTitle = `${product.title} — ${t(lang, "shop.title")} — PartlPhoto`;
 const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
 ---
 
@@ -48,41 +54,29 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
       "image": product.variants.length > 0 ? getFallbackUrl(product.variants) : undefined,
       "offers": {
         "@type": "Offer",
-        "price": product.price,
+        "price": defaultVariant?.price ?? product.minPrice ?? 0,
         "priceCurrency": product.currency,
         "availability": product.isAvailable
           ? "https://schema.org/InStock"
           : "https://schema.org/SoldOut",
-        "seller": {
-          "@type": "Organization",
-          "name": "PartlPhoto"
-        }
+        "seller": { "@type": "Organization", "name": "PartlPhoto" }
       }
     })} />
   </Fragment>
 
   <div class="product-detail-page">
-    <!-- Decorative background blobs -->
     <div class="product-detail-page__decor product-detail-page__decor--1"></div>
     <div class="product-detail-page__decor product-detail-page__decor--2"></div>
     <div class="product-detail-page__decor product-detail-page__decor--3"></div>
 
     <div class="product-detail">
-      <!-- Framed print -->
       <div class="product-detail__frame">
         <div class="product-detail__mat">
           <div class="product-detail__image">
             {product.variants.length > 0 ? (
               <picture>
-                <source
-                  srcset={buildSrcset(product.variants, "webp")}
-                  type="image/webp"
-                />
-                <img
-                  src={getFallbackUrl(product.variants)}
-                  alt={product.title}
-                  loading="eager"
-                />
+                <source srcset={buildSrcset(product.variants, "webp")} type="image/webp" />
+                <img src={getFallbackUrl(product.variants)} alt={product.title} loading="eager" />
               </picture>
             ) : (
               <div style="height:400px;background:#eee;display:flex;align-items:center;justify-content:center;">
@@ -95,14 +89,11 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
               {isSoldOut ? t(lang, "shop.soldOut") : `${product.editionRemaining}/${product.editionSize}`}
             </span>
           ) : (
-            <span class="product-detail__stamp">
-              {t(lang, "shop.openEdition")}
-            </span>
+            <span class="product-detail__stamp">{t(lang, "shop.openEdition")}</span>
           )}
         </div>
       </div>
 
-      <!-- Info panel -->
       <div class="product-detail__info">
         <a href={`/${lang}/shop`} class="product-detail__back product-detail__reveal">
           &larr; {t(lang, "shop.backToShop")}
@@ -116,20 +107,49 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
           <p class="product-detail__description product-detail__reveal">{product.description}</p>
         )}
 
-        <div class="product-detail__meta product-detail__reveal">
-          {product.format && (
+        {product.tags?.length > 0 && (
+          <div class="product-detail__tags product-detail__reveal">
+            {product.tags.map((tg) => (
+              <a href={`/${lang}/shop?tag=${tg.slug}`} class="product-detail__tag">#{tg.name}</a>
+            ))}
+          </div>
+        )}
+
+        {product.isLimitedEdition && defaultVariant ? (
+          <div class="product-detail__meta product-detail__reveal">
             <div class="product-detail__meta-item">
               <strong>{t(lang, "shop.format")}</strong>
-              {product.format}
+              {defaultVariant.formatName}
             </div>
-          )}
-          {product.paperType && (
             <div class="product-detail__meta-item">
               <strong>{t(lang, "shop.paperType")}</strong>
-              {product.paperType}
+              {defaultVariant.paperTypeName}
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div class="product-detail__selectors product-detail__reveal">
+            <label class="product-detail__selector">
+              <span class="product-detail__selector-label">{t(lang, "shop.format")}</span>
+              <select id="format-select" class="product-detail__select">
+                {formats.map((f) => (
+                  <option value={f.code} selected={f.code === defaultVariant?.formatCode}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label class="product-detail__selector">
+              <span class="product-detail__selector-label">{t(lang, "shop.paperType")}</span>
+              <select id="paper-select" class="product-detail__select">
+                {papers.map((p) => (
+                  <option value={p.code} selected={p.code === defaultVariant?.paperTypeCode}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
 
         <div class={`product-detail__edition product-detail__reveal ${isSoldOut ? "product-detail__edition--sold-out" : ""}`}>
           <span class="product-detail__edition-dot"></span>
@@ -137,7 +157,7 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
         </div>
 
         <div class="product-detail__price-row product-detail__reveal">
-          <span class="product-detail__price">{product.price}</span>
+          <span class="product-detail__price" id="product-price">{defaultVariant?.price ?? product.minPrice ?? 0}</span>
           <span class="product-detail__currency">{product.currency}</span>
         </div>
 
@@ -148,7 +168,6 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
             data-product-id={product.id}
             data-product-slug={product.slug}
             data-product-title={product.title}
-            data-product-price={product.price}
             data-product-currency={product.currency}
             data-product-image={product.variants.length > 0 ? getFallbackUrl(product.variants) : ""}
             data-edition-size={product.editionSize ?? ""}
@@ -161,7 +180,6 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
       </div>
     </div>
 
-    <!-- Quality trust strip -->
     <div class="product-quality">
       <div class="product-quality__item">
         <div class="product-quality__icon">&#9733;</div>
@@ -182,42 +200,68 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
     </div>
   </div>
 
-  <script define:vars={{ apiBase, lang }}>
-    const btn = document.getElementById('add-to-cart-btn');
-    if (btn && !btn.disabled) {
-      btn.addEventListener('click', () => {
-        const productSlug = btn.dataset.productSlug;
-        const productId = btn.dataset.productId;
-        const title = btn.dataset.productTitle;
-        const price = parseFloat(btn.dataset.productPrice || '0');
-        const currency = btn.dataset.productCurrency || 'EUR';
-        const imageUrl = btn.dataset.productImage || '';
-        const editionSize = btn.dataset.editionSize ? parseInt(btn.dataset.editionSize) : null;
-        const editionSold = parseInt(btn.dataset.editionSold || '0');
+  <script id="product-variants-data" type="application/json" set:html={JSON.stringify(product.productVariants || [])}></script>
 
-        const CART_KEY = 'partlphoto_cart';
-        const cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
-        const existing = cart.find(item => item.productSlug === productSlug);
-        if (existing) {
-          existing.quantity += 1;
-        } else {
-          cart.push({ productSlug, productId, title, price, currency, imageUrl, editionSize, editionSold, quantity: 1 });
-        }
-        localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  <script>
+    import { addToCart } from "../../../lib/cart";
 
-        const original = btn.textContent;
-        btn.textContent = '✓';
-        btn.disabled = true;
-        setTimeout(() => {
-          btn.textContent = original;
-          btn.disabled = false;
-        }, 1000);
+    const dataEl = document.getElementById("product-variants-data");
+    const allVariants = dataEl ? JSON.parse(dataEl.textContent || "[]") : [];
 
-        const badge = document.getElementById('cart-count-badge');
-        if (badge) {
-          const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-          badge.textContent = String(totalItems);
-          badge.style.display = totalItems > 0 ? '' : 'none';
+    const btn = document.getElementById("add-to-cart-btn") as HTMLButtonElement | null;
+    const priceEl = document.getElementById("product-price");
+    const formatSel = document.getElementById("format-select") as HTMLSelectElement | null;
+    const paperSel = document.getElementById("paper-select") as HTMLSelectElement | null;
+
+    function currentVariant() {
+      if (!formatSel || !paperSel) return allVariants[0] ?? null;
+      return allVariants.find(
+        (v: any) => v.formatCode === formatSel.value && v.paperTypeCode === paperSel.value && v.isAvailable,
+      ) ?? null;
+    }
+
+    function refresh() {
+      const v = currentVariant();
+      if (priceEl) priceEl.textContent = v ? String(v.price) : "—";
+      if (btn) {
+        btn.disabled = !v;
+      }
+    }
+
+    formatSel?.addEventListener("change", refresh);
+    paperSel?.addEventListener("change", refresh);
+    refresh();
+
+    if (btn) {
+      btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        const v = currentVariant();
+        if (!v) return;
+        try {
+          await addToCart({
+            productSlug: btn.dataset.productSlug!,
+            productId: btn.dataset.productId,
+            variantId: v.id,
+            formatCode: v.formatCode,
+            formatName: v.formatName,
+            paperTypeCode: v.paperTypeCode,
+            paperTypeName: v.paperTypeName,
+            title: btn.dataset.productTitle!,
+            price: v.price,
+            currency: btn.dataset.productCurrency || "EUR",
+            imageUrl: btn.dataset.productImage || "",
+            editionSize: btn.dataset.editionSize ? parseInt(btn.dataset.editionSize) : null,
+            editionSold: parseInt(btn.dataset.editionSold || "0"),
+          });
+
+          const original = btn.textContent;
+          btn.textContent = "✓";
+          btn.disabled = true;
+          setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1000);
+
+          window.dispatchEvent(new CustomEvent("cart:changed"));
+        } catch (err) {
+          console.error("add to cart failed", err);
         }
       });
     }

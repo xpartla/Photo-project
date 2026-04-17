@@ -27,11 +27,12 @@ async function ensureProduct(
       slug,
       descriptionSk: "E2E testovací produkt",
       descriptionEn: "E2E test product",
-      format: "30x40 cm",
-      paperType: "Fine Art",
-      price: 55,
+      isLimitedEdition: true,
       editionSize: 50,
       isAvailable: true,
+      variants: [
+        { formatCode: "30x40", paperTypeCode: "fine-art-310", price: 55 },
+      ],
     },
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -53,23 +54,23 @@ test.describe("shop", () => {
     await expect(shop.productCards().first()).toBeVisible();
   });
 
-  test("filter buttons toggle product visibility", async ({ page, request }) => {
+  test("filter form narrows product listing by format", async ({ page, request }) => {
     const token = await getAdminToken(request);
     await ensureProduct(request, token);
 
     const shop = new ShopPage(page);
     await shop.goto("/sk/obchod");
 
-    // All filter is active by default
-    await expect(shop.filterBtn("all")).toHaveClass(/--active/);
+    // Filter disclosure is collapsed when no filters are applied — expand it.
+    await page.locator(".shop-filters-wrap__summary").click();
+    await page.selectOption('.shop-filters select[name="format"]', "30x40");
+    await Promise.all([
+      page.waitForURL(/format=30x40/),
+      page.locator(".shop-filters__submit").click(),
+    ]);
 
-    // Click available filter
-    await shop.filterBtn("available").click();
-    await expect(shop.filterBtn("available")).toHaveClass(/--active/);
-    // All visible products should be available
-    const cards = shop.productCards();
-    const count = await cards.count();
-    expect(count).toBeGreaterThan(0);
+    // Narrowed list still contains the seeded 30×40 test product.
+    await expect(shop.productCards().first()).toBeVisible();
   });
 
   test("EN shop page loads with English content", async ({ page, request }) => {
@@ -120,10 +121,14 @@ test.describe("shop", () => {
   // ── Cart ───────────────────────────────────────────────────
 
   test("empty cart shows empty state", async ({ page }) => {
-    await page.evaluate(() => localStorage.setItem("partlphoto_cart", "[]"));
-
+    // Navigate first so localStorage has an origin, then clear and reload.
     const shop = new ShopPage(page);
     await shop.goto("/sk/obchod/kosik");
+    await page.evaluate(() => {
+      localStorage.removeItem("partlphoto_token");
+      localStorage.setItem("partlphoto_cart", "[]");
+    });
+    await page.reload();
 
     await expect(shop.cartEmpty()).toBeVisible();
   });

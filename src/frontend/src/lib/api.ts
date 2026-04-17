@@ -6,7 +6,7 @@
 const API_BASE =
   import.meta.env.PUBLIC_API_URL || "http://localhost:5000";
 
-async function fetchApi<T>(path: string): Promise<T> {
+export async function fetchApi<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${path}`);
@@ -155,6 +155,27 @@ export interface BookingDetail {
 
 // ── Shop types ───────────────────────────────────────────────────
 
+export interface ProductVariantOption {
+  id: string;
+  formatCode: string;
+  formatName: string;
+  formatNameSk: string;
+  formatNameEn: string;
+  paperTypeCode: string;
+  paperTypeName: string;
+  paperTypeNameSk: string;
+  paperTypeNameEn: string;
+  price: number;
+  isAvailable: boolean;
+}
+
+export interface ShopProductTag {
+  slug: string;
+  name: string;
+  nameSk: string;
+  nameEn: string;
+}
+
 export interface ShopProduct {
   id: string;
   slug: string;
@@ -163,15 +184,53 @@ export interface ShopProduct {
   titleSk: string;
   titleEn: string;
   description?: string;
-  format?: string;
-  paperType?: string;
-  price: number;
   currency: string;
+  isLimitedEdition: boolean;
   editionSize?: number;
   editionSold: number;
   editionRemaining?: number;
   isAvailable: boolean;
-  variants: Variant[];
+  minPrice?: number;
+  maxPrice?: number;
+  tags: ShopProductTag[];
+  productVariants: ProductVariantOption[];
+  variants: Variant[]; // image variants (from Portfolio)
+}
+
+export interface ShopCollectionSummary {
+  slug: string;
+  name: string;
+  nameSk: string;
+  nameEn: string;
+  description?: string;
+  productCount: number;
+  coverImage?: { photoId: string; variants: Variant[] };
+}
+
+export interface ShopCollectionDetail extends ShopCollectionSummary {
+  products: ShopProduct[];
+}
+
+export interface ShopTagSummary {
+  slug: string;
+  name: string;
+  nameSk: string;
+  nameEn: string;
+  productCount: number;
+}
+
+export interface ShopFormat {
+  id: string;
+  code: string;
+  nameSk: string;
+  nameEn: string;
+}
+
+export interface ShopPaperType {
+  id: string;
+  code: string;
+  nameSk: string;
+  nameEn: string;
 }
 
 export interface ShopProductList {
@@ -316,21 +375,44 @@ export async function getBooking(id: string): Promise<BookingDetail> {
 
 export async function getProducts(params?: {
   lang?: string;
-  format?: string;
   available?: boolean;
   photoId?: string;
+  collection?: string;
+  tag?: string;
+  format?: string;
+  paperType?: string;
+  q?: string;
   page?: number;
   size?: number;
 }): Promise<ShopProductList> {
   const qs = new URLSearchParams();
   if (params?.lang) qs.set("lang", params.lang);
-  if (params?.format) qs.set("format", params.format);
   if (params?.available !== undefined) qs.set("available", String(params.available));
   if (params?.photoId) qs.set("photoId", params.photoId);
+  if (params?.collection) qs.set("collection", params.collection);
+  if (params?.tag) qs.set("tag", params.tag);
+  if (params?.format) qs.set("format", params.format);
+  if (params?.paperType) qs.set("paperType", params.paperType);
+  if (params?.q) qs.set("q", params.q);
   if (params?.page) qs.set("page", String(params.page));
   if (params?.size) qs.set("size", String(params.size));
   const query = qs.toString();
   return fetchApi(`/api/shop/products${query ? `?${query}` : ""}`);
+}
+
+export async function getShopCollections(lang?: string): Promise<ShopCollectionSummary[]> {
+  const qs = lang ? `?lang=${lang}` : "";
+  return fetchApi(`/api/shop/collections${qs}`);
+}
+
+export async function getShopCollection(slug: string, lang?: string): Promise<ShopCollectionDetail> {
+  const qs = lang ? `?lang=${lang}` : "";
+  return fetchApi(`/api/shop/collections/${slug}${qs}`);
+}
+
+export async function getShopTags(lang?: string): Promise<ShopTagSummary[]> {
+  const qs = lang ? `?lang=${lang}` : "";
+  return fetchApi(`/api/shop/tags${qs}`);
 }
 
 export async function getProduct(slug: string, lang?: string): Promise<ShopProduct> {

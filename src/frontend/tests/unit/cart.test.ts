@@ -12,7 +12,12 @@ const mockLocalStorage = {
 
 const CART_KEY = "partlphoto_cart";
 
-// Inline the pure functions to test (avoiding localStorage import issues in node env)
+// Inline re-implementations that mirror cart.ts semantics.
+// Matches the (productSlug, formatCode, paperTypeCode) identity.
+function localKey(i: any): string {
+  return `${i.productSlug}::${i.formatCode ?? ""}::${i.paperTypeCode ?? ""}`;
+}
+
 function getLocalCart(): any[] {
   try {
     return JSON.parse(localStorage.getItem(CART_KEY) || "[]");
@@ -23,28 +28,25 @@ function getLocalCart(): any[] {
 
 function addToLocalCart(item: any): void {
   const cart = getLocalCart();
-  const existing = cart.find((ci: any) => ci.productSlug === item.productSlug);
-  if (existing) {
-    existing.quantity += item.quantity ?? 1;
-  } else {
-    cart.push({ ...item, quantity: item.quantity ?? 1 });
-  }
+  const key = localKey(item);
+  const existing = cart.find((ci) => localKey(ci) === key);
+  if (existing) existing.quantity += item.quantity ?? 1;
+  else cart.push({ ...item, quantity: item.quantity ?? 1 });
   localStorage.setItem(CART_KEY, JSON.stringify(cart));
 }
 
-function removeFromLocalCart(slug: string): void {
-  const cart = getLocalCart().filter((ci: any) => ci.productSlug !== slug);
+function removeFromLocalCart(match: any): void {
+  const key = localKey(match);
+  const cart = getLocalCart().filter((ci: any) => localKey(ci) !== key);
   localStorage.setItem(CART_KEY, JSON.stringify(cart));
 }
 
-function updateLocalCartQuantity(slug: string, quantity: number): void {
+function updateLocalCartQuantity(match: any, quantity: number): void {
   const cart = getLocalCart();
-  const item = cart.find((ci: any) => ci.productSlug === slug);
+  const key = localKey(match);
+  const item = cart.find((ci: any) => localKey(ci) === key);
   if (item) {
-    if (quantity <= 0) {
-      removeFromLocalCart(slug);
-      return;
-    }
+    if (quantity <= 0) { removeFromLocalCart(match); return; }
     item.quantity = quantity;
     localStorage.setItem(CART_KEY, JSON.stringify(cart));
   }
@@ -57,7 +59,7 @@ function getLocalCartTotal(cart: any[]): number {
 function formatEditionBadge(
   editionSize: number | null,
   editionSold: number,
-  labels: { remaining: string; soldOut: string; openEdition: string }
+  labels: { remaining: string; soldOut: string; openEdition: string },
 ): string {
   if (editionSize == null) return labels.openEdition;
   const remaining = editionSize - editionSold;
@@ -77,52 +79,63 @@ describe("localStorage cart operations", () => {
   });
 
   it("adds item to cart", () => {
-    addToLocalCart({ productSlug: "test-product", title: "Test", price: 50, currency: "EUR" });
+    addToLocalCart({ productSlug: "test-product", formatCode: "a4", paperTypeCode: "matte-200", title: "Test", price: 50, currency: "EUR" });
     const cart = getLocalCart();
     expect(cart).toHaveLength(1);
     expect(cart[0].productSlug).toBe("test-product");
     expect(cart[0].quantity).toBe(1);
   });
 
-  it("increments quantity for existing item", () => {
-    addToLocalCart({ productSlug: "test-product", title: "Test", price: 50, currency: "EUR" });
-    addToLocalCart({ productSlug: "test-product", title: "Test", price: 50, currency: "EUR" });
+  it("increments quantity for existing variant", () => {
+    addToLocalCart({ productSlug: "p", formatCode: "a4", paperTypeCode: "matte-200", title: "Test", price: 50, currency: "EUR" });
+    addToLocalCart({ productSlug: "p", formatCode: "a4", paperTypeCode: "matte-200", title: "Test", price: 50, currency: "EUR" });
     const cart = getLocalCart();
     expect(cart).toHaveLength(1);
     expect(cart[0].quantity).toBe(2);
   });
 
+  it("keeps different variants of same product as distinct lines", () => {
+    addToLocalCart({ productSlug: "p", formatCode: "a4", paperTypeCode: "matte-200", title: "A4 Matte", price: 30, currency: "EUR" });
+    addToLocalCart({ productSlug: "p", formatCode: "a3", paperTypeCode: "matte-200", title: "A3 Matte", price: 50, currency: "EUR" });
+    addToLocalCart({ productSlug: "p", formatCode: "a4", paperTypeCode: "fine-art-310", title: "A4 Fine Art", price: 55, currency: "EUR" });
+    const cart = getLocalCart();
+    expect(cart).toHaveLength(3);
+  });
+
   it("adds different products as separate items", () => {
-    addToLocalCart({ productSlug: "product-a", title: "A", price: 30, currency: "EUR" });
-    addToLocalCart({ productSlug: "product-b", title: "B", price: 40, currency: "EUR" });
+    addToLocalCart({ productSlug: "product-a", formatCode: "a4", paperTypeCode: "matte-200", title: "A", price: 30, currency: "EUR" });
+    addToLocalCart({ productSlug: "product-b", formatCode: "a4", paperTypeCode: "matte-200", title: "B", price: 40, currency: "EUR" });
     const cart = getLocalCart();
     expect(cart).toHaveLength(2);
   });
 
   it("removes item from cart", () => {
-    addToLocalCart({ productSlug: "to-remove", title: "X", price: 10, currency: "EUR" });
-    addToLocalCart({ productSlug: "to-keep", title: "Y", price: 20, currency: "EUR" });
-    removeFromLocalCart("to-remove");
+    const key = { productSlug: "to-remove", formatCode: "a4", paperTypeCode: "matte-200" };
+    addToLocalCart({ ...key, title: "X", price: 10, currency: "EUR" });
+    addToLocalCart({ productSlug: "to-keep", formatCode: "a4", paperTypeCode: "matte-200", title: "Y", price: 20, currency: "EUR" });
+    removeFromLocalCart(key);
     const cart = getLocalCart();
     expect(cart).toHaveLength(1);
     expect(cart[0].productSlug).toBe("to-keep");
   });
 
   it("updates quantity", () => {
-    addToLocalCart({ productSlug: "qty-test", title: "T", price: 25, currency: "EUR" });
-    updateLocalCartQuantity("qty-test", 5);
+    const key = { productSlug: "qty-test", formatCode: "a4", paperTypeCode: "matte-200" };
+    addToLocalCart({ ...key, title: "T", price: 25, currency: "EUR" });
+    updateLocalCartQuantity(key, 5);
     expect(getLocalCart()[0].quantity).toBe(5);
   });
 
   it("removes item when quantity set to 0", () => {
-    addToLocalCart({ productSlug: "zero-qty", title: "T", price: 10, currency: "EUR" });
-    updateLocalCartQuantity("zero-qty", 0);
+    const key = { productSlug: "zero-qty", formatCode: "a4", paperTypeCode: "matte-200" };
+    addToLocalCart({ ...key, title: "T", price: 10, currency: "EUR" });
+    updateLocalCartQuantity(key, 0);
     expect(getLocalCart()).toHaveLength(0);
   });
 
   it("clears cart", () => {
-    addToLocalCart({ productSlug: "a", title: "A", price: 10, currency: "EUR" });
-    addToLocalCart({ productSlug: "b", title: "B", price: 20, currency: "EUR" });
+    addToLocalCart({ productSlug: "a", formatCode: "a4", paperTypeCode: "matte-200", title: "A", price: 10, currency: "EUR" });
+    addToLocalCart({ productSlug: "b", formatCode: "a4", paperTypeCode: "matte-200", title: "B", price: 20, currency: "EUR" });
     localStorage.setItem(CART_KEY, "[]");
     expect(getLocalCart()).toHaveLength(0);
   });

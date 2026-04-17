@@ -119,6 +119,18 @@ public static class DependencyInjection
             // Ensure database exists using first context
             await contexts[0].Database.EnsureCreatedAsync();
 
+            // Dev-only: rebuild the eshop schema when its model has changed in a
+            // backwards-incompatible way. Detection is by presence of a table that
+            // only exists in the latest model. Product data is re-seeded by seed-shop.sh.
+            var eshopDb = sp.GetRequiredService<EShopDbContext>();
+            var variantsTableExists = await eshopDb.Database
+                .SqlQueryRaw<bool>("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'eshop' AND table_name = 'product_variants') AS \"Value\"")
+                .FirstAsync();
+            if (!variantsTableExists)
+            {
+                await eshopDb.Database.ExecuteSqlRawAsync("DROP SCHEMA IF EXISTS eshop CASCADE");
+            }
+
             // For remaining contexts, create schemas and tables via SQL generation
             foreach (var context in contexts.Skip(1))
             {
@@ -204,6 +216,30 @@ public static class DependencyInjection
                 }
             );
             await bookingDb.SaveChangesAsync();
+        }
+
+        // Seed eshop lookup tables (formats & paper types)
+        var eshopDb = sp.GetRequiredService<EShopDbContext>();
+        if (!await eshopDb.Formats.AnyAsync())
+        {
+            eshopDb.Formats.AddRange(
+                new Persistence.EShop.Format { Code = "a4", NameSk = "A4 (21×30 cm)", NameEn = "A4 (21×30 cm)", DisplayOrder = 1 },
+                new Persistence.EShop.Format { Code = "a3", NameSk = "A3 (30×42 cm)", NameEn = "A3 (30×42 cm)", DisplayOrder = 2 },
+                new Persistence.EShop.Format { Code = "30x40", NameSk = "30×40 cm", NameEn = "30×40 cm", DisplayOrder = 3 },
+                new Persistence.EShop.Format { Code = "40x60", NameSk = "40×60 cm", NameEn = "40×60 cm", DisplayOrder = 4 },
+                new Persistence.EShop.Format { Code = "50x70", NameSk = "50×70 cm", NameEn = "50×70 cm", DisplayOrder = 5 }
+            );
+            await eshopDb.SaveChangesAsync();
+        }
+        if (!await eshopDb.PaperTypes.AnyAsync())
+        {
+            eshopDb.PaperTypes.AddRange(
+                new Persistence.EShop.PaperType { Code = "fine-art-310", NameSk = "Fine Art 310g (Hahnemühle)", NameEn = "Fine Art 310g (Hahnemühle)", DisplayOrder = 1 },
+                new Persistence.EShop.PaperType { Code = "baryta", NameSk = "Baryta Photographique (Canson)", NameEn = "Baryta Photographique (Canson)", DisplayOrder = 2 },
+                new Persistence.EShop.PaperType { Code = "matte-200", NameSk = "Matný 200g", NameEn = "Matte 200g", DisplayOrder = 3 },
+                new Persistence.EShop.PaperType { Code = "glossy-premium", NameSk = "Premium lesklý", NameEn = "Premium Glossy", DisplayOrder = 4 }
+            );
+            await eshopDb.SaveChangesAsync();
         }
 
         // Seed blog categories

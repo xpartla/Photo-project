@@ -85,8 +85,13 @@ create_tag() {
 }
 
 log "Creating tags..."
-create_tag "dog"  "Pes"  "Dog"
-create_tag "film" "Film" "Film"
+create_tag "dog"       "Pes"        "Dog"
+create_tag "film"      "Film"       "Film"
+create_tag "street"    "Ulica"      "Street"
+create_tag "urban"     "Mestské"    "Urban"
+create_tag "landscape" "Krajina"    "Landscape"
+create_tag "portrait"  "Portrét"    "Portrait"
+create_tag "analog"    "Analógové"  "Analog"
 
 # ── Helper: upload one image ──────────────────────────────────────────
 # Args: file_path slug title_sk title_en alt_sk alt_en desc_sk desc_en
@@ -160,13 +165,16 @@ wait_for_processing() {
 }
 
 # ── Helper: publish + tag a photo ─────────────────────────────────────
+# $3 is a comma-separated list of tag slugs, e.g. "film,street,analog".
 publish_and_tag() {
-  local id="$1" slug="$2" tag="$3" sort_order="$4"
+  local id="$1" slug="$2" tags_csv="$3" sort_order="$4"
+  local tags_json
+  tags_json=$(jq -c -n --arg csv "$tags_csv" '$csv | split(",")')
   local resp status
   resp=$(curl -sS -o - -w '\n%{http_code}' -X PUT "$API_URL/api/portfolio/photos/$id" \
     -H "$AUTH_HEADER" \
     -H "Content-Type: application/json" \
-    -d "{\"isPublished\":true,\"sortOrder\":$sort_order,\"tagSlugs\":[\"$tag\"]}")
+    -d "{\"isPublished\":true,\"sortOrder\":$sort_order,\"tagSlugs\":$tags_json}")
   status=$(http_status "$resp")
   [[ "$status" == "200" ]] || fail "publish '$slug' failed (HTTP $status): $(http_body "$resp")"
 }
@@ -192,6 +200,18 @@ declare -a META=(
 
 declare -a DOG_IDS=()
 declare -a FILM_IDS=()
+# Theme assignment for the 7 film photos (indices 8..14). Used both for
+# per-photo tagging and to group photos into thematic collections below.
+declare -A FILM_TAGS=(
+  [8]="film,street,urban"     # film-frame-1  → bratislava
+  [9]="film,urban"            # film-frame-2  → bratislava
+  [10]="film,analog,portrait" # film-frame-3  → wildlife-in-motion
+  [11]="film,portrait"        # film-frame-4  → wildlife-in-motion
+  [12]="film,street,urban"    # film-frame-5  → bratislava
+  [13]="film,landscape"       # film-frame-6  → the-alps
+  [14]="film,landscape,analog" # film-frame-7 → the-alps
+)
+declare -A FILM_ID_BY_INDEX=()
 
 log "Uploading and processing images..."
 for i in $(seq 1 14); do
@@ -213,8 +233,9 @@ for i in $(seq 1 14); do
     publish_and_tag "$id" "$slug" "dog" "$i"
     DOG_IDS+=("$id")
   else
-    publish_and_tag "$id" "$slug" "film" "$i"
+    publish_and_tag "$id" "$slug" "${FILM_TAGS[$i]}" "$i"
     FILM_IDS+=("$id")
+    FILM_ID_BY_INDEX[$i]="$id"
   fi
 done
 
@@ -255,11 +276,43 @@ if (( ${#DOG_IDS[@]} > 0 )); then
     "Kolekcia psích portrétov." "A collection of dog portraits." \
     "${DOG_IDS[@]}"
 fi
-if (( ${#FILM_IDS[@]} > 0 )); then
-  create_collection "film-collection" \
-    "Filmová kolekcia" "Film Collection" \
-    "Analógové zábery na 35mm film." "Analog frames on 35mm film." \
-    "${FILM_IDS[@]}"
+
+# Thematic film collections — grouped by photo index so they match the tags
+# assigned above. These drive the shop collection filter and landing pages.
+BRATISLAVA_IDS=()
+for i in 8 9 12; do
+  [[ -n "${FILM_ID_BY_INDEX[$i]:-}" ]] && BRATISLAVA_IDS+=("${FILM_ID_BY_INDEX[$i]}")
+done
+if (( ${#BRATISLAVA_IDS[@]} > 0 )); then
+  create_collection "bratislava-2026" \
+    "Bratislava 2026" "Bratislava 2026" \
+    "Ulice a atmosféra Bratislavy zachytené na 35mm film v roku 2026." \
+    "The streets and atmosphere of Bratislava captured on 35mm film, 2026." \
+    "${BRATISLAVA_IDS[@]}"
+fi
+
+ALPS_IDS=()
+for i in 13 14; do
+  [[ -n "${FILM_ID_BY_INDEX[$i]:-}" ]] && ALPS_IDS+=("${FILM_ID_BY_INDEX[$i]}")
+done
+if (( ${#ALPS_IDS[@]} > 0 )); then
+  create_collection "the-alps" \
+    "Alpy" "The Alps" \
+    "Krajiny Álp na analógovom filme." \
+    "Alpine landscapes shot on analog film." \
+    "${ALPS_IDS[@]}"
+fi
+
+WILDLIFE_IDS=()
+for i in 10 11; do
+  [[ -n "${FILM_ID_BY_INDEX[$i]:-}" ]] && WILDLIFE_IDS+=("${FILM_ID_BY_INDEX[$i]}")
+done
+if (( ${#WILDLIFE_IDS[@]} > 0 )); then
+  create_collection "wildlife-in-motion" \
+    "Divočina v pohybe" "Wildlife in Motion" \
+    "Portréty a pohyb zachytené na film." \
+    "Portraits and motion captured on film." \
+    "${WILDLIFE_IDS[@]}"
 fi
 
 log "Done. Visit http://localhost:4321/sk/portfolio to see the seeded gallery."

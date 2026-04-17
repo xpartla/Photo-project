@@ -29,27 +29,194 @@ public static class EShopEndpoints
     {
         var group = app.MapGroup("/api/shop").WithTags("EShop");
 
-        // ── Public endpoints ───────────────────────────────────────────
+        // ── Public: formats & paper types ──────────────────────────────
+
+        group.MapGet("/formats", async (EShopDbContext db) =>
+        {
+            var formats = await db.Formats.OrderBy(f => f.DisplayOrder).ThenBy(f => f.NameEn).ToListAsync();
+            return Results.Ok(formats.Select(f => new { id = f.Id, code = f.Code, nameSk = f.NameSk, nameEn = f.NameEn }));
+        });
+
+        group.MapGet("/paper-types", async (EShopDbContext db) =>
+        {
+            var papers = await db.PaperTypes.OrderBy(p => p.DisplayOrder).ThenBy(p => p.NameEn).ToListAsync();
+            return Results.Ok(papers.Select(p => new { id = p.Id, code = p.Code, nameSk = p.NameSk, nameEn = p.NameEn }));
+        });
+
+        // ── Public: portfolio-backed collections & tags surfaced to shop ──
+
+        group.MapGet("/collections", async (EShopDbContext db, PortfolioDbContext portfolioDb, string? lang) =>
+        {
+            var l = lang ?? "sk";
+
+            // Collections are shop-visible when at least one product references a photo in them.
+            var productPhotoIds = await db.Products
+                .Where(p => p.PhotoId.HasValue)
+                .Select(p => p.PhotoId!.Value)
+                .Distinct().ToListAsync();
+            if (productPhotoIds.Count == 0) return Results.Ok(Array.Empty<object>());
+
+            var collections = await portfolioDb.Collections
+                .Include(c => c.CollectionPhotos)
+                .Where(c => c.CollectionPhotos.Any(cp => productPhotoIds.Contains(cp.PhotoId)))
+                .OrderBy(c => c.SortOrder).ThenBy(c => c.NameEn)
+                .ToListAsync();
+
+            var coverPhotoIds = collections
+                .Where(c => c.CoverPhotoId.HasValue).Select(c => c.CoverPhotoId!.Value)
+                .Distinct().ToList();
+            var coverVariants = coverPhotoIds.Count > 0
+                ? await portfolioDb.PhotoVariants.Where(v => coverPhotoIds.Contains(v.PhotoId)).ToListAsync()
+                : new List<PhotoVariant>();
+
+            return Results.Ok(collections.Select(c =>
+            {
+                var productCount = c.CollectionPhotos.Count(cp => productPhotoIds.Contains(cp.PhotoId));
+                return new
+                {
+                    slug = c.Slug,
+                    name = l == "en" ? c.NameEn : c.NameSk,
+                    nameSk = c.NameSk,
+                    nameEn = c.NameEn,
+                    description = l == "en" ? c.DescriptionEn ?? c.DescriptionSk : c.DescriptionSk ?? c.DescriptionEn,
+                    productCount,
+                    coverImage = c.CoverPhotoId.HasValue ? MapCoverImage(coverVariants, c.CoverPhotoId.Value) : null
+                };
+            }));
+        });
+
+        group.MapGet("/collections/{slug}", async (
+            string slug, EShopDbContext db, PortfolioDbContext portfolioDb, string? lang) =>
+        {
+            var l = lang ?? "sk";
+
+            var collection = await portfolioDb.Collections
+                .Include(c => c.CollectionPhotos)
+                .FirstOrDefaultAsync(c => c.Slug == slug);
+            if (collection is null) return Results.NotFound();
+
+            var collectionPhotoIds = collection.CollectionPhotos.Select(cp => cp.PhotoId).ToList();
+            if (collectionPhotoIds.Count == 0)
+                return Results.NotFound();
+
+            var products = await db.Products
+                .Include(p => p.Variants).ThenInclude(v => v.Format)
+                .Include(p => p.Variants).ThenInclude(v => v.PaperType)
+                .Where(p => p.PhotoId.HasValue && collectionPhotoIds.Contains(p.PhotoId.Value))
+                .OrderByDescending(p => p.CreatedAt)
+                .ToListAsync();
+
+            if (products.Count == 0) return Results.NotFound();
+
+            var photoIds = products.Select(p => p.PhotoId!.Value).Concat(
+                collection.CoverPhotoId.HasValue ? new[] { collection.CoverPhotoId.Value } : Array.Empty<Guid>()
+            ).Distinct().ToList();
+            var photoVariants = await portfolioDb.PhotoVariants.Where(v => photoIds.Contains(v.PhotoId)).ToListAsync();
+            var tagsByPhoto = await LoadTagsByPhoto(portfolioDb, photoIds);
+
+            return Results.Ok(new
+            {
+                slug = collection.Slug,
+                name = l == "en" ? collection.NameEn : collection.NameSk,
+                nameSk = collection.NameSk,
+                nameEn = collection.NameEn,
+                description = l == "en" ? collection.DescriptionEn ?? collection.DescriptionSk : collection.DescriptionSk ?? collection.DescriptionEn,
+                coverImage = collection.CoverPhotoId.HasValue ? MapCoverImage(photoVariants, collection.CoverPhotoId.Value) : null,
+                products = products.Select(p => MapProduct(p, l, photoVariants, tagsByPhoto))
+            });
+        });
+
+        group.MapGet("/tags", async (EShopDbContext db, PortfolioDbContext portfolioDb, string? lang) =>
+        {
+            var l = lang ?? "sk";
+
+            var productPhotoIds = await db.Products
+                .Where(p => p.PhotoId.HasValue)
+                .Select(p => p.PhotoId!.Value)
+                .Distinct().ToListAsync();
+            if (productPhotoIds.Count == 0) return Results.Ok(Array.Empty<object>());
+
+            var tagCounts = await portfolioDb.Photos
+                .Where(p => productPhotoIds.Contains(p.Id))
+                .SelectMany(p => p.PhotoTags.Select(pt => pt.Tag))
+                .GroupBy(t => new { t.Slug, t.NameSk, t.NameEn })
+                .Select(g => new { g.Key.Slug, g.Key.NameSk, g.Key.NameEn, Count = g.Count() })
+                .ToListAsync();
+
+            return Results.Ok(tagCounts
+                .OrderByDescending(t => t.Count).ThenBy(t => t.NameEn)
+                .Select(t => new
+                {
+                    slug = t.Slug,
+                    name = l == "en" ? t.NameEn : t.NameSk,
+                    nameSk = t.NameSk,
+                    nameEn = t.NameEn,
+                    productCount = t.Count
+                }));
+        });
+
+        // ── Public: products ───────────────────────────────────────────
 
         group.MapGet("/products", async (
             EShopDbContext db,
             PortfolioDbContext portfolioDb,
             string? lang,
-            string? format,
             bool? available,
             Guid? photoId,
+            string? collection,
+            string? tag,
+            string? format,
+            string? paperType,
+            string? q,
             int page = 1,
             int size = 20) =>
         {
             var l = lang ?? "sk";
-            var query = db.Products.AsQueryable();
+            var query = db.Products.Include(p => p.Variants).ThenInclude(v => v.Format)
+                                    .Include(p => p.Variants).ThenInclude(v => v.PaperType)
+                                    .AsQueryable();
 
-            if (!string.IsNullOrEmpty(format))
-                query = query.Where(p => p.Format == format);
             if (available.HasValue)
                 query = query.Where(p => p.IsAvailable == available.Value);
             if (photoId.HasValue)
                 query = query.Where(p => p.PhotoId == photoId.Value);
+            if (!string.IsNullOrEmpty(format))
+                query = query.Where(p => p.Variants.Any(v => v.Format.Code == format));
+            if (!string.IsNullOrEmpty(paperType))
+                query = query.Where(p => p.Variants.Any(v => v.PaperType.Code == paperType));
+
+            // Cross-module filters (collection, tag, search across photo text) resolve
+            // the matching photo IDs in Portfolio and narrow the product query by them.
+            if (!string.IsNullOrEmpty(collection))
+            {
+                var ids = await portfolioDb.Collections
+                    .Where(c => c.Slug == collection)
+                    .SelectMany(c => c.CollectionPhotos.Select(cp => cp.PhotoId))
+                    .ToListAsync();
+                query = query.Where(p => p.PhotoId.HasValue && ids.Contains(p.PhotoId.Value));
+            }
+            if (!string.IsNullOrEmpty(tag))
+            {
+                var ids = await portfolioDb.Photos
+                    .Where(p => p.PhotoTags.Any(pt => pt.Tag.Slug == tag))
+                    .Select(p => p.Id).ToListAsync();
+                query = query.Where(p => p.PhotoId.HasValue && ids.Contains(p.PhotoId.Value));
+            }
+            if (!string.IsNullOrEmpty(q))
+            {
+                var pattern = $"%{q}%";
+                var photoHits = await portfolioDb.Photos
+                    .Where(p => EF.Functions.ILike(p.TitleSk ?? "", pattern)
+                             || EF.Functions.ILike(p.TitleEn ?? "", pattern)
+                             || EF.Functions.ILike(p.Location ?? "", pattern))
+                    .Select(p => p.Id).ToListAsync();
+                query = query.Where(p =>
+                    EF.Functions.ILike(p.TitleSk, pattern) ||
+                    EF.Functions.ILike(p.TitleEn, pattern) ||
+                    EF.Functions.ILike(p.DescriptionSk ?? "", pattern) ||
+                    EF.Functions.ILike(p.DescriptionEn ?? "", pattern) ||
+                    (p.PhotoId.HasValue && photoHits.Contains(p.PhotoId.Value)));
+            }
 
             var total = await query.CountAsync();
             var products = await query
@@ -58,17 +225,15 @@ public static class EShopEndpoints
                 .Take(size)
                 .ToListAsync();
 
-            // Fetch photo variants for product images
             var photoIds = products.Where(p => p.PhotoId.HasValue).Select(p => p.PhotoId!.Value).Distinct().ToList();
             var photoVariants = photoIds.Count > 0
-                ? await portfolioDb.PhotoVariants
-                    .Where(v => photoIds.Contains(v.PhotoId))
-                    .ToListAsync()
+                ? await portfolioDb.PhotoVariants.Where(v => photoIds.Contains(v.PhotoId)).ToListAsync()
                 : [];
+            var tagsByPhoto = await LoadTagsByPhoto(portfolioDb, photoIds);
 
             return Results.Ok(new
             {
-                items = products.Select(p => MapProduct(p, l, photoVariants)),
+                items = products.Select(p => MapProduct(p, l, photoVariants, tagsByPhoto)),
                 total,
                 page,
                 size
@@ -77,27 +242,32 @@ public static class EShopEndpoints
 
         group.MapGet("/products/{slug}", async (string slug, EShopDbContext db, PortfolioDbContext portfolioDb, string? lang) =>
         {
-            var product = await db.Products.FirstOrDefaultAsync(p => p.Slug == slug);
+            var product = await db.Products
+                .Include(p => p.Variants).ThenInclude(v => v.Format)
+                .Include(p => p.Variants).ThenInclude(v => v.PaperType)
+                .FirstOrDefaultAsync(p => p.Slug == slug);
             if (product is null) return Results.NotFound();
 
             var l = lang ?? "sk";
-            var variants = product.PhotoId.HasValue
+            var photoVariants = product.PhotoId.HasValue
                 ? await portfolioDb.PhotoVariants.Where(v => v.PhotoId == product.PhotoId.Value).ToListAsync()
                 : [];
+            var photoIds = product.PhotoId.HasValue ? new List<Guid> { product.PhotoId.Value } : new();
+            var tagsByPhoto = await LoadTagsByPhoto(portfolioDb, photoIds);
 
-            return Results.Ok(MapProduct(product, l, variants));
+            return Results.Ok(MapProduct(product, l, photoVariants, tagsByPhoto));
         });
 
         group.MapPost("/webhooks/payment", async (
             PaymentWebhookRequest request,
             EShopDbContext db,
+            PortfolioDbContext portfolioDb,
             IPaymentGateway gateway,
             IEmailService emailService,
             ILoggerFactory loggerFactory) =>
         {
             var logger = loggerFactory.CreateLogger("EShop.Webhook");
 
-            // Find order by payment ID
             var order = await db.Orders
                 .Include(o => o.Items)
                 .FirstOrDefaultAsync(o => o.GoPayPaymentId == request.PaymentId);
@@ -113,7 +283,6 @@ public static class EShopEndpoints
                 if (order.Status != "pending_payment")
                     return Results.Ok(new { orderId = order.Id, status = order.Status, message = "Already processed." });
 
-                // Confirm payment in gateway
                 if (gateway is MockPaymentGateway mock)
                     mock.ConfirmPayment(request.PaymentId);
 
@@ -121,24 +290,47 @@ public static class EShopEndpoints
                 order.UpdatedAt = DateTime.UtcNow;
                 await db.SaveChangesAsync();
 
-                // Send confirmation emails
                 try
                 {
-                    var items = await db.OrderItems
-                        .Where(oi => oi.OrderId == order.Id)
-                        .Join(db.Products.IgnoreQueryFilters(), oi => oi.ProductId, p => p.Id,
-                            (oi, p) => new OrderEmailTemplates.OrderItemInfo(p.TitleEn, oi.Quantity, oi.UnitPrice, oi.EditionNumber))
-                        .ToListAsync();
+                    // Look up each order item's product photo for thumbnails.
+                    var productIds = order.Items.Select(oi => oi.ProductId).Distinct().ToList();
+                    var productPhotos = await db.Products.IgnoreQueryFilters()
+                        .Where(p => productIds.Contains(p.Id))
+                        .Select(p => new { p.Id, p.PhotoId })
+                        .ToDictionaryAsync(p => p.Id, p => p.PhotoId);
+                    var photoIds = productPhotos.Values
+                        .Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+                    var photoVariants = photoIds.Count > 0
+                        ? await portfolioDb.PhotoVariants.Where(v => photoIds.Contains(v.PhotoId)).ToListAsync()
+                        : new List<PhotoVariant>();
+
+                    var items = order.Items
+                        .Select(oi =>
+                        {
+                            productPhotos.TryGetValue(oi.ProductId, out var photoId);
+                            var img = EmailImageUrl(PickThumbnail(photoVariants, photoId));
+                            return new OrderEmailTemplates.OrderItemInfo(
+                                oi.ProductTitleEn,
+                                oi.FormatNameEn,
+                                oi.PaperTypeNameEn,
+                                img,
+                                oi.Quantity,
+                                oi.UnitPrice,
+                                oi.EditionNumber);
+                        })
+                        .ToList();
+
+                    var shippingAddress = ParseAddress(order.ShippingAddressJson);
 
                     var customerHtml = OrderEmailTemplates.CustomerOrderConfirmation(
-                        order.Id, items, order.TotalAmount, order.Currency);
+                        order.Id, items, order.TotalAmount, order.Currency, shippingAddress);
                     await emailService.SendAsync(
                         order.CustomerEmail ?? "customer@example.com",
                         $"Order Confirmation #{order.Id.ToString()[..8]} — PartlPhoto",
                         customerHtml);
 
                     var photographerHtml = OrderEmailTemplates.PhotographerOrderNotification(
-                        order.Id, order.CustomerEmail ?? "unknown", items, order.TotalAmount, order.ShippingAddressJson);
+                        order.Id, order.CustomerEmail ?? "unknown", items, order.TotalAmount, order.Currency, shippingAddress);
                     await emailService.SendAsync(
                         "admin@partlphoto.sk",
                         $"New Order #{order.Id.ToString()[..8]} — {order.TotalAmount} {order.Currency}",
@@ -162,7 +354,6 @@ public static class EShopEndpoints
                     order.Status = "cancelled";
                     order.UpdatedAt = DateTime.UtcNow;
 
-                    // Restore edition counts
                     await RestoreEditionCounts(db, order.Id);
                     await db.SaveChangesAsync();
                 }
@@ -173,7 +364,6 @@ public static class EShopEndpoints
             return Results.BadRequest(new { error = $"Unknown payment status: {request.Status}" });
         });
 
-        // Payment details for mock payment page
         group.MapGet("/payments/{paymentId}", (string paymentId, IPaymentGateway gateway) =>
         {
             if (gateway is not MockPaymentGateway mock)
@@ -198,44 +388,51 @@ public static class EShopEndpoints
 
         var auth = app.MapGroup("/api/shop").WithTags("EShop").RequireAuthorization();
 
-        // Cart
-        auth.MapGet("/cart", async (EShopDbContext db, ICurrentUser currentUser) =>
+        auth.MapGet("/cart", async (EShopDbContext db, PortfolioDbContext portfolioDb, ICurrentUser currentUser) =>
         {
             var cart = await db.ShoppingCarts
-                .Include(c => c.Items)
+                .Include(c => c.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.Product)
+                .Include(c => c.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.Format)
+                .Include(c => c.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.PaperType)
                 .FirstOrDefaultAsync(c => c.UserId == currentUser.UserId);
 
             if (cart is null)
                 return Results.Ok(new { items = Array.Empty<object>(), total = 0m });
 
-            var productIds = cart.Items.Select(ci => ci.ProductId).Distinct().ToList();
-            var products = await db.Products
-                .Where(p => productIds.Contains(p.Id))
-                .ToDictionaryAsync(p => p.Id);
+            var photoIds = cart.Items
+                .Select(ci => ci.Variant.Product.PhotoId)
+                .Where(id => id.HasValue).Select(id => id!.Value)
+                .Distinct().ToList();
+            var photoVariants = photoIds.Count > 0
+                ? await portfolioDb.PhotoVariants.Where(v => photoIds.Contains(v.PhotoId)).ToListAsync()
+                : [];
 
             return Results.Ok(new
             {
-                items = cart.Items.Select(ci =>
+                items = cart.Items.Select(ci => new
                 {
-                    products.TryGetValue(ci.ProductId, out var product);
-                    return new
-                    {
-                        id = ci.Id,
-                        productId = ci.ProductId,
-                        productSlug = product?.Slug,
-                        title = product?.TitleEn ?? "Unknown",
-                        price = product?.Price ?? 0m,
-                        quantity = ci.Quantity,
-                        editionSize = product?.EditionSize,
-                        editionSold = product?.EditionSold ?? 0,
-                        isAvailable = product?.IsAvailable ?? false
-                    };
+                    id = ci.Id,
+                    variantId = ci.VariantId,
+                    productId = ci.Variant.ProductId,
+                    productSlug = ci.Variant.Product.Slug,
+                    title = ci.Variant.Product.TitleEn,
+                    titleSk = ci.Variant.Product.TitleSk,
+                    titleEn = ci.Variant.Product.TitleEn,
+                    formatCode = ci.Variant.Format.Code,
+                    formatNameSk = ci.Variant.Format.NameSk,
+                    formatNameEn = ci.Variant.Format.NameEn,
+                    paperTypeCode = ci.Variant.PaperType.Code,
+                    paperTypeNameSk = ci.Variant.PaperType.NameSk,
+                    paperTypeNameEn = ci.Variant.PaperType.NameEn,
+                    price = ci.Variant.Price,
+                    currency = ci.Variant.Product.Currency,
+                    quantity = ci.Quantity,
+                    editionSize = ci.Variant.Product.EditionSize,
+                    editionSold = ci.Variant.Product.EditionSold,
+                    isAvailable = ci.Variant.Product.IsAvailable && ci.Variant.IsAvailable,
+                    imageUrl = PickThumbnail(photoVariants, ci.Variant.Product.PhotoId)
                 }),
-                total = cart.Items.Sum(ci =>
-                {
-                    products.TryGetValue(ci.ProductId, out var product);
-                    return (product?.Price ?? 0m) * ci.Quantity;
-                })
+                total = cart.Items.Sum(ci => ci.Variant.Price * ci.Quantity)
             });
         });
 
@@ -244,11 +441,13 @@ public static class EShopEndpoints
             EShopDbContext db,
             ICurrentUser currentUser) =>
         {
-            var product = await db.Products.FindAsync(request.ProductId);
-            if (product is null)
-                return Results.NotFound(new { error = "Product not found." });
-            if (!product.IsAvailable)
-                return Results.BadRequest(new { error = "Product is not available." });
+            var variant = await db.ProductVariants
+                .Include(v => v.Product)
+                .FirstOrDefaultAsync(v => v.Id == request.VariantId);
+            if (variant is null)
+                return Results.NotFound(new { error = "Variant not found." });
+            if (!variant.IsAvailable || !variant.Product.IsAvailable)
+                return Results.BadRequest(new { error = "Variant is not available." });
 
             var cart = await db.ShoppingCarts
                 .Include(c => c.Items)
@@ -260,19 +459,11 @@ public static class EShopEndpoints
                 db.ShoppingCarts.Add(cart);
             }
 
-            var existing = cart.Items.FirstOrDefault(ci => ci.ProductId == request.ProductId);
+            var existing = cart.Items.FirstOrDefault(ci => ci.VariantId == request.VariantId);
             if (existing is not null)
-            {
                 existing.Quantity += request.Quantity;
-            }
             else
-            {
-                cart.Items.Add(new CartItem
-                {
-                    ProductId = request.ProductId,
-                    Quantity = request.Quantity
-                });
-            }
+                cart.Items.Add(new CartItem { VariantId = request.VariantId, Quantity = request.Quantity });
 
             cart.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
@@ -296,13 +487,9 @@ public static class EShopEndpoints
             if (item is null) return Results.NotFound(new { error = "Cart item not found." });
 
             if (request.Quantity <= 0)
-            {
                 db.CartItems.Remove(item);
-            }
             else
-            {
                 item.Quantity = request.Quantity;
-            }
 
             cart.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
@@ -348,22 +535,14 @@ public static class EShopEndpoints
 
             foreach (var localItem in request.Items)
             {
-                var product = await db.Products.FirstOrDefaultAsync(p => p.Slug == localItem.ProductSlug);
-                if (product is null || !product.IsAvailable) continue;
+                var variant = await ResolveVariantAsync(db, localItem);
+                if (variant is null || !variant.IsAvailable || !variant.Product.IsAvailable) continue;
 
-                var existing = cart.Items.FirstOrDefault(ci => ci.ProductId == product.Id);
+                var existing = cart.Items.FirstOrDefault(ci => ci.VariantId == variant.Id);
                 if (existing is not null)
-                {
                     existing.Quantity += localItem.Quantity;
-                }
                 else
-                {
-                    cart.Items.Add(new CartItem
-                    {
-                        ProductId = product.Id,
-                        Quantity = localItem.Quantity
-                    });
-                }
+                    cart.Items.Add(new CartItem { VariantId = variant.Id, Quantity = localItem.Quantity });
             }
 
             cart.UpdatedAt = DateTime.UtcNow;
@@ -383,29 +562,30 @@ public static class EShopEndpoints
             var logger = loggerFactory.CreateLogger("EShop.Orders");
 
             var cart = await db.ShoppingCarts
-                .Include(c => c.Items)
+                .Include(c => c.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.Product)
+                .Include(c => c.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.Format)
+                .Include(c => c.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.PaperType)
                 .FirstOrDefaultAsync(c => c.UserId == currentUser.UserId);
 
             if (cart is null || cart.Items.Count == 0)
                 return Results.BadRequest(new { error = "Cart is empty." });
 
-            // Validate all products and check edition availability
-            var productIds = cart.Items.Select(ci => ci.ProductId).Distinct().ToList();
-            var products = await db.Products
-                .Where(p => productIds.Contains(p.Id))
-                .ToDictionaryAsync(p => p.Id);
+            // Validate variant availability + edition capacity (per-product, not per-variant).
+            var productLimits = cart.Items
+                .GroupBy(ci => ci.Variant.ProductId)
+                .ToDictionary(g => g.Key, g => g.Sum(ci => ci.Quantity));
 
             foreach (var item in cart.Items)
             {
-                if (!products.TryGetValue(item.ProductId, out var product))
-                    return Results.BadRequest(new { error = $"Product not found." });
-                if (!product.IsAvailable)
-                    return Results.BadRequest(new { error = $"Product '{product.TitleEn}' is no longer available." });
-                if (product.EditionSize.HasValue && product.EditionSold + item.Quantity > product.EditionSize.Value)
-                    return Results.BadRequest(new { error = $"Product '{product.TitleEn}' does not have enough editions available." });
+                var variant = item.Variant;
+                var product = variant.Product;
+                if (!variant.IsAvailable || !product.IsAvailable)
+                    return Results.BadRequest(new { error = $"'{product.TitleEn}' is no longer available." });
+                if (product.EditionSize.HasValue &&
+                    product.EditionSold + productLimits[product.Id] > product.EditionSize.Value)
+                    return Results.BadRequest(new { error = $"'{product.TitleEn}' does not have enough editions available." });
             }
 
-            // Create order
             var order = new Order
             {
                 UserId = currentUser.UserId,
@@ -423,7 +603,8 @@ public static class EShopEndpoints
 
             foreach (var cartItem in cart.Items)
             {
-                var product = products[cartItem.ProductId];
+                var variant = cartItem.Variant;
+                var product = variant.Product;
 
                 for (var i = 0; i < cartItem.Quantity; i++)
                 {
@@ -440,13 +621,20 @@ public static class EShopEndpoints
                     orderItems.Add(new OrderItem
                     {
                         ProductId = product.Id,
+                        VariantId = variant.Id,
                         Quantity = 1,
-                        UnitPrice = product.Price,
-                        EditionNumber = editionNumber
+                        UnitPrice = variant.Price,
+                        EditionNumber = editionNumber,
+                        ProductTitleSk = product.TitleSk,
+                        ProductTitleEn = product.TitleEn,
+                        FormatNameSk = variant.Format.NameSk,
+                        FormatNameEn = variant.Format.NameEn,
+                        PaperTypeNameSk = variant.PaperType.NameSk,
+                        PaperTypeNameEn = variant.PaperType.NameEn
                     });
                 }
 
-                total += product.Price * cartItem.Quantity;
+                total += variant.Price * cartItem.Quantity;
                 product.UpdatedAt = DateTime.UtcNow;
             }
 
@@ -454,8 +642,6 @@ public static class EShopEndpoints
             order.Items = orderItems;
 
             db.Orders.Add(order);
-
-            // Clear the cart
             db.CartItems.RemoveRange(cart.Items);
 
             try
@@ -464,12 +650,10 @@ public static class EShopEndpoints
             }
             catch (DbUpdateConcurrencyException)
             {
-                // Edition was purchased concurrently — reload and check
                 logger.LogWarning("Concurrency conflict during order creation for user {UserId}", currentUser.UserId);
                 return Results.Conflict(new { error = "A product edition was just purchased by another customer. Please try again." });
             }
 
-            // Create payment
             var returnUrl = request.ReturnUrl ?? $"/en/shop/orders/{order.Id}";
             var cancelUrl = request.CancelUrl ?? "/en/shop/cart";
 
@@ -526,6 +710,44 @@ public static class EShopEndpoints
 
         // ── Admin endpoints ────────────────────────────────────────────
 
+        auth.MapPost("/formats", async (CreateFormatRequest request, EShopDbContext db, ICurrentUser currentUser) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+            if (await db.Formats.AnyAsync(f => f.Code == request.Code))
+                return Results.Conflict(new { error = $"Format '{request.Code}' already exists." });
+
+            var format = new Format
+            {
+                Code = request.Code,
+                NameSk = request.NameSk,
+                NameEn = request.NameEn,
+                DisplayOrder = request.DisplayOrder ?? 0
+            };
+            db.Formats.Add(format);
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/shop/formats/{format.Id}",
+                new { id = format.Id, code = format.Code, nameSk = format.NameSk, nameEn = format.NameEn });
+        });
+
+        auth.MapPost("/paper-types", async (CreatePaperTypeRequest request, EShopDbContext db, ICurrentUser currentUser) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+            if (await db.PaperTypes.AnyAsync(p => p.Code == request.Code))
+                return Results.Conflict(new { error = $"Paper type '{request.Code}' already exists." });
+
+            var paper = new PaperType
+            {
+                Code = request.Code,
+                NameSk = request.NameSk,
+                NameEn = request.NameEn,
+                DisplayOrder = request.DisplayOrder ?? 0
+            };
+            db.PaperTypes.Add(paper);
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/shop/paper-types/{paper.Id}",
+                new { id = paper.Id, code = paper.Code, nameSk = paper.NameSk, nameEn = paper.NameEn });
+        });
+
         auth.MapPost("/products", async (
             CreateProductRequest request,
             EShopDbContext db,
@@ -533,9 +755,26 @@ public static class EShopEndpoints
         {
             if (!currentUser.IsAdmin) return Results.Forbid();
 
-            // Check slug uniqueness
             if (await db.Products.AnyAsync(p => p.Slug == request.Slug))
                 return Results.Conflict(new { error = $"Product with slug '{request.Slug}' already exists." });
+
+            if (request.Variants.Count == 0)
+                return Results.BadRequest(new { error = "Product must have at least one variant." });
+            if (request.IsLimitedEdition && request.Variants.Count != 1)
+                return Results.BadRequest(new { error = "Limited edition products must have exactly one variant." });
+
+            var formatCodes = request.Variants.Select(v => v.FormatCode).Distinct().ToList();
+            var paperCodes = request.Variants.Select(v => v.PaperTypeCode).Distinct().ToList();
+            var formats = await db.Formats.Where(f => formatCodes.Contains(f.Code)).ToDictionaryAsync(f => f.Code);
+            var papers = await db.PaperTypes.Where(p => paperCodes.Contains(p.Code)).ToDictionaryAsync(p => p.Code);
+
+            foreach (var v in request.Variants)
+            {
+                if (!formats.ContainsKey(v.FormatCode))
+                    return Results.BadRequest(new { error = $"Unknown format code '{v.FormatCode}'." });
+                if (!papers.ContainsKey(v.PaperTypeCode))
+                    return Results.BadRequest(new { error = $"Unknown paper type code '{v.PaperTypeCode}'." });
+            }
 
             var product = new Product
             {
@@ -545,13 +784,23 @@ public static class EShopEndpoints
                 Slug = request.Slug,
                 DescriptionSk = request.DescriptionSk,
                 DescriptionEn = request.DescriptionEn,
-                Format = request.Format,
-                PaperType = request.PaperType,
-                Price = request.Price,
                 Currency = request.Currency ?? "EUR",
+                IsLimitedEdition = request.IsLimitedEdition,
                 EditionSize = request.EditionSize,
                 IsAvailable = request.IsAvailable ?? true
             };
+
+            foreach (var v in request.Variants)
+            {
+                product.Variants.Add(new ProductVariant
+                {
+                    FormatId = formats[v.FormatCode].Id,
+                    PaperTypeId = papers[v.PaperTypeCode].Id,
+                    Price = v.Price,
+                    Sku = v.Sku,
+                    IsAvailable = v.IsAvailable ?? true
+                });
+            }
 
             db.Products.Add(product);
             await db.SaveChangesAsync();
@@ -561,8 +810,9 @@ public static class EShopEndpoints
                 id = product.Id,
                 slug = product.Slug,
                 titleEn = product.TitleEn,
-                price = product.Price,
-                editionSize = product.EditionSize
+                isLimitedEdition = product.IsLimitedEdition,
+                editionSize = product.EditionSize,
+                variantCount = product.Variants.Count
             });
         });
 
@@ -581,9 +831,6 @@ public static class EShopEndpoints
             if (request.TitleEn is not null) product.TitleEn = request.TitleEn;
             if (request.DescriptionSk is not null) product.DescriptionSk = request.DescriptionSk;
             if (request.DescriptionEn is not null) product.DescriptionEn = request.DescriptionEn;
-            if (request.Format is not null) product.Format = request.Format;
-            if (request.PaperType is not null) product.PaperType = request.PaperType;
-            if (request.Price.HasValue) product.Price = request.Price.Value;
             if (request.EditionSize.HasValue) product.EditionSize = request.EditionSize.Value;
             if (request.IsAvailable.HasValue) product.IsAvailable = request.IsAvailable.Value;
             product.UpdatedAt = DateTime.UtcNow;
@@ -591,6 +838,91 @@ public static class EShopEndpoints
             await db.SaveChangesAsync();
 
             return Results.Ok(new { id = product.Id, slug = product.Slug, message = "Product updated." });
+        });
+
+        auth.MapDelete("/products/{id:guid}", async (
+            Guid id,
+            EShopDbContext db,
+            ICurrentUser currentUser) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+
+            var product = await db.Products.FindAsync(id);
+            if (product is null) return Results.NotFound();
+
+            product.DeletedAt = DateTime.UtcNow;
+            product.IsAvailable = false;
+            product.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            return Results.NoContent();
+        });
+
+        auth.MapPost("/products/{id:guid}/variants", async (
+            Guid id,
+            CreateVariantRequest request,
+            EShopDbContext db,
+            ICurrentUser currentUser) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+
+            var product = await db.Products.Include(p => p.Variants).FirstOrDefaultAsync(p => p.Id == id);
+            if (product is null) return Results.NotFound();
+            if (product.IsLimitedEdition)
+                return Results.BadRequest(new { error = "Limited edition products cannot have additional variants." });
+
+            var format = await db.Formats.FirstOrDefaultAsync(f => f.Code == request.FormatCode);
+            if (format is null) return Results.BadRequest(new { error = $"Unknown format '{request.FormatCode}'." });
+            var paper = await db.PaperTypes.FirstOrDefaultAsync(p => p.Code == request.PaperTypeCode);
+            if (paper is null) return Results.BadRequest(new { error = $"Unknown paper type '{request.PaperTypeCode}'." });
+
+            if (product.Variants.Any(v => v.FormatId == format.Id && v.PaperTypeId == paper.Id))
+                return Results.Conflict(new { error = "Variant with this format and paper type already exists." });
+
+            var variant = new ProductVariant
+            {
+                ProductId = product.Id,
+                FormatId = format.Id,
+                PaperTypeId = paper.Id,
+                Price = request.Price,
+                Sku = request.Sku,
+                IsAvailable = request.IsAvailable ?? true
+            };
+            db.ProductVariants.Add(variant);
+            await db.SaveChangesAsync();
+
+            return Results.Created($"/api/shop/variants/{variant.Id}",
+                new { id = variant.Id, price = variant.Price });
+        });
+
+        auth.MapPut("/variants/{id:guid}", async (
+            Guid id,
+            UpdateVariantRequest request,
+            EShopDbContext db,
+            ICurrentUser currentUser) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+
+            var variant = await db.ProductVariants.FindAsync(id);
+            if (variant is null) return Results.NotFound();
+
+            if (request.Price.HasValue) variant.Price = request.Price.Value;
+            if (request.Sku is not null) variant.Sku = request.Sku;
+            if (request.IsAvailable.HasValue) variant.IsAvailable = request.IsAvailable.Value;
+            variant.UpdatedAt = DateTime.UtcNow;
+
+            await db.SaveChangesAsync();
+            return Results.Ok(new { id = variant.Id, message = "Variant updated." });
+        });
+
+        auth.MapDelete("/variants/{id:guid}", async (Guid id, EShopDbContext db, ICurrentUser currentUser) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+            var variant = await db.ProductVariants.FindAsync(id);
+            if (variant is null) return Results.NotFound();
+            db.ProductVariants.Remove(variant);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         auth.MapPut("/orders/{id:guid}/status", async (
@@ -606,7 +938,6 @@ public static class EShopEndpoints
             var order = await db.Orders.FindAsync(id);
             if (order is null) return Results.NotFound();
 
-            // Validate state transition
             if (!ValidTransitions.TryGetValue(order.Status, out var allowed) || !allowed.Contains(request.Status))
                 return Results.BadRequest(new { error = $"Cannot transition from '{order.Status}' to '{request.Status}'." });
 
@@ -614,7 +945,6 @@ public static class EShopEndpoints
             order.Status = request.Status;
             order.UpdatedAt = DateTime.UtcNow;
 
-            // If cancelling a paid order, restore editions
             if (request.Status is "cancelled" or "refunded" && previousStatus != "pending_payment")
             {
                 await RestoreEditionCounts(db, order.Id);
@@ -622,7 +952,6 @@ public static class EShopEndpoints
 
             await db.SaveChangesAsync();
 
-            // Send status update email
             if (order.CustomerEmail is not null)
             {
                 try
@@ -644,6 +973,31 @@ public static class EShopEndpoints
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
+
+    private static async Task<ProductVariant?> ResolveVariantAsync(EShopDbContext db, SyncCartItem item)
+    {
+        if (item.VariantId.HasValue)
+        {
+            return await db.ProductVariants
+                .Include(v => v.Product)
+                .FirstOrDefaultAsync(v => v.Id == item.VariantId.Value);
+        }
+
+        if (string.IsNullOrEmpty(item.ProductSlug)) return null;
+
+        var query = db.ProductVariants
+            .Include(v => v.Product)
+            .Include(v => v.Format)
+            .Include(v => v.PaperType)
+            .Where(v => v.Product.Slug == item.ProductSlug);
+
+        if (!string.IsNullOrEmpty(item.FormatCode))
+            query = query.Where(v => v.Format.Code == item.FormatCode);
+        if (!string.IsNullOrEmpty(item.PaperTypeCode))
+            query = query.Where(v => v.PaperType.Code == item.PaperTypeCode);
+
+        return await query.FirstOrDefaultAsync();
+    }
 
     private static async Task RestoreEditionCounts(EShopDbContext db, Guid orderId)
     {
@@ -668,9 +1022,17 @@ public static class EShopEndpoints
         }
     }
 
-    private static object MapProduct(Product p, string lang, List<PhotoVariant> variants)
+    private static object MapProduct(
+        Product p,
+        string lang,
+        List<PhotoVariant> photoVariants,
+        Dictionary<Guid, List<TagSummary>> tagsByPhoto)
     {
-        var photoVariants = variants.Where(v => v.PhotoId == p.PhotoId).ToList();
+        var photoForProduct = photoVariants.Where(v => v.PhotoId == p.PhotoId).ToList();
+        var prices = p.Variants.Select(v => v.Price).ToList();
+        var photoTags = p.PhotoId.HasValue && tagsByPhoto.TryGetValue(p.PhotoId.Value, out var t)
+            ? t
+            : new List<TagSummary>();
 
         return new
         {
@@ -681,15 +1043,38 @@ public static class EShopEndpoints
             titleSk = p.TitleSk,
             titleEn = p.TitleEn,
             description = lang == "en" ? p.DescriptionEn ?? p.DescriptionSk : p.DescriptionSk ?? p.DescriptionEn,
-            format = p.Format,
-            paperType = p.PaperType,
-            price = p.Price,
             currency = p.Currency,
+            isLimitedEdition = p.IsLimitedEdition,
             editionSize = p.EditionSize,
             editionSold = p.EditionSold,
             editionRemaining = p.EditionSize.HasValue ? p.EditionSize.Value - p.EditionSold : (int?)null,
             isAvailable = p.IsAvailable,
-            variants = photoVariants.Select(v => new
+            minPrice = prices.Count > 0 ? prices.Min() : (decimal?)null,
+            maxPrice = prices.Count > 0 ? prices.Max() : (decimal?)null,
+            tags = photoTags.Select(t => new
+            {
+                slug = t.Slug,
+                name = lang == "en" ? t.NameEn : t.NameSk,
+                nameSk = t.NameSk,
+                nameEn = t.NameEn
+            }),
+            productVariants = p.Variants
+                .OrderBy(v => v.Format.DisplayOrder).ThenBy(v => v.PaperType.DisplayOrder)
+                .Select(v => new
+                {
+                    id = v.Id,
+                    formatCode = v.Format.Code,
+                    formatName = lang == "en" ? v.Format.NameEn : v.Format.NameSk,
+                    formatNameSk = v.Format.NameSk,
+                    formatNameEn = v.Format.NameEn,
+                    paperTypeCode = v.PaperType.Code,
+                    paperTypeName = lang == "en" ? v.PaperType.NameEn : v.PaperType.NameSk,
+                    paperTypeNameSk = v.PaperType.NameSk,
+                    paperTypeNameEn = v.PaperType.NameEn,
+                    price = v.Price,
+                    isAvailable = v.IsAvailable
+                }),
+            variants = photoForProduct.Select(v => new
             {
                 width = v.Width,
                 height = v.Height,
@@ -699,6 +1084,44 @@ public static class EShopEndpoints
                 sizeBytes = v.SizeBytes
             })
         };
+    }
+
+    private record TagSummary(string Slug, string NameSk, string NameEn);
+
+    private static object MapCoverImage(List<PhotoVariant> allVariants, Guid photoId)
+    {
+        var variants = allVariants.Where(v => v.PhotoId == photoId)
+            .Select(v => new
+            {
+                width = v.Width,
+                height = v.Height,
+                format = v.Format,
+                quality = v.Quality,
+                blobUrl = v.BlobUrl,
+                sizeBytes = v.SizeBytes
+            }).ToList();
+        return new { photoId, variants };
+    }
+
+    private static async Task<Dictionary<Guid, List<TagSummary>>> LoadTagsByPhoto(
+        PortfolioDbContext portfolioDb, List<Guid> photoIds)
+    {
+        if (photoIds.Count == 0) return new();
+        var rows = await portfolioDb.Photos
+            .Where(p => photoIds.Contains(p.Id))
+            .SelectMany(p => p.PhotoTags.Select(pt => new
+            {
+                PhotoId = p.Id,
+                pt.Tag.Slug,
+                pt.Tag.NameSk,
+                pt.Tag.NameEn
+            }))
+            .ToListAsync();
+        return rows
+            .GroupBy(r => r.PhotoId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(r => new TagSummary(r.Slug, r.NameSk, r.NameEn)).ToList());
     }
 
     private static object MapOrder(Order order, Dictionary<Guid, Product> products)
@@ -719,8 +1142,15 @@ public static class EShopEndpoints
                 {
                     id = oi.Id,
                     productId = oi.ProductId,
+                    variantId = oi.VariantId,
                     productSlug = product?.Slug,
-                    productTitle = product?.TitleEn ?? "Unknown",
+                    productTitle = oi.ProductTitleEn,
+                    productTitleSk = oi.ProductTitleSk,
+                    productTitleEn = oi.ProductTitleEn,
+                    formatNameSk = oi.FormatNameSk,
+                    formatNameEn = oi.FormatNameEn,
+                    paperTypeNameSk = oi.PaperTypeNameSk,
+                    paperTypeNameEn = oi.PaperTypeNameEn,
                     quantity = oi.Quantity,
                     unitPrice = oi.UnitPrice,
                     editionNumber = oi.EditionNumber
@@ -730,16 +1160,52 @@ public static class EShopEndpoints
             updatedAt = order.UpdatedAt
         };
     }
+
+    private static OrderEmailTemplates.OrderAddress? ParseAddress(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return null;
+        try
+        {
+            var dto = JsonSerializer.Deserialize<AddressDto>(json);
+            if (dto is null) return null;
+            return new OrderEmailTemplates.OrderAddress(dto.Name, dto.Street, dto.City, dto.PostalCode, dto.Country);
+        }
+        catch { return null; }
+    }
+
+    // Images are stored under the internal Docker hostname; rewrite so the
+    // recipient's mail client can fetch them. In production, swap the target
+    // for the CDN origin.
+    private static string? EmailImageUrl(string? url)
+        => url?.Replace("http://azurite:10000/devstoreaccount1", "http://localhost:10000/devstoreaccount1");
+
+    private static string? PickThumbnail(List<PhotoVariant> variants, Guid? photoId)
+    {
+        if (!photoId.HasValue) return null;
+        var forPhoto = variants.Where(v => v.PhotoId == photoId.Value).ToList();
+        if (forPhoto.Count == 0) return null;
+        // Prefer the smallest JPEG — JPEG is the broadest-compatible format for a
+        // quick <img src> render, and the smallest variant is enough for a thumbnail.
+        var jpeg = forPhoto.Where(v => v.Format == "jpeg" || v.Format == "jpg")
+            .OrderBy(v => v.Width).FirstOrDefault();
+        return (jpeg ?? forPhoto.OrderBy(v => v.Width).First()).BlobUrl;
+    }
+
 }
 
 // ── Request DTOs ───────────────────────────────────────────────────
 
-public record AddToCartRequest(Guid ProductId, int Quantity = 1);
+public record AddToCartRequest(Guid VariantId, int Quantity = 1);
 
 public record UpdateCartItemRequest(int Quantity);
 
 public record SyncCartRequest(List<SyncCartItem> Items);
-public record SyncCartItem(string ProductSlug, int Quantity = 1);
+public record SyncCartItem(
+    string? ProductSlug = null,
+    string? FormatCode = null,
+    string? PaperTypeCode = null,
+    Guid? VariantId = null,
+    int Quantity = 1);
 
 public record CreateOrderRequest(
     AddressDto ShippingAddress,
@@ -757,18 +1223,27 @@ public record AddressDto(
 
 public record UpdateOrderStatusRequest(string Status);
 
+public record CreateFormatRequest(string Code, string NameSk, string NameEn, int? DisplayOrder = null);
+public record CreatePaperTypeRequest(string Code, string NameSk, string NameEn, int? DisplayOrder = null);
+
 public record CreateProductRequest(
     string TitleSk,
     string TitleEn,
     string Slug,
+    List<ProductVariantInput> Variants,
     Guid? PhotoId = null,
     string? DescriptionSk = null,
     string? DescriptionEn = null,
-    string? Format = null,
-    string? PaperType = null,
-    decimal Price = 0,
     string? Currency = null,
+    bool IsLimitedEdition = false,
     int? EditionSize = null,
+    bool? IsAvailable = null);
+
+public record ProductVariantInput(
+    string FormatCode,
+    string PaperTypeCode,
+    decimal Price,
+    string? Sku = null,
     bool? IsAvailable = null);
 
 public record UpdateProductRequest(
@@ -776,10 +1251,19 @@ public record UpdateProductRequest(
     string? TitleEn = null,
     string? DescriptionSk = null,
     string? DescriptionEn = null,
-    string? Format = null,
-    string? PaperType = null,
-    decimal? Price = null,
     int? EditionSize = null,
+    bool? IsAvailable = null);
+
+public record CreateVariantRequest(
+    string FormatCode,
+    string PaperTypeCode,
+    decimal Price,
+    string? Sku = null,
+    bool? IsAvailable = null);
+
+public record UpdateVariantRequest(
+    decimal? Price = null,
+    string? Sku = null,
     bool? IsAvailable = null);
 
 public record PaymentWebhookRequest(string PaymentId, string Status);

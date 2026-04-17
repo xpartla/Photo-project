@@ -1,0 +1,124 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../../components/SeoMeta.astro";
+import { getShopCollection } from "../../../../lib/api";
+import { t, getAlternateUrl } from "../../../../lib/i18n";
+import { buildSrcset, getFallbackUrl } from "../../../../lib/imageUrl";
+import type { ShopCollectionDetail, ShopProduct } from "../../../../lib/api";
+
+const lang = "en";
+const { slug } = Astro.params;
+const pageUrl = Astro.url.pathname;
+const alternateUrl = getAlternateUrl(lang, pageUrl);
+
+let collection: ShopCollectionDetail | null = null;
+try {
+  collection = await getShopCollection(slug!, lang);
+} catch {
+  return Astro.redirect(`/${lang}/shop`);
+}
+if (!collection) return Astro.redirect(`/${lang}/shop`);
+
+const products: ShopProduct[] = collection.products ?? [];
+const pageTitle = `${collection.name} — ${t(lang, "shop.title")} — PartlPhoto`;
+const coverVariants = collection.coverImage?.variants ?? [];
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={collection.description || t(lang, "shop.description")}
+    lang={lang}
+    path={pageUrl}
+  />
+
+  <main class="collection-page">
+    <a href={`/${lang}/shop`} class="collection-page__back">
+      &larr; {t(lang, "shop.collections.backToShop")}
+    </a>
+
+    {coverVariants.length > 0 && (
+      <div class="collection-page__hero">
+        <picture>
+          <source srcset={buildSrcset(coverVariants, "webp")} type="image/webp" />
+          <img src={getFallbackUrl(coverVariants)} alt={collection.name} loading="eager" />
+        </picture>
+      </div>
+    )}
+
+    <div class="collection-page__header">
+      <h1 class="collection-page__title">{collection.name}</h1>
+      {collection.description && (
+        <p class="collection-page__description">{collection.description}</p>
+      )}
+    </div>
+
+    {products.length === 0 ? (
+      <p class="shop__empty">{t(lang, "shop.noProducts")}</p>
+    ) : (
+      <div class="shop__grid">
+        {products.map((product) => {
+          const editionRemaining = product.editionRemaining;
+          const isSoldOut = !product.isAvailable;
+          const badgeText = isSoldOut
+            ? t(lang, "shop.soldOut")
+            : product.editionSize
+              ? `${editionRemaining} ${t(lang, "shop.remaining")}`
+              : t(lang, "shop.openEdition");
+          const badgeClass = isSoldOut ? "product-card__badge--sold-out" : "";
+
+          const variants = product.productVariants ?? [];
+          const specs = product.isLimitedEdition && variants.length > 0
+            ? [variants[0].formatName, variants[0].paperTypeName].filter(Boolean)
+            : Array.from(new Set(variants.map((v) => v.formatName))).slice(0, 3);
+
+          return (
+            <a href={`/${lang}/shop/${product.slug}`} class="product-card">
+              <div class="product-card__image">
+                {product.variants.length > 0 ? (
+                  <picture>
+                    <source srcset={buildSrcset(product.variants, "webp")} type="image/webp" />
+                    <img src={getFallbackUrl(product.variants)} alt={product.title} loading="lazy" />
+                  </picture>
+                ) : (
+                  <div style="height:280px;background:#eee;"></div>
+                )}
+                <span class={`product-card__badge ${badgeClass}`}>{badgeText}</span>
+              </div>
+              <div class="product-card__body">
+                <h3 class="product-card__title">{product.title}</h3>
+                {specs.length > 0 && (
+                  <div class="product-card__specs">
+                    {specs.map((s) => (<span class="product-card__spec">{s}</span>))}
+                  </div>
+                )}
+                {product.tags?.length > 0 && (
+                  <div class="product-card__specs product-card__specs--tags">
+                    {product.tags.map((tg) => (
+                      <span class="product-card__spec product-card__spec--tag">#{tg.name}</span>
+                    ))}
+                  </div>
+                )}
+                <div class="product-card__footer">
+                  <span class="product-card__price">
+                    {!product.isLimitedEdition && product.minPrice !== product.maxPrice && (
+                      <span class="product-card__price-prefix">{t(lang, "shop.fromPrice")} </span>
+                    )}
+                    {product.minPrice ?? 0} {product.currency}
+                  </span>
+                  <span class="product-card__cta">{t(lang, "shop.viewDetail")}</span>
+                </div>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    )}
+  </main>
+</BaseLayout>
+
+<style lang="scss" is:global>
+  @use "../../../../styles/components/shop";
+  @use "../../../../styles/components/collection-page";
+</style>

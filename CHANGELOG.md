@@ -1,5 +1,66 @@
 # Changelog
 
+## Epic 6.2: Shop Collections, Filtering & Search (2026-04-17)
+
+### Added
+- **Shop collections (via portfolio reuse)** — `GET /api/shop/collections` surfaces `portfolio.collections` that have ≥1 linked product (derived from `portfolio.collection_photos` → `products.photo_id`). `GET /api/shop/collections/{slug}` returns the full landing data (name, description, cover image, products). No new tables; coupling is deliberate so a visitor navigating portfolio → shop follows a continuous thread.
+- **Product filters** — `GET /api/shop/products` accepts `?collection=`, `?tag=`, `?format=`, `?paperType=`, `?q=`. Collection/tag resolve via cross-module reads into portfolio; `q` does `ILIKE '%…%'` across product title/description and photo title/location.
+- **Tag inheritance** — `MapProduct` now emits a `tags[]` array inherited from the product's photo. Visible on the product detail and available for filtering.
+- **`GET /api/shop/tags`** — lists tags that appear on at least one product's photo, with per-tag product counts for the filter UI.
+- **Shop filters component** — `<ShopFilters>` renders search + collection/tag/format/paper `<select>`s as a URL-backed `<form method="get">`. Filters are shareable, bookmarkable, SEO-friendly, and hydrate state from the URL on every page load. Responsive grid: 1 column on mobile, expands on wider viewports.
+- **Collection landing pages** — `/sk/obchod/kolekcie/[slug]` + `/en/shop/collections/[slug]` with a hero image (from the collection's `cover_photo_id`), description, and product grid. Back-link to the shop.
+- **Seed script overhaul**
+  - `seed-images.sh` now creates five additional tags (`street`, `urban`, `landscape`, `portrait`, `analog`), re-tags each film photo with `film + 1–2 themes`, and creates three thematic collections (`bratislava-2026`, `the-alps`, `wildlife-in-motion`). `publish_and_tag` now accepts a CSV of tag slugs.
+  - `seed-shop.sh` now creates four products from film photos only (`bratislava-film-1`, `bratislava-film-2`, `alps-landscape-1`, `wildlife-motion-1`) so collection/tag filters have meaningful data out of the box.
+
+### Changed
+- **Film-category constraint** — treated as admin discipline (seed script + admin workflow), not a hard API check. Products can reference any photo; the expectation is that shop products use `film`-tagged photos. Flagged in PLAN for a later "enforce on POST /products" upgrade if needed.
+- **Search strategy** — `ILIKE` instead of PostgreSQL `tsvector`/`tsquery`. With <100 items it runs in ~1 ms and keeps the implementation to ~15 lines; GIN/tsvector is documented as the upgrade path when the catalog grows.
+
+### Testing
+- **Backend integration tests (6 new)** — `GetProducts_FilterByFormat`, `GetProducts_FilterByCollectionAndTag`, `GetProducts_SearchMatchesTitleAndPhotoLocation`, `GetCollections_IncludesOnlyCollectionsWithProducts`, `GetCollectionBySlug_ReturnsProducts`, `GetTags_ReturnsTagsWithProductCounts`. Helper `SeedPhotoWithTagsAndCollectionAsync` seeds portfolio photos/tags/collections directly via `PortfolioDbContext` so tests don't need the image-upload pipeline. 49 tests total, all passing.
+- **Arch tests** — unchanged (cross-module read into `Portfolio` was already permitted for `PhotoVariants`).
+
+### Design Decisions
+- **Reused `portfolio.collections` instead of a new `eshop.collections` table** — follows the user's portfolio → shop discovery flow (visitor spots a print in a portfolio collection and expects the shop to surface the same collection as a theme). Admin maintains one list of collections, not two. Cover image and description already live on the portfolio collection; nothing to duplicate.
+- **Cross-module filters via pre-fetched ID lists** — resolve matching photo IDs in `PortfolioDbContext`, then narrow the `db.Products` query with `Contains(ids)`. Simpler than a raw join across schemas and keeps the read pattern consistent with the existing `PhotoVariants` fan-out.
+- **URL-backed filters (`<form method="get">`)** — no client-side state machine; every filter change is a full-page navigation to a bookmarkable URL. Works with Astro's SSR, accessible without JavaScript, and trivially shareable. Fine at ~100 items; if interactive filtering becomes critical, a future client-side layer can hydrate on top without breaking the URL contract.
+
+---
+
+## Epic 6.1: E-Shop Variants + Cart Fix (2026-04-17)
+
+### Added
+- **Product variants** — Multi-format, multi-paper support via a new `product_variants` table. Each variant = (product × format × paper × price). Open-edition products can have many variants; limited editions are constrained to exactly one variant to preserve the "one limited edition, one configuration" feel.
+- **Format and paper type lookups** — `formats` and `paper_types` tables with bilingual names (`name_sk`, `name_en`), short `code` identifiers, and `display_order`. Seeded with A4/A3/30×40/40×60/50×70 and Fine Art 310g / Baryta / Matte 200g / Premium Glossy.
+- **Public endpoints** — `GET /api/shop/formats`, `GET /api/shop/paper-types` for populating the variant dropdowns.
+- **Admin endpoints** — `POST /api/shop/formats`, `POST /api/shop/paper-types`, `POST /api/shop/products/{id}/variants`, `PUT/DELETE /api/shop/variants/{id}` for managing the lookup tables and product variants.
+- **Order-item snapshots** — `order_items` now stores `format_name_sk/en`, `paper_type_name_sk/en`, and `product_title_sk/en` at purchase time so order history survives later renames or deletes of the referenced product/variant.
+- **Cart keyed by variant** — `cart_items.variant_id` replaces `product_id`. Variants of the same product (A4 Matte vs A3 Fine Art) are now distinct cart lines. `POST /api/shop/cart/sync` resolves anonymous-cart items by `(productSlug, formatCode, paperTypeCode)` triples.
+- **Variant selection UI** — Product detail page renders two `<select>` dropdowns (format, paper) for open editions that re-price on change; limited editions render a static spec strip ("A4 · Fine Art 310g"). Listing cards show "from X €" when variant prices span a range.
+
+### Fixed
+- **Cart disappears after login-on-checkout** — previously, add-to-cart and cart-page reads always hit `localStorage` regardless of auth state, while the checkout submit used the server cart. After login, localStorage was cleared (synced to server) but subsequent adds wrote to localStorage again — which the checkout submit ignored. Rewritten as a single `src/lib/cart.ts` service that switches source-of-truth on `isAuthenticated()`: anonymous → localStorage, authenticated → server API. All pages (product detail, cart, checkout, navbar badge) go through the service.
+
+### Changed
+- **Product schema** — removed `format`, `paper_type`, `price` columns from `products`. Price now lives per-variant; product metadata (`is_limited_edition` flag, `edition_size`, `edition_sold`) stays at product level since edition tracking is per-product.
+- **Shop listing** — `product.format` removed from cards; price shows `from X EUR` for products with variable variant pricing.
+- **Seed script** — `seed-shop.sh` now POSTs a `variants` array. Three limited-edition products each have one variant; one open-edition product (`dog-portrait-3-print`) has five variants spanning A4/A3/30×40 across glossy and fine art papers (45–89 EUR range).
+- **Dev schema bootstrap** — `DependencyInjection.ApplyMigrationsAsync` detects the absence of `eshop.product_variants` and drops the `eshop` schema so `EnsureCreated` can rebuild it. Dev-only; production uses versioned migrations.
+
+### Testing
+- **Backend integration tests** — added: `CreateProduct_LimitedEditionWithMultipleVariants_Returns400`, `Cart_DifferentVariantsAreDistinctLines`, `Formats_PaperTypes_ArePubliclyReadable`. Existing tests updated for the new `variants` payload and `variantId` cart shape. 43 tests, all passing.
+- **Frontend unit tests** — cart tests updated to use `(slug, formatCode, paperTypeCode)` identity instead of slug alone. Adds a test verifying variants of the same product stay as distinct lines.
+- **Playwright** — `ensureProduct` helper updated for variants payload.
+
+### Design Decisions
+- **`ProductVariant` table over two pivot tables** — the user's initial suggestion of `product_formats` + `product_paper_types` pivots can't express per-combination price, availability, or SKU, and would force cart/order items to compose a three-way composite key. A single `product_variants` row per offered combo is simpler for both storage and the UI (one select wired directly to variant records).
+- **Limited editions stay single-variant** — `is_limited_edition` flag enforces exactly one variant at admin creation; the UI renders a static spec strip instead of dropdowns. Keeps the "one piece, one configuration" feel the user asked for without special-casing the data model.
+- **Snapshot format/paper names on `order_items`** — variant deletion or rename after purchase must not corrupt historical orders. Snapshots cost ~4 extra varchar columns and remove a whole class of historical-integrity bugs.
+- **Price moves entirely off `products`** — avoids the ambiguity of "which price wins, product or variant?". Listings show `minPrice`/`maxPrice` (computed) so the UX still has a clear price headline.
+
+---
+
 ## Epic 6: E-Shop Module (2026-04-14)
 
 ### Added

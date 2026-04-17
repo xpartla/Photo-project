@@ -37,64 +37,56 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
     </div>
   </main>
 
-  <script define:vars={{ apiBase, lang }}>
-    const form = document.getElementById('login-form');
-    form.addEventListener('submit', async function(e) {
+  <script id="login-config" type="application/json" set:html={JSON.stringify({
+    apiBase,
+    lang,
+    submitLabel: t(lang, "nav.login"),
+  })}></script>
+
+  <script>
+    import { syncLocalCartToServer } from "../../../lib/cart";
+
+    const cfg = JSON.parse(document.getElementById("login-config")!.textContent!);
+    const form = document.getElementById("login-form") as HTMLFormElement;
+
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const btn = document.getElementById('login-btn');
-      const errEl = document.getElementById('login-error');
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
+      const btn = document.getElementById("login-btn") as HTMLButtonElement;
+      const errEl = document.getElementById("login-error")!;
+      const email = (document.getElementById("email") as HTMLInputElement).value.trim();
+      const password = (document.getElementById("password") as HTMLInputElement).value;
 
       btn.disabled = true;
-      btn.textContent = '...';
-      errEl.textContent = '';
+      btn.textContent = "...";
+      errEl.textContent = "";
 
       try {
-        const res = await fetch(apiBase + '/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+        const res = await fetch(`${cfg.apiBase}/api/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
         });
 
         if (!res.ok) {
-          const err = await res.json().catch(function() { return {}; });
-          throw new Error(err.error || 'Login failed');
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Login failed");
         }
 
         const data = await res.json();
-        localStorage.setItem('partlphoto_token', data.accessToken);
-        localStorage.setItem('partlphoto_user', JSON.stringify({
-          id: data.userId, email: data.email, role: data.role
+        localStorage.setItem("partlphoto_token", data.accessToken);
+        localStorage.setItem("partlphoto_user", JSON.stringify({
+          id: data.userId, email: data.email, role: data.role,
         }));
 
-        // Sync localStorage cart to server
-        const CART_KEY = 'partlphoto_cart';
-        const localCart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
-        if (localCart.length > 0) {
-          try {
-            await fetch(apiBase + '/api/shop/cart/sync', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + data.accessToken
-              },
-              body: JSON.stringify({
-                items: localCart.map(function(i) { return { productSlug: i.productSlug, quantity: i.quantity }; })
-              })
-            });
-            localStorage.setItem(CART_KEY, '[]');
-          } catch(e) { /* sync failed, keep local cart */ }
-        }
+        try { await syncLocalCartToServer(data.accessToken); } catch { /* ignore */ }
 
-        // Redirect to return URL or home
         const params = new URLSearchParams(window.location.search);
-        const returnUrl = params.get('return') || '/' + lang;
+        const returnUrl = params.get("return") || `/${cfg.lang}`;
         window.location.href = returnUrl;
-      } catch (err) {
+      } catch (err: any) {
         errEl.textContent = err.message;
         btn.disabled = false;
-        btn.textContent = 'Prihlásiť';
+        btn.textContent = cfg.submitLabel;
       }
     });
   </script>
