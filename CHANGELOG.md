@@ -1,5 +1,33 @@
 # Changelog
 
+## Portfolio filtering & sub-pages (2026-06-25)
+
+The portfolio gains a way to browse by tag and collection: an expandable filter
+on every listing page plus dedicated, animated sub-pages for each tag and
+collection. (Previously a collection was only reachable from a photo's detail
+page, and tag pills led to a dead `?tag=` query.)
+
+### Added
+- **`PortfolioFilter.astro`** — a compact, centered, expandable filter on every portfolio listing page: chip groups for **Collections** and **Tags** plus an **"All photos"** reset, active chip highlighted. Chips link to the matching sub-page; the only JS is expand/collapse (closes on outside-click / Escape). New `_portfolio-filter.scss`.
+- **`PortfolioGallery.astro`** — shared animated gallery: a masonry grid of cartoon-framed cards with scroll-reveal + a lightbox — the index split's feel as one full-width list. The lightbox "buy as print" button stays gated by `STORE_ENABLED`. New `_portfolio-gallery.scss`.
+- **`PortfolioHero.astro`** — shared sub-page hero (title + drawn underline + subtitle) with sparkle / dashed-circle background decorations matching the home hero (circles hidden on small phones). New `_portfolio-hero.scss`.
+- **Tag sub-pages** — `/en/portfolio/tags/[slug]` + `/sk/portfolio/znacky/[slug]`: hero (tag name + count) → filter → gallery via `getPhotos({ tag })`. Unknown tag → redirect to `/portfolio`.
+- **`getTags()` + `TagSummary`** in `lib/api.ts` (wraps `GET /api/portfolio/tags`).
+
+### Changed
+- **Collection pages** (`/portfolio/collections/[slug]` EN, `/portfolio/kolekcie/[slug]` SK) rebuilt from a plain static grid into hero + filter + the animated `PortfolioGallery` + lightbox. Pagination dropped in favour of loading up to 60 and revealing on scroll.
+- **Portfolio index** keeps the Film/Digital split and now renders the filter beneath the hero (via a `<slot />` in `PortfolioSplit`).
+- **Photo-detail tag pills** now link to the new tag sub-pages instead of the dead `/portfolio?tag=` query.
+- **i18n** — `getAlternateUrl` extended for `tags ↔ znacky` (bilingual links + hreflang); new keys `portfolio.filter`, `portfolio.photosTagged` (EN + SK).
+- **Mobile** — the sub-page gallery collapses to a single full-width column (≤768px), matching the basic portfolio, so phone images are large.
+
+### Removed
+- Orphaned `_collection-detail.scss` (old plain collection-page styles, no longer referenced).
+
+### Verification
+- `astro build` clean (Node 22); 62/62 Vitest unit tests pass; both i18n JSONs valid.
+- Live: index filter shows 14 chips; `tags/film` → 7 cards + lightbox, `collections/utulkaci` → 4 cards + description; SK `znacky/digital` → 7 cards; unknown tag → 302; hreflang maps `tags ↔ znacky` both ways.
+
 ## Dog-only launch refactor (2026-06-25)
 
 The public site now focuses solely on **dog photography**; the fine-art-film

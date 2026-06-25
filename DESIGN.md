@@ -246,8 +246,10 @@ $transition-slow: 400ms ease;   // Page-level transitions, hero entrance
 
 ### Gallery Layouts
 - **Grid:** CSS Grid with `auto-fill, minmax(280px, 1fr)` — adapts naturally to viewport
-- **Masonry** (for mixed-aspect-ratio collections): CSS `columns` or future CSS masonry. Photos keep their natural aspect ratios — never force square crops on film photos.
+- **Masonry** (tag & collection sub-pages, mixed aspect ratios): CSS `columns` (`PortfolioGallery`). Photos keep their natural aspect ratios — never force square crops on film photos. Collapses to a single full-width column on mobile (≤768px), matching the index portfolio.
+- **Split:** The index portfolio shows two side-by-side columns (Film / Digital) that stack into tabs on mobile (`PortfolioSplit`).
 - **Featured/Hero:** Single large image spanning full width with generous vertical padding
+- **Filter:** Listing pages (index + sub-pages) carry a centered, expandable filter pill (`PortfolioFilter`) that opens to Collections + Tags chips — outline-pill chips, active one filled `$sage`.
 
 ### Lightbox
 - Dark overlay (`rgba($dark, 0.92)`) — photos pop against near-black
@@ -299,9 +301,11 @@ src/styles/
     ├── _navbar.scss          ← Navbar component styles
     ├── _home-content.scss    ← Homepage hero, CTA banner
     ├── _photo-strip.scss     ← Photo carousel strip
-    ├── _portfolio-split.scss ← Split gallery view + lightbox
+    ├── _portfolio-split.scss ← Portfolio index: Film/Digital split + lightbox
+    ├── _portfolio-filter.scss ← Expandable tag/collection filter bar
+    ├── _portfolio-hero.scss  ← Sub-page hero (title + background deco)
+    ├── _portfolio-gallery.scss ← Tag/collection sub-page gallery + lightbox
     ├── _photo-detail.scss    ← Photo detail page (shared EN/SK)
-    ├── _collection-detail.scss ← Collection gallery page
     └── _layout.scss          ← Layout-level styles (footer)
 ```
 
