@@ -1,5 +1,35 @@
 # Changelog
 
+## Dog-only launch refactor (2026-06-25)
+
+The public site now focuses solely on **dog photography**; the fine-art-film
+positioning is retired and the e-commerce store is hidden (built, not deleted)
+for the initial launch. Full re-enable guide: `docs/store-reenable.md`.
+
+### Changed — Film / Digital reframe
+- **Home page** (`en/index.astro`, `sk/index.astro`, `HomeContent.astro`) — the two photo strips now show **Film** (top) and **Digital** (bottom) instead of Dog / Film. Still tag-driven: the strips fetch `?tag=film` and `?tag=digital`. Props renamed `dogPhotos`/`filmPhotos` → `filmPhotos`/`digitalPhotos`; accents swapped (film = lavender, digital = peach).
+- **Portfolio page** (`{en,sk}/portfolio/index.astro`, `PortfolioSplit.astro`, `_portfolio-split.scss`) — the two-column split + mobile tabs are now Film (left) / Digital (right). Column ids/classes/data-attributes renamed `dog`/`film` → `film`/`digital`.
+- **i18n** — renamed `home.dogPhotos` → `home.digitalPhotos` and `portfolio.dogSection` → `portfolio.digitalSection` (= "Digital Photography" / "Digitálna fotografia"); kept the Film labels. `footer.tagline` dropped "fine art" (now "film & digital photography" / "filmová a digitálna fotografia"); `portfolio.description` fine-art → "film and digital photography". (`booking.about.text`, `blog.*` kept as on-message; `shop.*` left as-is until the store returns.)
+
+### Added — store feature flag
+- **`src/lib/features.ts`** — `STORE_ENABLED` from env `PUBLIC_STORE_ENABLED` (default off).
+- **`src/middleware.ts`** — when the store is off, redirects `^/(sk|en)/(obchod|shop)` and `^/(sk|en)/admin/(obchod|shop)` to the language home page (routes unreachable, files intact).
+- **Guarded UI** — shop nav link, cart (desktop + mobile), "My Orders" dropdown, home strip "Shop" links, portfolio detail + lightbox "Buy as print", account "Orders" card, and admin "Shop" + "Pending orders" cards are all wrapped in `{STORE_ENABLED && …}` (Navbar, PhotoStrip, PortfolioSplit, `{en,sk}` portfolio `[slug]`, account, admin index).
+- **Backend untouched** — `MapEShopEndpoints()` stays live; no `/api/shop/**` change, so `EShopTests` is unaffected.
+- **`tests/e2e/shop.spec.ts`** — the `shop` describe is skipped unless `PUBLIC_STORE_ENABLED=true`.
+
+### Changed — seed data (rewritten for dog taxonomy)
+- **`scripts/seed-images.sh`** — new tags `film, digital, outdoor, nature, park, studio, training, action, bw, bratislava` (old `dog/street/urban/landscape/analog` retired); 14 dog photos (`utulkac-*`, `turista-*`, `portret-*`), each with exactly one medium tag; collections `utulkaci` (Útulkáči / Shelter Dogs), `turisti` (Turisti / Hikers), `portrety` (Portréty / Portraits).
+- **`scripts/seed-shop.sh`** — sample products repointed from removed fine-art frames to the new dog photos and renamed to dog-print themes; runs only matter once the store is re-enabled.
+
+### Docs
+- **`docs/store-reenable.md`** (new) — what was hidden/kept/changed, before/after table, deferred copy, and step-by-step re-enable + verification checklist.
+- **`CLAUDE.md`** — Overview, structure, conventions, commands and Current Status updated for the dog-only launch + hidden store.
+
+### Verification
+- Frontend `astro build` clean (Node 22); 62/62 Vitest unit tests pass.
+- Reseeded the local stack: API returns `film=7`, `digital=7`, `dog=0`, 3 collections, 10 tags. Live checks: shop/admin-shop routes 302 → home; no shop/cart links rendered; home + portfolio render Film→Digital (SK + EN); footer carries no "fine art".
+
 ## Bug fixes (2026-04-17)
 
 ### Fixed

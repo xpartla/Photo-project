@@ -2,9 +2,9 @@
 
 ## Brand Identity
 
-**PartlPhoto** is a fine art 35mm film & dog photography brand based in Bratislava, Slovakia. The visual identity blends **Cuphead-era cartoon aesthetics** — thick ink outlines, bold pastel fills, hand-drawn energy — with the warmth and grain of analog film photography. The result should feel like a vintage animation cel come to life: playful, confident, and unmistakably handcrafted.
+**PartlPhoto** is a **dog photography** brand based in Bratislava, Slovakia, shooting on both 35mm film and digital. The visual identity blends **Cuphead-era cartoon aesthetics** — thick ink outlines, bold pastel fills, hand-drawn energy — with the warmth and grain of analog film photography. The result should feel like a vintage animation cel come to life: playful, confident, and unmistakably handcrafted.
 
-The brand serves two audiences: dog owners looking for portrait sessions, and art collectors drawn to fine art film prints. The design must feel approachable enough for pet owners yet carry enough visual weight to frame fine art credibly.
+The brand serves dog owners looking for portrait and outdoor sessions, with work shown across both film and digital. The design must feel approachable and warm for pet owners while still carrying enough craft and visual weight to feel premium. (A fine-art dog-print store is built but hidden for the initial launch — see `docs/store-reenable.md`.)
 
 ---
 
@@ -46,7 +46,7 @@ The brand serves two audiences: dog owners looking for portrait sessions, and ar
 - **Outlines are always `$dark` (`#2A2A2A`)**. Never use colored outlines — the dark ink look is non-negotiable.
 - **Text is always `$dark`** on light backgrounds. On `$sage` or `$dark` backgrounds, use `$white`.
 - **Background alternation:** Alternate between `$cream` and `$white` for page sections to create visual rhythm without hard dividers.
-- **Section accents:** Dog photography sections use `$peach`, film photography sections use `$lavender`.
+- **Section accents:** Film sections use `$lavender`, digital sections use `$peach`.
 
 ---
 
