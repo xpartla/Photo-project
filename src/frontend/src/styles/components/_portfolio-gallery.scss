@@ -8,11 +8,34 @@
 }
 
 .pf-gallery__grid {
-  columns: 3 300px;
-  column-gap: 1.5rem;
+  // No-JS / pre-hydration fallback: a plain row-major grid that already packs
+  // the full width (3-up, dropping to 2/1 as the viewport narrows). The
+  // PortfolioGallery script upgrades this in place to a balanced JS masonry
+  // (`.is-masonry`) — a CSS multi-column layout was used here before, but it
+  // flows column-major and balances by height, leaving ragged half-empty rows.
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 2rem 4rem;
+}
+
+// JS masonry: a flex row of equal-width columns. The script distributes cards
+// into the shortest column, so rows pack the full width while keeping the
+// staggered, hand-pinned look. Built in PortfolioGallery.astro.
+.pf-gallery__grid.is-masonry {
+  display: flex;
+  align-items: flex-start;
+}
+
+.pf-gallery__col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .pf-gallery__empty {
@@ -37,8 +60,7 @@
 
   display: block;
   width: 100%;
-  break-inside: avoid;
-  margin: 0 0 1.5rem;
+  margin: 0;
 
   // Reveal
   opacity: 0;
@@ -280,14 +302,16 @@
 // ── Responsive ────────────────────────────────────────
 @media (max-width: $breakpoint-md) {
   // Single full-width column on mobile, matching the basic portfolio — one
-  // large image per row instead of a cramped two-up masonry.
+  // large image per row instead of a cramped two-up grid. (The JS masonry
+  // also collapses to one column under this breakpoint.)
   .pf-gallery__grid {
-    columns: 1;
+    grid-template-columns: 1fr;
+    gap: 2rem;
     padding: 0 1.25rem 3rem;
   }
 
-  .pf-gallery__card {
-    margin-bottom: 2rem;
+  .pf-gallery__col {
+    gap: 2rem;
   }
 
   .lightbox__panel {

@@ -1,5 +1,21 @@
 # Changelog
 
+## Portfolio tilt & gallery layout polish (2026-06-25)
+
+Small visual fixes to the portfolio index and its tag/collection sub-pages: the
+split-screen photo tilts looked mirror-matched, and the sub-page gallery left
+ragged half-empty rows.
+
+### Changed
+- **`PortfolioSplit.astro`** (portfolio index) — the Film (left) and Digital (right) columns previously read from one shared `rotations` array indexed by the same position, so each row's two photos got an identical tilt. Split into two distinct, opposite-leaning sequences (`filmRotations` / `digitalRotations`) so no side-by-side pair shares a tilt — the split now reads as hand-pinned, not mirrored.
+- **`PortfolioGallery.astro`** (tag & collection sub-pages) — widened the tilt sequence to a prime-length (11) array with more variation so rotations don't line up cleanly across the gallery columns.
+
+### Fixed
+- **Sub-page gallery masonry** — the gallery used a CSS multi-column layout (`columns: 3 300px`), which flows column-major and balances by **height**, leaving uneven, half-empty rows (e.g. 3 / 2 / 2) with variable-height photos. Replaced with a **JS masonry**: cards are distributed into the shortest of N equal-width flex columns, so rows always pack the full width while keeping the staggered look. Re-runs on `resize` (rAF-debounced) and on `window.load`; collapses to one column under the `md` breakpoint. A row-major CSS Grid (`repeat(auto-fill, minmax(300px, 1fr))`) is kept as the **no-JS / pre-hydration fallback**. Cards reserve their aspect-ratio height before images load (`ResponsiveImage` sets width/height), so `offsetHeight` is stable during distribution. (`_portfolio-gallery.scss`)
+
+### Verification
+- Manually verified in the running app: index split tilts no longer mirror across the divider; sub-page galleries pack full-width rows.
+
 ## Portfolio filtering & sub-pages (2026-06-25)
 
 The portfolio gains a way to browse by tag and collection: an expandable filter
