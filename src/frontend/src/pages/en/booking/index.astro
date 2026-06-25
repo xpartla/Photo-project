@@ -23,6 +23,14 @@ try {
   // fallback
 }
 
+// Fixed display order for the launch packages (the API sorts by price).
+const sessionOrder = ["legacy", "digital", "action"];
+const orderOf = (slug: string) => {
+  const i = sessionOrder.indexOf(slug);
+  return i === -1 ? sessionOrder.length : i;
+};
+sessionTypes = [...sessionTypes].sort((a, b) => orderOf(a.slug) - orderOf(b.slug));
+
 // Server-side uses Docker-internal URL; client-side JS needs the host-accessible URL
 const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
 
@@ -76,13 +84,6 @@ const jsonLd = [
     },
   })),
 ];
-
-const categoryKeys: Record<string, string> = {
-  portrait: "booking.category.portrait",
-  action: "booking.category.action",
-  studio: "booking.category.studio",
-  outdoor: "booking.category.outdoor",
-};
 ---
 
 <BaseLayout title={pageTitle} description={pageDescription} lang={lang}>
@@ -103,23 +104,15 @@ const categoryKeys: Record<string, string> = {
   <div class="session-grid reveal-stagger">
     {sessionTypes.map((st) => (
       <div class="session-card reveal">
-        {st.category && (
-          <span class="session-card__category">
-            {t(lang, categoryKeys[st.category] || `booking.category.${st.category}`)}
-          </span>
-        )}
         <h2 class="session-card__name">{st.name}</h2>
         <p class="session-card__description">{st.description}</p>
+        <div class="session-card__price">
+          {st.basePrice} {st.currency}
+        </div>
         <div class="session-card__meta">
-          <span class="session-card__meta-item">
-            {t(lang, "booking.duration")}: {st.durationMinutes} {t(lang, "booking.minutes")}
-          </span>
           <span class="session-card__meta-item">
             {t(lang, "booking.maxDogs")}: {st.maxDogs}
           </span>
-        </div>
-        <div class="session-card__price">
-          {st.basePrice} {st.currency}
         </div>
         {st.includes && st.includes.length > 0 && (
           <ul class="session-card__includes">
@@ -141,15 +134,9 @@ const categoryKeys: Record<string, string> = {
       <div class="session-modal" role="dialog" aria-labelledby={`modal-title-${st.slug}`}>
         <button type="button" class="session-modal__close" data-close-modal aria-label={t(lang, "portfolio.close")}>&times;</button>
 
-        {st.category && (
-          <span class="session-modal__category">
-            {t(lang, categoryKeys[st.category] || `booking.category.${st.category}`)}
-          </span>
-        )}
         <h2 class="session-modal__title" id={`modal-title-${st.slug}`}>{st.name}</h2>
 
         <div class="session-modal__meta">
-          <span>{t(lang, "booking.duration")}: {st.durationMinutes} {t(lang, "booking.minutes")}</span>
           <span>{t(lang, "booking.maxDogs")}: {st.maxDogs}</span>
           <span class="session-modal__price">{st.basePrice} {st.currency}</span>
         </div>
@@ -176,16 +163,20 @@ const categoryKeys: Record<string, string> = {
         <h3 class="session-modal__section-title">{t(lang, "booking.detail.faq")}</h3>
         <div class="booking-faq">
           <details class="booking-faq__item">
-            <summary>{t(lang, "booking.detail.faq.howLong")}</summary>
-            <p>{t(lang, "booking.detail.faq.howLongAnswer")}</p>
+            <summary>{t(lang, "booking.detail.faq.prints")}</summary>
+            <p>{t(lang, "booking.detail.faq.printsAnswer")}</p>
           </details>
           <details class="booking-faq__item">
-            <summary>{t(lang, "booking.detail.faq.howMany")}</summary>
-            <p>{t(lang, "booking.detail.faq.howManyAnswer")}</p>
+            <summary>{t(lang, "booking.detail.faq.legacy")}</summary>
+            <p>{t(lang, "booking.detail.faq.legacyAnswer")}</p>
           </details>
           <details class="booking-faq__item">
-            <summary>{t(lang, "booking.detail.faq.where")}</summary>
-            <p>{t(lang, "booking.detail.faq.whereAnswer")}</p>
+            <summary>{t(lang, "booking.detail.faq.timing")}</summary>
+            <p>{t(lang, "booking.detail.faq.timingAnswer")}</p>
+          </details>
+          <details class="booking-faq__item">
+            <summary>{t(lang, "booking.detail.faq.extraPrints")}</summary>
+            <p>{t(lang, "booking.detail.faq.extraPrintsAnswer")}</p>
           </details>
         </div>
       </div>

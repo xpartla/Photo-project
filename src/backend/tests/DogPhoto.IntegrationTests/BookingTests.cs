@@ -54,13 +54,13 @@ public sealed class BookingTests : ApiTestBase
     public async Task GetSessionTypeBySlug_ReturnsDetail()
     {
         var client = CreateClient();
-        var response = await client.GetAsync("/api/booking/session-types/dog-portrait");
+        var response = await client.GetAsync("/api/booking/session-types/legacy");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
-        Assert.Equal("dog-portrait", doc.RootElement.GetProperty("slug").GetString());
-        Assert.Equal(60, doc.RootElement.GetProperty("durationMinutes").GetInt32());
+        Assert.Equal("legacy", doc.RootElement.GetProperty("slug").GetString());
+        Assert.Equal(90, doc.RootElement.GetProperty("durationMinutes").GetInt32());
     }
 
     [Fact]
@@ -457,11 +457,11 @@ public sealed class BookingTests : ApiTestBase
     [Fact]
     public async Task CreateBooking_DogCountExceedsMax_Returns400()
     {
-        // dog-portrait session allows max 2 dogs
+        // action session allows max 2 dogs
         var (slotId, _) = await CreateSlotAndGetSessionTypeAsync("2027-02-15");
 
         var client = CreateClient();
-        var typesResponse = await client.GetAsync("/api/booking/session-types/dog-portrait");
+        var typesResponse = await client.GetAsync("/api/booking/session-types/action");
         var typesBody = await typesResponse.Content.ReadAsStringAsync();
         using var typesDoc = JsonDocument.Parse(typesBody);
         var sessionTypeId = typesDoc.RootElement.GetProperty("id").GetString();

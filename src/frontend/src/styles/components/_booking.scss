@@ -110,7 +110,6 @@
     color: $dark;
     opacity: 0.8;
     margin: 0 0 16px;
-    flex: 1;
   }
 
   &__meta {
@@ -164,6 +163,7 @@
 
   &__cta {
     display: inline-block;
+    margin-top: auto;
     font-family: $font-body;
     font-size: 0.95rem;
     font-weight: 700;

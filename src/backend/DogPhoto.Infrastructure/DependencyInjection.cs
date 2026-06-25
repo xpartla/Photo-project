@@ -181,67 +181,89 @@ public static class DependencyInjection
         using var scope = services.CreateScope();
         var sp = scope.ServiceProvider;
 
-        // Seed booking session types
+        // Seed / reconcile booking session types — the dog-only launch packages.
+        // This runs every startup (not just on an empty table) so edits to the
+        // canonical package content take effect without a manual DB reset.
+        // Rows are matched by slug; any other active session type (e.g. retired
+        // seed data) is deactivated so it drops out of the public listing while
+        // keeping existing bookings' foreign-key references intact.
+        // `includes` is stored bilingually as {"sk":[...],"en":[...]}.
         var bookingDb = sp.GetRequiredService<BookingDbContext>();
-        if (!await bookingDb.SessionTypes.AnyAsync())
+        var desiredSessionTypes = new[]
         {
-            bookingDb.SessionTypes.AddRange(
-                new SessionType
-                {
-                    NameSk = "Psí portrét",
-                    NameEn = "Dog Portrait",
-                    Slug = "dog-portrait",
-                    DescriptionSk = "Profesionálne portréty vášho psa v štúdiu alebo exteriéri.",
-                    DescriptionEn = "Professional portraits of your dog in studio or outdoor setting.",
-                    DurationMinutes = 60,
-                    BasePrice = 120,
-                    Category = "portrait",
-                    MaxDogs = 2,
-                    IncludesJson = """["10 edited photos", "online gallery", "print rights"]"""
-                },
-                new SessionType
-                {
-                    NameSk = "Akčné fotenie",
-                    NameEn = "Action Session",
-                    Slug = "action-session",
-                    DescriptionSk = "Dynamické zábery vášho psa v pohybe.",
-                    DescriptionEn = "Dynamic shots of your dog in motion.",
-                    DurationMinutes = 90,
-                    BasePrice = 150,
-                    Category = "action",
-                    MaxDogs = 3,
-                    IncludesJson = """["15 edited photos", "online gallery", "print rights"]"""
-                },
-                // Studio session — temporarily disabled
-                // new SessionType
-                // {
-                //     NameSk = "Štúdiové fotenie",
-                //     NameEn = "Studio Session",
-                //     Slug = "studio-session",
-                //     DescriptionSk = "Fotenie v profesionálnom štúdiu s rôznymi pozadiami.",
-                //     DescriptionEn = "Photography in professional studio with various backdrops.",
-                //     DurationMinutes = 45,
-                //     BasePrice = 100,
-                //     Category = "studio",
-                //     MaxDogs = 1,
-                //     IncludesJson = """["8 edited photos", "online gallery", "print rights"]"""
-                // },
-                new SessionType
-                {
-                    NameSk = "Exteriérové fotenie",
-                    NameEn = "Outdoor Session",
-                    Slug = "outdoor-session",
-                    DescriptionSk = "Fotenie v prírode alebo mestskom prostredí Bratislavy.",
-                    DescriptionEn = "Photography in nature or urban Bratislava settings.",
-                    DurationMinutes = 90,
-                    BasePrice = 140,
-                    Category = "outdoor",
-                    MaxDogs = 3,
-                    IncludesJson = """["12 edited photos", "online gallery", "print rights"]"""
-                }
-            );
-            await bookingDb.SaveChangesAsync();
+            new SessionType
+            {
+                NameSk = "Legacy",
+                NameEn = "Legacy",
+                Slug = "legacy",
+                DescriptionSk = "24 profesionálnych fotografií na kvalitný 35 mm film. Po vyvolaní a digitalizácii dostanete celú rolku analógu, jednu vybranú fotografiu vytlačenú v galerijnej kvalite a všetky zábery v online galérii.",
+                DescriptionEn = "24 professional photographs on quality 35 mm film. After developing and digitising you receive the whole roll of analogue shots, one selected photo printed in gallery quality, and every image in an online gallery.",
+                DurationMinutes = 90,
+                BasePrice = 180,
+                Category = "film",
+                MaxDogs = 1,
+                IncludesJson = """{"sk":["24 analógových fotografií","online galéria","vybrané výtlačky"],"en":["24 analog photos","online gallery","selected prints"]}"""
+            },
+            new SessionType
+            {
+                NameSk = "Digital",
+                NameEn = "Digital",
+                Slug = "digital",
+                DescriptionSk = "15 kvalitných, profesionálne upravených fotografií fotených v štúdiu alebo v exteriéri.",
+                DescriptionEn = "15 high-quality, professionally edited photographs taken in the studio or outdoors.",
+                DurationMinutes = 60,
+                BasePrice = 130,
+                Category = "digital",
+                MaxDogs = 1,
+                IncludesJson = """{"sk":["15 profesionálne upravených fotografií","online galéria","vybrané výtlačky"],"en":["15 professionally edited photos","online gallery","selected prints"]}"""
+            },
+            new SessionType
+            {
+                NameSk = "Action",
+                NameEn = "Action",
+                Slug = "action",
+                DescriptionSk = "12 profesionálne upravených fotografií vášho psa v pohybe, fotených v prírode — či už beží za loptičkou alebo sa rúti za vami.",
+                DescriptionEn = "12 professionally edited photographs of your dog in motion, shot outdoors — whether chasing a ball or racing toward you.",
+                DurationMinutes = 90,
+                BasePrice = 150,
+                Category = "action",
+                MaxDogs = 2,
+                IncludesJson = """{"sk":["12 profesionálne upravených fotografií","online galéria","vybrané výtlačky"],"en":["12 professionally edited photos","online gallery","selected prints"]}"""
+            }
+        };
+
+        var existingSessionTypes = await bookingDb.SessionTypes.ToListAsync();
+        var sessionTypesBySlug = existingSessionTypes.ToDictionary(s => s.Slug);
+        foreach (var desired in desiredSessionTypes)
+        {
+            if (sessionTypesBySlug.TryGetValue(desired.Slug, out var row))
+            {
+                row.NameSk = desired.NameSk;
+                row.NameEn = desired.NameEn;
+                row.DescriptionSk = desired.DescriptionSk;
+                row.DescriptionEn = desired.DescriptionEn;
+                row.DurationMinutes = desired.DurationMinutes;
+                row.BasePrice = desired.BasePrice;
+                row.Category = desired.Category;
+                row.MaxDogs = desired.MaxDogs;
+                row.IncludesJson = desired.IncludesJson;
+                row.IsActive = true;
+                row.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                bookingDb.SessionTypes.Add(desired);
+            }
         }
+
+        var desiredSlugs = desiredSessionTypes.Select(d => d.Slug).ToHashSet();
+        foreach (var stale in existingSessionTypes.Where(s => s.IsActive && !desiredSlugs.Contains(s.Slug)))
+        {
+            stale.IsActive = false;
+            stale.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await bookingDb.SaveChangesAsync();
 
         // Seed eshop lookup tables (formats & paper types)
         var eshopDb = sp.GetRequiredService<EShopDbContext>();

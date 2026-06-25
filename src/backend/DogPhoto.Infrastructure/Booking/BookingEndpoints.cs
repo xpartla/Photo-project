@@ -582,12 +582,7 @@ public static class BookingEndpoints
 
     private static object MapSessionType(SessionType st, string lang)
     {
-        string[]? includes = null;
-        if (!string.IsNullOrEmpty(st.IncludesJson))
-        {
-            try { includes = JsonSerializer.Deserialize<string[]>(st.IncludesJson); }
-            catch { /* ignore malformed JSON */ }
-        }
+        var includes = ParseIncludes(st.IncludesJson, lang);
 
         return new
         {
@@ -607,6 +602,30 @@ public static class BookingEndpoints
             maxDogs = st.MaxDogs,
             isActive = st.IsActive
         };
+    }
+
+    // Includes are stored as JSONB. Current format is bilingual
+    // ({"sk":[...],"en":[...]}); the legacy format was a single flat array
+    // (["..."]). Both are supported so old rows keep rendering.
+    private static string[]? ParseIncludes(string? json, string lang)
+    {
+        if (string.IsNullOrEmpty(json)) return null;
+
+        try
+        {
+            var byLang = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json);
+            if (byLang is not null && byLang.Count > 0)
+            {
+                if (byLang.TryGetValue(lang, out var localized) && localized is not null) return localized;
+                if (byLang.TryGetValue("en", out var en) && en is not null) return en;
+                if (byLang.TryGetValue("sk", out var sk) && sk is not null) return sk;
+                return byLang.Values.FirstOrDefault();
+            }
+        }
+        catch { /* not the bilingual shape — fall through to the legacy flat array */ }
+
+        try { return JsonSerializer.Deserialize<string[]>(json); }
+        catch { return null; }
     }
 
     private static object MapBookingDetail(BookingEntity b)
