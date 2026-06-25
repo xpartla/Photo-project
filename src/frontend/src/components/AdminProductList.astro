@@ -1,0 +1,119 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; }
+const { lang } = Astro.props;
+const langSlug = lang === "sk" ? "obchod" : "shop";
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin`} class="admin__back">← {t(lang, "admin.title")}</a>
+    <h1 class="admin__title">{t(lang, "admin.shop.title")}</h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a class="admin__primary-btn" href={`/${lang}/admin/${langSlug}/lookups`}>{t(lang, "admin.shop.lookups")}</a>
+      <a class="admin__primary-btn" href={`/${lang}/admin/${langSlug}/orders`}>{t(lang, "admin.shop.orders")}</a>
+      <a class="admin__primary-btn" href={`/${lang}/admin/${langSlug}/new`}>+ {t(lang, "admin.shop.newProduct")}</a>
+    </div>
+  </header>
+
+  <section class="admin-list">
+    <ul id="prod-list" class="admin-list__items"></ul>
+    <p id="prod-empty" class="admin-list__empty" hidden>{t(lang, "admin.common.empty")}</p>
+  </section>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="prod-config" type="application/json" set:html={JSON.stringify({
+  lang,
+  editPath: `/${lang}/admin/${langSlug}/edit`,
+  edit: t(lang, "admin.common.edit"),
+  del: t(lang, "admin.common.delete"),
+  confirmDelete: t(lang, "admin.common.confirmDelete"),
+  openEdition: t(lang, "admin.shop.openEdition"),
+})}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import { listProducts, deleteProduct } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("prod-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const listEl = document.getElementById("prod-list")!;
+  const emptyEl = document.getElementById("prod-empty")!;
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+  function thumb(p: any): string {
+    const v = (p.variants || []).find((x: any) => x.format === "jpeg" || x.format === "jpg") ?? p.variants?.[0];
+    return v ? v.blobUrl.replace(/^http:\/\/azurite:10000\/devstoreaccount1/, "http://localhost:10000/devstoreaccount1") : "";
+  }
+  function priceLabel(p: any): string {
+    if (p.minPrice == null) return "—";
+    if (p.minPrice === p.maxPrice) return `${p.minPrice} ${p.currency}`;
+    return `${p.minPrice}–${p.maxPrice} ${p.currency}`;
+  }
+  function editionLabel(p: any): string {
+    if (!p.isLimitedEdition) return cfg.openEdition;
+    return `${p.editionSold} / ${p.editionSize ?? "?"}`;
+  }
+
+  async function load() {
+    try {
+      const data = await listProducts(cfg.lang);
+      const items = data.items || [];
+      if (items.length === 0) {
+        listEl.innerHTML = "";
+        emptyEl.hidden = false;
+        return;
+      }
+      emptyEl.hidden = true;
+      listEl.innerHTML = items.map((p: any) => `
+        <li class="admin-list__item">
+          <div class="admin-list__main">
+            <div style="display:flex;gap:12px;align-items:center;">
+              ${thumb(p) ? `<img src="${escapeHtml(thumb(p))}" alt="" style="width:48px;height:48px;object-fit:cover;border:2px solid #2A2A2A;border-radius:4px;" />` : ""}
+              <div>
+                <a class="admin-list__title" href="${cfg.editPath}/${escapeHtml(p.slug)}">${escapeHtml(p.title)}</a>
+                <div class="admin-list__meta">
+                  <span>${escapeHtml(p.slug)}</span>
+                  <span>${escapeHtml(priceLabel(p))}</span>
+                  <span>${escapeHtml(editionLabel(p))}</span>
+                  ${p.isAvailable ? "" : `<span class="admin-status-pill admin-status-pill--cancelled">${escapeHtml(cfg.del)}</span>`}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="admin-list__actions">
+            <a href="${cfg.editPath}/${escapeHtml(p.slug)}" class="admin-list__btn">${cfg.edit}</a>
+            <button class="admin-list__btn admin-list__btn--danger" data-delete-id="${escapeHtml(p.id)}">${cfg.del}</button>
+          </div>
+        </li>
+      `).join("");
+
+      listEl.querySelectorAll<HTMLButtonElement>("[data-delete-id]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm(cfg.confirmDelete)) return;
+          try {
+            await deleteProduct(btn.dataset.deleteId!);
+            btn.closest("li")?.remove();
+            if (listEl.children.length === 0) emptyEl.hidden = false;
+          } catch (err: any) {
+            alert(err.message);
+          }
+        });
+      });
+    } catch (err: any) {
+      listEl.innerHTML = `<li class="admin-list__error">${escapeHtml(err.message)}</li>`;
+    }
+  }
+
+  load();
+</script>

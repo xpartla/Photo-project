@@ -1,5 +1,81 @@
 # Changelog
 
+## Bug fixes (2026-04-17)
+
+### Fixed
+- **Navbar visibility leaks** — `.navbar__dropdown-item` and `.navbar__mobile-link` both declared `display: block` with the same specificity as the browser's `[hidden] { display: none }` UA rule and appeared later in the cascade, so the `hidden` attribute was a no-op. As a result, the Admin link in the account dropdown showed up for non-admin users (it clicked through to login) and the logged-out mobile menu showed My Account + Admin entries. Added `&[hidden] { display: none }` inside both BEM blocks in `_navbar.scss`.
+- **Admin booking confirmation** — admins could only cancel bookings. Added `PUT /api/booking/bookings/{id}/confirm` (admin-only; rejects if already Confirmed or Cancelled), wired a matching `confirmBooking()` client, and surfaced a "Confirm" button next to Cancel on Pending rows in `AdminBookingList.astro`.
+- **Booking status emails** — confirming or cancelling a booking now emails the client (`BookingEmailTemplates.CustomerConfirmed` / `CustomerCancelled`). Email sends are wrapped in try/catch so transient SMTP failures don't roll back the status change.
+- **Admin order addresses** — addresses were persisted via `JsonSerializer.Serialize(address)` with the framework default (PascalCase), but the admin order detail parsed with camelCase keys (`a.name`, `a.street`, …), so addresses rendered blank. Switched persistence + parse to `JsonSerializerDefaults.Web` (camelCase) and taught the frontend `safeAddress` to accept both casings so any orders persisted before the fix still render.
+
+## Epic 8: Admin Interface & Customer Account (2026-04-17)
+
+### Added — Customer Account
+- **`identity.addresses`** table + `User.Phone` column. Dev bootstrap adds both via `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ADD COLUMN IF NOT EXISTS` so existing local DBs pick up the change without wiping user data. Address rows cascade-delete with their owner.
+- **`/api/account/*` endpoints** (`AccountEndpoints.cs`):
+  - `GET /profile`, `PUT /profile` — display name, phone, password change (current-password required when one exists; min 8 chars)
+  - `GET/POST/PUT/DELETE /addresses` — CRUD scoped to the current user
+  - `PUT /addresses/{id}/default` — atomic flag flip via `ExecuteUpdateAsync` so only one `is_default_shipping` / `is_default_billing` row exists per user
+  - First saved address auto-defaults to both shipping + billing. Deleting a default promotes the next-most-recent address so checkout always has something to pre-fill.
+- **Address-aware checkout** — `POST /api/shop/orders` now accepts `shippingAddressId`/`billingAddressId` (look up from the address book) or an inline payload with `saveShippingAddress=true` (persists a new `Address` row). Existing inline-only callers keep working — new fields are optional.
+- **Frontend pages** (bilingual SK / EN, route mapping `registracia ↔ register`, `ucet ↔ account`, `ucet/profil ↔ account/profile`, `ucet/adresy ↔ account/addresses`):
+  - `/sk/registracia` + `/en/register` — email + password + display name + optional phone, redirects to `/ucet` after sync
+  - `/sk/ucet` + `/en/account` — dashboard linking to Profile / Addresses / My orders + sign-out button
+  - `/sk/ucet/profil` + `/en/account/profile` — profile editor (display name, phone, password change)
+  - `/sk/ucet/adresy` + `/en/account/addresses` — address card grid with default-shipping / default-billing badges, add/edit/delete, "use for both" master checkbox
+- **Checkout picker** — both SK + EN checkout pages show a saved-address `<select>` above the form when the customer has any addresses. Default-shipping is auto-selected and the inline fields are populated read-through. "Enter new address" flips the form into editable mode with a "Save this address to my account" checkbox. Submit sends `shippingAddressId` or inline `shippingAddress` + `saveShippingAddress` as appropriate.
+- **Navbar** — dropdown now lists Account / Profile / Addresses / My orders. Mobile account icon lands on `/ucet` (or `/admin` for admins, login for anonymous visitors). New mobile-menu link for the account dashboard.
+- **`src/lib/account.ts`** — typed client for `/api/account/*` plus `requireAuth()` mirror of `requireAdmin()`.
+
+### Added — Admin Interface
+- **Dashboard** (`/sk/admin`, `/en/admin`) — replaced the three "coming in Epic 8" stub cards with live links. Added live-counts row at the top (pending bookings count from `my-bookings`, draft posts count from blog listing; orders count left as `—` until the admin clicks through).
+- **Portfolio admin** (`/sk/admin/portfolio` + `/en/admin/portfolio`):
+  - List page with thumbnails, tags, edit/delete (`AdminPhotoList.astro`)
+  - Drag-and-drop upload with per-file metadata queue + processing-status polling (`AdminPhotoUpload.astro`) — reuses the existing `POST /api/image-pipeline/upload` + `/photos/{id}/status` endpoints
+  - Photo editor with title / description / alt / location / sortOrder / published + tag chip selector (`AdminPhotoEditor.astro`)
+  - Tag manager — list + create form (`AdminTagManager.astro`)
+  - Collections list + create/edit with photo picker grid (`AdminCollectionList.astro`, `AdminCollectionEditor.astro`)
+- **Shop admin** (`/sk/admin/obchod` + `/en/admin/shop`, sub-paths share English names):
+  - Products list with edition badge, price range, availability, edit/delete (`AdminProductList.astro`)
+  - Product editor with photo picker modal, limited-edition gating (forces exactly one variant), dynamic variants table with add/update/delete + formats + paper-type selectors (`AdminProductEditor.astro`)
+  - Lookup manager for formats + paper types side-by-side (`AdminLookupManager.astro`)
+  - Orders list with status filter + per-order detail showing items, snapshotted format/paper names, shipping + billing addresses, and a status state-machine dropdown that mirrors the backend's `ValidTransitions` table (`AdminOrderList.astro`, `AdminOrderDetail.astro`)
+- **Booking admin** (`/sk/admin/rezervacia` + `/en/admin/booking`):
+  - Hub page with three section cards (`AdminBookingHub.astro`)
+  - Bookings list with status filter + cancel action (`AdminBookingList.astro`)
+  - Session-types editor — inline edit form per type with includes-as-textarea (`AdminSessionTypes.astro`)
+  - Availability calendar — month grid with prev/next nav, click day → bulk-day form, per-slot block/unblock toggles, recurring-rule modal with day-of-week chips (`AdminAvailabilityCalendar.astro`)
+- **New backend endpoints** for admin cross-user listing (no existing "list all" surface):
+  - `GET /api/shop/admin/orders` (with optional `?status=`)
+  - `GET /api/booking/admin/bookings` (with optional `?status=`)
+  - `POST /api/booking/availability/recurring` — takes `daysOfWeek[] + fromDate + toDate + startTime + endTime + slotDurationMinutes + breakMinutes`, generates slots day-by-day, skips whole days that already have any slots, returns `{ count, addedDays, skippedDays }`.
+- **`src/lib/admin-api.ts`** — one-file typed client for every admin endpoint (portfolio photos/tags/collections, shop products/variants/formats/paper-types/orders, booking sessions/slots/recurring/bookings, image upload + status polling).
+- **SCSS** — `_admin.scss` extended with dashboard count cards, drag-drop zone, upload queue items, tag chips, variants table, status pills, mini calendar grid + day-detail, modal backdrop, photo-picker grid. New `_account.scss` (~380 lines) for customer account pages.
+- **i18n** — ~200 new keys per language across `register.*`, `account.*`, `profile.*`, `addresses.*`, `checkout.savedAddress|useNewAddress|saveAddress|manageAddresses`, `admin.dashboard.*`, `admin.common.*`, `admin.portfolio.*`, `admin.shop.*`, `admin.booking.*`. Route mappings added: `registracia ↔ register`, `ucet ↔ account` (with `/profil ↔ /profile` and `/adresy ↔ /addresses`), `admin/obchod ↔ admin/shop`, `admin/rezervacia ↔ admin/booking`.
+
+### Testing
+- **Backend integration tests**:
+  - `AccountTests.cs` (9 tests) — profile auth gate, display-name + phone persistence, password change with current-password check (incl. wrong-password reject + too-short reject), address create validation, first-address-auto-defaults-to-both, set-default-clears-previous, delete-default-promotes-next, cross-user isolation (404 on another user's address)
+  - `EShopTests.cs` (5 new) — order creation with `shippingAddressId` uses the saved address; `saveShippingAddress=true` persists a new row; bogus id returns 400; `/admin/orders` requires admin; admin listing crosses users and filters by status
+  - `BookingTests.cs` (6 new) — recurring availability requires admin; generates expected slot count for matching weekdays; skips whole days that already have slots; rejects inverted date range; rejects empty day list; admin-wide bookings listing requires admin + filters by status
+  - Total integration tests ran in this epic: ~20 new across three files
+- **Frontend unit tests** — 6 new cases in `i18n.test.ts` covering the new route mappings (registracia / ucet / ucet-sub / admin-obchod / admin-rezervacia including sub-routes). Total vitest: 62 passing.
+- **Playwright E2E**:
+  - `account.spec.ts` (5 tests) — registration page renders, account dashboard requires auth, authed customer sees dashboard with their email, address book create → list round-trip, checkout pre-fills from seeded default shipping address + axe scan on `/sk/ucet`
+  - `admin.spec.ts` (14 tests) — dashboard renders four section cards; portfolio list / upload / tags pages render; shop list / new-product / orders / lookups pages render; booking hub / calendar / session-types / bookings pages render; axe scans on `/sk/admin`, `/sk/admin/obchod`, `/sk/admin/rezervacia/calendar`
+- **Arch tests** — unchanged (new cross-module access is EShop → Identity for address resolution, which wasn't banned).
+
+### Design Decisions
+- **Additive dev-DB patches instead of schema-drop** — the eshop variants migration dropped the whole schema to force EnsureCreated to rebuild it. For Epic 8's identity changes we used `ALTER TABLE ADD COLUMN IF NOT EXISTS` + `CREATE TABLE IF NOT EXISTS` instead so user accounts and refresh tokens survive a re-run. `DROP SCHEMA` is reserved for backwards-incompatible model changes.
+- **One Astro shared component per admin section, thin SK + EN page wrappers** — mirrors the existing `BlogPostEditor.astro` pattern. Each `Admin*Editor.astro` / `Admin*List.astro` component holds all logic; the 16-line SK and EN page files just import it and pass `lang`. Keeps duplication to translatable strings only.
+- **Recurring-availability whole-day skip instead of per-slot** — the endpoint skips any date that already has any slots (not just conflicting times). Protects against accidental double-bookings when an admin has already manually edited a day.
+- **No admin "list all addresses" endpoint** — addresses are strictly private to their owner. The checkout picker + account/addresses page are enough; admins don't browse other customers' address books.
+- **Checkout picker stays in-form** — when a saved address is selected, the inline fields auto-populate but remain visible (read-through) so the customer can confirm what's about to be shipped. Edits aren't saved back unless they pick "Enter new address" and tick the save checkbox.
+- **Status state-machine duplicated client-side** — the order detail page stores the valid-transitions table in JS so the dropdown only shows reachable statuses. Server still validates; client-side gating is UX only.
+- **No "create session type" UI yet** — existing 3 session types (Dog Portrait / Action / Outdoor) cover the local business. The editor allows metadata edits + activation toggle; creation is deferred unless a second photographer or a new session format comes along.
+
+---
+
 ## Epic 7: Blog Module (2026-04-17)
 
 ### Added

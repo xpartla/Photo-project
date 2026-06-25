@@ -4,6 +4,7 @@ import SeoMeta from "../../../components/SeoMeta.astro";
 import ResponsiveImage from "../../../components/ResponsiveImage.astro";
 import { getPhoto } from "../../../lib/api";
 import { t } from "../../../lib/i18n";
+import { STORE_ENABLED } from "../../../lib/features";
 import { getFallbackUrl } from "../../../lib/imageUrl";
 
 const lang = "en";
@@ -139,9 +140,11 @@ const jsonLd = [
 
         <!-- Action buttons -->
         <div class="info__actions">
-          <span class="action-btn action-btn--primary">
-            {t(lang, "portfolio.buyAsPrint")}
-          </span>
+          {STORE_ENABLED && (
+            <span class="action-btn action-btn--primary">
+              {t(lang, "portfolio.buyAsPrint")}
+            </span>
+          )}
           <a href="/en/booking" class="action-btn action-btn--secondary">
             {t(lang, "portfolio.bookSession")}
           </a>

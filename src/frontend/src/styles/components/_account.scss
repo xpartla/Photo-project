@@ -1,0 +1,446 @@
+@use "../variables" as *;
+
+.account {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+
+  @media (max-width: $breakpoint-md) {
+    padding: 24px 16px 64px;
+  }
+}
+
+.account__header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.account__eyebrow {
+  font-family: $font-body;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: $terracotta;
+  margin: 0 0 8px;
+}
+
+.account__title {
+  font-family: $font-heading;
+  font-size: 2.25rem;
+  color: $dark;
+  margin: 0 0 12px;
+  line-height: 1.1;
+}
+
+.account__subtitle {
+  font-family: $font-body;
+  font-size: 1rem;
+  color: $dark;
+  margin: 0;
+}
+
+.account__back {
+  display: inline-block;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: $sage;
+  text-decoration: none;
+  margin-bottom: 16px;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.account__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+.account__card {
+  display: block;
+  position: relative;
+  border: $outline-width solid $dark;
+  border-radius: 12px;
+  background: $white;
+  box-shadow: 4px 4px 0 $dark;
+  padding: 24px;
+  text-decoration: none;
+  color: $dark;
+  transition: transform $transition-base, box-shadow $transition-base;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 6px 6px 0 $dark;
+  }
+}
+
+.account__card-title {
+  font-family: $font-heading;
+  font-size: 1.5rem;
+  margin: 0 0 8px;
+  color: $dark;
+}
+
+.account__card-desc {
+  font-family: $font-body;
+  font-size: 0.95rem;
+  color: $dark;
+  opacity: 0.8;
+  margin: 0;
+}
+
+.account__signout {
+  display: inline-block;
+  margin-top: 16px;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 20px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $rose;
+  color: $white;
+  box-shadow: 3px 3px 0 $dark;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+}
+
+.account__notice {
+  text-align: center;
+  font-family: $font-body;
+  color: $dark;
+  padding: 64px 24px;
+}
+
+// ── Profile / Address forms ────────────────────────────────────────
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: $white;
+  border: $outline-width solid $dark;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 $dark;
+  padding: 32px;
+
+  @media (max-width: $breakpoint-md) {
+    padding: 24px 20px;
+  }
+}
+
+.account-form__section-title {
+  font-family: $font-heading;
+  font-size: 1.25rem;
+  color: $dark;
+  margin: 16px 0 0;
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.account-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: $breakpoint-md) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.account-form__label {
+  font-family: $font-body;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: $dark;
+}
+
+.account-form__input,
+.account-form__select {
+  font-family: $font-body;
+  font-size: 1rem;
+  padding: 10px 12px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $white;
+  color: $dark;
+  transition: border-color $transition-fast, background $transition-fast;
+
+  &:focus {
+    outline: none;
+    border-color: $sage;
+    background: $cream;
+    box-shadow: 0 0 0 3px rgba($sage, 0.2);
+  }
+
+  &:disabled,
+  &[readonly] {
+    background: $cream;
+    color: rgba($dark, 0.6);
+    cursor: not-allowed;
+  }
+}
+
+.account-form__hint {
+  font-family: $font-body;
+  font-size: 0.8rem;
+  color: rgba($dark, 0.7);
+}
+
+.account-form__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: $font-body;
+  font-size: 0.95rem;
+  color: $dark;
+  cursor: pointer;
+
+  input {
+    width: 18px;
+    height: 18px;
+    accent-color: $sage;
+    cursor: pointer;
+  }
+}
+
+.account-form__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.account-form__submit {
+  font-family: $font-body;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 28px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $sage;
+  color: $white;
+  box-shadow: 3px 3px 0 $dark;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 3px 3px 0 $dark;
+  }
+}
+
+.account-form__cancel {
+  font-family: $font-body;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 24px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: transparent;
+  color: $dark;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba($dark, 0.05);
+  }
+}
+
+.account-form__error {
+  font-family: $font-body;
+  font-size: 0.9rem;
+  color: $rose;
+  min-height: 1.2em;
+}
+
+.account-form__success {
+  font-family: $font-body;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: $sage;
+  min-height: 1.2em;
+}
+
+// ── Address book ───────────────────────────────────────────────────
+
+.address-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.address-card {
+  position: relative;
+  border: $outline-width solid $dark;
+  border-radius: 12px;
+  background: $white;
+  box-shadow: 4px 4px 0 $dark;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.address-card__label {
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: $terracotta;
+}
+
+.address-card__name {
+  font-family: $font-heading;
+  font-size: 1.15rem;
+  color: $dark;
+  margin: 0;
+}
+
+.address-card__lines {
+  font-family: $font-body;
+  font-size: 0.95rem;
+  color: $dark;
+  line-height: 1.5;
+
+  span {
+    display: block;
+  }
+}
+
+.address-card__badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.address-card__badge {
+  font-family: $font-body;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
+  border: 2px solid $dark;
+  border-radius: 999px;
+  background: $peach;
+  color: $dark;
+
+  &--billing {
+    background: $lavender;
+  }
+}
+
+.address-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 2px dashed rgba($dark, 0.15);
+  padding-top: 12px;
+}
+
+.address-card__btn {
+  font-family: $font-body;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 14px;
+  border: 2px solid $dark;
+  border-radius: 6px;
+  background: $white;
+  color: $dark;
+  cursor: pointer;
+  transition: background $transition-fast;
+
+  &:hover {
+    background: $cream;
+  }
+
+  &--danger {
+    background: $rose;
+    color: $white;
+
+    &:hover {
+      background: $rose;
+      filter: brightness(0.95);
+    }
+  }
+
+  &--primary {
+    background: $sage;
+    color: $white;
+
+    &:hover {
+      background: $sage;
+      filter: brightness(0.95);
+    }
+  }
+}
+
+.address-empty {
+  border: 3px dashed rgba($dark, 0.25);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  font-family: $font-body;
+  color: rgba($dark, 0.7);
+  background: rgba($cream, 0.5);
+  margin-bottom: 24px;
+}
+
+.address-add-btn {
+  font-family: $font-body;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 28px;
+  border: $outline-width solid $dark;
+  border-radius: 8px;
+  background: $peach;
+  color: $dark;
+  box-shadow: 3px 3px 0 $dark;
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    box-shadow: 4px 4px 0 $dark;
+    transform: translateY(-1px);
+  }
+}

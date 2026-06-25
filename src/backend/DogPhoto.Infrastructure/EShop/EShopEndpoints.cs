@@ -2,6 +2,7 @@ using System.Text.Json;
 using DogPhoto.Infrastructure.Email;
 using DogPhoto.Infrastructure.Payments;
 using DogPhoto.Infrastructure.Persistence.EShop;
+using DogPhoto.Infrastructure.Persistence.Identity;
 using DogPhoto.Infrastructure.Persistence.Portfolio;
 using DogPhoto.SharedKernel.Auth;
 using DogPhoto.SharedKernel.Email;
@@ -24,6 +25,11 @@ public static class EShopEndpoints
         ["processing"] = ["shipped"],
         ["shipped"] = ["completed"],
     };
+
+    // Match ASP.NET Core's default web JSON policy so address fields persisted
+    // in ShippingAddressJson / BillingAddressJson use camelCase, matching what
+    // the frontend parsers expect (a.name, a.street, …).
+    private static readonly JsonSerializerOptions AddressJsonOptions = new(JsonSerializerDefaults.Web);
 
     public static void MapEShopEndpoints(this IEndpointRouteBuilder app)
     {
@@ -555,6 +561,7 @@ public static class EShopEndpoints
         auth.MapPost("/orders", async (
             CreateOrderRequest request,
             EShopDbContext db,
+            IdentityDbContext identityDb,
             ICurrentUser currentUser,
             IPaymentGateway gateway,
             ILoggerFactory loggerFactory) =>
@@ -586,16 +593,32 @@ public static class EShopEndpoints
                     return Results.BadRequest(new { error = $"'{product.TitleEn}' does not have enough editions available." });
             }
 
+            // Resolve shipping/billing — caller may pass an addressId from the saved
+            // address book, or an inline payload (optionally saved on the way through).
+            var shippingResult = await ResolveOrderAddressAsync(
+                request.ShippingAddressId, request.ShippingAddress, request.SaveShippingAddress,
+                currentUser.UserId, identityDb);
+            if (shippingResult.Error is not null)
+                return Results.BadRequest(new { error = shippingResult.Error });
+            if (shippingResult.Address is null)
+                return Results.BadRequest(new { error = "Shipping address is required." });
+
+            var billingResult = request.BillingAddressId is null && request.BillingAddress is null
+                ? new ResolvedAddress(shippingResult.Address, null) // mirror shipping
+                : await ResolveOrderAddressAsync(
+                    request.BillingAddressId, request.BillingAddress, request.SaveBillingAddress,
+                    currentUser.UserId, identityDb);
+            if (billingResult.Error is not null)
+                return Results.BadRequest(new { error = billingResult.Error });
+
             var order = new Order
             {
                 UserId = currentUser.UserId,
                 Status = "pending_payment",
                 Currency = "EUR",
                 CustomerEmail = request.Email ?? currentUser.Email,
-                ShippingAddressJson = JsonSerializer.Serialize(request.ShippingAddress),
-                BillingAddressJson = request.BillingAddress is not null
-                    ? JsonSerializer.Serialize(request.BillingAddress)
-                    : JsonSerializer.Serialize(request.ShippingAddress)
+                ShippingAddressJson = JsonSerializer.Serialize(shippingResult.Address, AddressJsonOptions),
+                BillingAddressJson = JsonSerializer.Serialize(billingResult.Address ?? shippingResult.Address, AddressJsonOptions)
             };
 
             decimal total = 0;
@@ -700,6 +723,27 @@ public static class EShopEndpoints
                 .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
 
+            var productIds = orders.SelectMany(o => o.Items).Select(oi => oi.ProductId).Distinct().ToList();
+            var products = productIds.Count > 0
+                ? await db.Products.IgnoreQueryFilters().Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id)
+                : new Dictionary<Guid, Product>();
+
+            return Results.Ok(orders.Select(o => MapOrder(o, products)));
+        });
+
+        // Admin: cross-user orders listing for the order tracker.
+        auth.MapGet("/admin/orders", async (
+            EShopDbContext db,
+            ICurrentUser currentUser,
+            string? status) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+
+            var query = db.Orders.Include(o => o.Items).AsQueryable();
+            if (!string.IsNullOrEmpty(status))
+                query = query.Where(o => o.Status == status);
+
+            var orders = await query.OrderByDescending(o => o.CreatedAt).Take(200).ToListAsync();
             var productIds = orders.SelectMany(o => o.Items).Select(oi => oi.ProductId).Distinct().ToList();
             var products = productIds.Count > 0
                 ? await db.Products.IgnoreQueryFilters().Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id)
@@ -974,6 +1018,49 @@ public static class EShopEndpoints
 
     // ── Helpers ────────────────────────────────────────────────────────
 
+    private record ResolvedAddress(AddressDto? Address, string? Error);
+
+    private static async Task<ResolvedAddress> ResolveOrderAddressAsync(
+        Guid? addressId,
+        AddressDto? inline,
+        bool? save,
+        Guid? userId,
+        IdentityDbContext identityDb)
+    {
+        if (addressId.HasValue)
+        {
+            if (userId is null) return new ResolvedAddress(null, "Authentication required to use a saved address.");
+            var saved = await identityDb.Addresses
+                .FirstOrDefaultAsync(a => a.Id == addressId.Value && a.UserId == userId.Value);
+            if (saved is null) return new ResolvedAddress(null, "Saved address not found.");
+            return new ResolvedAddress(
+                new AddressDto(saved.Name, saved.Street, saved.City, saved.PostalCode, saved.Country),
+                null);
+        }
+
+        if (inline is null) return new ResolvedAddress(null, null);
+
+        if (save == true && userId.HasValue)
+        {
+            var hasAny = await identityDb.Addresses.AnyAsync(a => a.UserId == userId.Value);
+            var entity = new Address
+            {
+                UserId = userId.Value,
+                Name = inline.Name,
+                Street = inline.Street,
+                City = inline.City,
+                PostalCode = inline.PostalCode,
+                Country = string.IsNullOrWhiteSpace(inline.Country) ? "SK" : inline.Country,
+                IsDefaultShipping = !hasAny,
+                IsDefaultBilling = !hasAny
+            };
+            identityDb.Addresses.Add(entity);
+            await identityDb.SaveChangesAsync();
+        }
+
+        return new ResolvedAddress(inline, null);
+    }
+
     private static async Task<ProductVariant?> ResolveVariantAsync(EShopDbContext db, SyncCartItem item)
     {
         if (item.VariantId.HasValue)
@@ -1166,7 +1253,9 @@ public static class EShopEndpoints
         if (string.IsNullOrEmpty(json)) return null;
         try
         {
-            var dto = JsonSerializer.Deserialize<AddressDto>(json);
+            // Case-insensitive so both new camelCase records and any legacy
+            // PascalCase records deserialize correctly.
+            var dto = JsonSerializer.Deserialize<AddressDto>(json, AddressJsonOptions);
             if (dto is null) return null;
             return new OrderEmailTemplates.OrderAddress(dto.Name, dto.Street, dto.City, dto.PostalCode, dto.Country);
         }
@@ -1208,8 +1297,12 @@ public record SyncCartItem(
     int Quantity = 1);
 
 public record CreateOrderRequest(
-    AddressDto ShippingAddress,
+    AddressDto? ShippingAddress = null,
     AddressDto? BillingAddress = null,
+    Guid? ShippingAddressId = null,
+    Guid? BillingAddressId = null,
+    bool? SaveShippingAddress = null,
+    bool? SaveBillingAddress = null,
     string? Email = null,
     string? ReturnUrl = null,
     string? CancelUrl = null);

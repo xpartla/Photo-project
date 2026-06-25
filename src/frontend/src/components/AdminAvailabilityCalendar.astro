@@ -1,0 +1,322 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; }
+const { lang } = Astro.props;
+const langSlug = lang === "sk" ? "rezervacia" : "booking";
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/${langSlug}`} class="admin__back">← {t(lang, "admin.common.backToList")}</a>
+    <h1 class="admin__title">{t(lang, "admin.booking.calendar")}</h1>
+    <button type="button" class="admin__primary-btn" id="open-recurring">{t(lang, "admin.booking.recurring")}</button>
+  </header>
+
+  <div class="admin-calendar__nav">
+    <button type="button" id="prev-month">←</button>
+    <h2 id="month-label">—</h2>
+    <button type="button" id="next-month">→</button>
+  </div>
+
+  <div class="admin-calendar" id="calendar-grid"></div>
+
+  <div class="admin-day-detail" id="day-detail" hidden>
+    <h2 class="account-form__section-title" id="day-detail-title">—</h2>
+    <ul id="day-slots-list"></ul>
+
+    <h3 style="margin-top:16px;">{t(lang, "admin.booking.bulkDay")}</h3>
+    <div class="account-form__row" style="align-items:end;">
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.booking.startTime")}</label>
+        <input class="account-form__input" type="time" id="bulk-start" value="09:00" />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.booking.endTime")}</label>
+        <input class="account-form__input" type="time" id="bulk-end" value="17:00" />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.booking.slotDuration")}</label>
+        <input class="account-form__input" type="number" id="bulk-duration" value="90" min="15" />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.booking.breakMinutes")}</label>
+        <input class="account-form__input" type="number" id="bulk-break" value="15" min="0" />
+      </div>
+    </div>
+    <div class="account-form__actions">
+      <button type="button" class="account-form__submit" id="bulk-add-btn">+ {t(lang, "admin.booking.addSlot")}</button>
+    </div>
+    <div id="day-error" class="account-form__error"></div>
+  </div>
+
+  <!-- Recurring rule modal -->
+  <div class="admin-modal-backdrop" id="recurring-modal" hidden>
+    <div class="admin-modal">
+      <h3>{t(lang, "admin.booking.recurring")}</h3>
+
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.booking.daysOfWeek")}</label>
+        <div class="admin-tag-list" id="dow-list"></div>
+      </div>
+
+      <div class="account-form__row">
+        <div class="account-form__field">
+          <label class="account-form__label">{t(lang, "admin.booking.fromDate")}</label>
+          <input class="account-form__input" type="date" id="rec-from" />
+        </div>
+        <div class="account-form__field">
+          <label class="account-form__label">{t(lang, "admin.booking.toDate")}</label>
+          <input class="account-form__input" type="date" id="rec-to" />
+        </div>
+      </div>
+
+      <div class="account-form__row">
+        <div class="account-form__field">
+          <label class="account-form__label">{t(lang, "admin.booking.startTime")}</label>
+          <input class="account-form__input" type="time" id="rec-start" value="09:00" />
+        </div>
+        <div class="account-form__field">
+          <label class="account-form__label">{t(lang, "admin.booking.endTime")}</label>
+          <input class="account-form__input" type="time" id="rec-end" value="17:00" />
+        </div>
+        <div class="account-form__field">
+          <label class="account-form__label">{t(lang, "admin.booking.slotDuration")}</label>
+          <input class="account-form__input" type="number" id="rec-duration" value="90" />
+        </div>
+        <div class="account-form__field">
+          <label class="account-form__label">{t(lang, "admin.booking.breakMinutes")}</label>
+          <input class="account-form__input" type="number" id="rec-break" value="15" />
+        </div>
+      </div>
+
+      <div id="rec-error" class="account-form__error"></div>
+      <div id="rec-success" class="account-form__success"></div>
+
+      <div class="account-form__actions">
+        <button type="button" class="account-form__submit" id="rec-apply-btn">{t(lang, "admin.booking.applyRecurring")}</button>
+        <button type="button" class="account-form__cancel" id="rec-cancel">{t(lang, "admin.common.cancel")}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="cal-config" type="application/json" set:html={JSON.stringify({
+  lang,
+  daysShort: [0,1,2,3,4,5,6].map((d) => t(lang, `admin.booking.daysShort.${d}`)),
+  block: t(lang, "admin.booking.blockSlot"),
+  unblock: t(lang, "admin.booking.unblockSlot"),
+  recurringDoneTpl: t(lang, "admin.booking.recurringDone"),
+})}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import {
+    listAvailability, createAvailability, updateAvailability,
+    createRecurringAvailability,
+  } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("cal-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const calendarEl = document.getElementById("calendar-grid")!;
+  const monthLabelEl = document.getElementById("month-label")!;
+  const dayDetailEl = document.getElementById("day-detail") as HTMLElement;
+  const dayDetailTitleEl = document.getElementById("day-detail-title")!;
+  const daySlotsListEl = document.getElementById("day-slots-list")!;
+  const dayErrorEl = document.getElementById("day-error")!;
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+
+  let viewYear = new Date().getFullYear();
+  let viewMonth = new Date().getMonth() + 1; // 1-12
+  let slots: any[] = [];
+  let activeDate: string | null = null;
+
+  function fmt(n: number): string { return String(n).padStart(2, "0"); }
+
+  function ymd(y: number, m: number, d: number): string {
+    return `${y}-${fmt(m)}-${fmt(d)}`;
+  }
+
+  function buildGrid() {
+    const firstOfMonth = new Date(viewYear, viewMonth - 1, 1);
+    const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+    // Render Mon-first weeks. `getDay()` returns 0 = Sunday.
+    const startWeekday = (firstOfMonth.getDay() + 6) % 7; // 0 = Mon
+
+    const todayStr = (() => {
+      const t = new Date();
+      return ymd(t.getFullYear(), t.getMonth() + 1, t.getDate());
+    })();
+
+    const slotsByDate = new Map<string, any[]>();
+    for (const s of slots) {
+      if (!slotsByDate.has(s.date)) slotsByDate.set(s.date, []);
+      slotsByDate.get(s.date)!.push(s);
+    }
+
+    monthLabelEl.textContent = firstOfMonth.toLocaleString(cfg.lang === "sk" ? "sk-SK" : "en-GB", { year: "numeric", month: "long" });
+
+    let html = "";
+    // Day-of-week headers
+    const dowOrder = [1,2,3,4,5,6,0];
+    for (const d of dowOrder) {
+      html += `<div class="admin-calendar__day admin-calendar__day--outside" style="visibility:visible;min-height:0;padding:4px 8px;font-weight:700;cursor:default;">${escapeHtml(cfg.daysShort[d])}</div>`;
+    }
+    // Padding for first week
+    for (let i = 0; i < startWeekday; i++) {
+      html += `<div class="admin-calendar__day admin-calendar__day--outside"></div>`;
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = ymd(viewYear, viewMonth, d);
+      const daySlots = slotsByDate.get(date) ?? [];
+      const isPast = date < todayStr;
+      const isBlocked = daySlots.length > 0 && daySlots.every((s) => s.isBlocked);
+      const hasSlots = daySlots.length > 0 && !isBlocked;
+      const cls = ["admin-calendar__day"];
+      if (isPast) cls.push("admin-calendar__day--past");
+      if (isBlocked) cls.push("admin-calendar__day--blocked");
+      else if (hasSlots) cls.push("admin-calendar__day--has-slots");
+      html += `
+        <div class="${cls.join(" ")}" data-date="${date}">
+          <span class="admin-calendar__day__date">${d}</span>
+          ${daySlots.length > 0 ? `<span class="admin-calendar__day__count">${daySlots.length}</span>` : ""}
+        </div>
+      `;
+    }
+    calendarEl.innerHTML = html;
+
+    calendarEl.querySelectorAll<HTMLElement>("[data-date]").forEach((el) => {
+      el.addEventListener("click", () => {
+        if (el.classList.contains("admin-calendar__day--past")) return;
+        activeDate = el.dataset.date!;
+        renderDayDetail();
+      });
+    });
+  }
+
+  function renderDayDetail() {
+    if (!activeDate) { dayDetailEl.hidden = true; return; }
+    dayDetailEl.hidden = false;
+    dayDetailTitleEl.textContent = activeDate;
+    dayErrorEl.textContent = "";
+    const daySlots = slots.filter((s) => s.date === activeDate);
+    daySlotsListEl.innerHTML = daySlots.length === 0
+      ? `<li>—</li>`
+      : daySlots.map((s) => `
+          <li>
+            <span>${escapeHtml(s.startTime)}–${escapeHtml(s.endTime)} ${s.isBlocked ? "🚫" : ""}</span>
+            <button type="button" class="admin-list__btn" data-toggle-id="${escapeHtml(s.id)}" data-blocked="${s.isBlocked ? "1" : "0"}">
+              ${s.isBlocked ? cfg.unblock : cfg.block}
+            </button>
+          </li>
+        `).join("");
+
+    daySlotsListEl.querySelectorAll<HTMLButtonElement>("[data-toggle-id]").forEach((b) => {
+      b.addEventListener("click", async () => {
+        try {
+          await updateAvailability(b.dataset.toggleId!, { isBlocked: b.dataset.blocked === "0" });
+          await refresh();
+          renderDayDetail();
+        } catch (err: any) { dayErrorEl.textContent = err.message; }
+      });
+    });
+  }
+
+  document.getElementById("bulk-add-btn")?.addEventListener("click", async () => {
+    if (!activeDate) return;
+    dayErrorEl.textContent = "";
+    try {
+      await createAvailability({
+        date: activeDate,
+        startTime: (document.getElementById("bulk-start") as HTMLInputElement).value,
+        endTime: (document.getElementById("bulk-end") as HTMLInputElement).value,
+        slotDurationMinutes: parseInt((document.getElementById("bulk-duration") as HTMLInputElement).value, 10),
+        breakMinutes: parseInt((document.getElementById("bulk-break") as HTMLInputElement).value, 10),
+      });
+      await refresh();
+      renderDayDetail();
+    } catch (err: any) { dayErrorEl.textContent = err.message; }
+  });
+
+  async function refresh() {
+    slots = await listAvailability(viewMonth, viewYear);
+    buildGrid();
+  }
+
+  document.getElementById("prev-month")?.addEventListener("click", () => {
+    viewMonth--; if (viewMonth < 1) { viewMonth = 12; viewYear--; }
+    activeDate = null; dayDetailEl.hidden = true;
+    refresh();
+  });
+  document.getElementById("next-month")?.addEventListener("click", () => {
+    viewMonth++; if (viewMonth > 12) { viewMonth = 1; viewYear++; }
+    activeDate = null; dayDetailEl.hidden = true;
+    refresh();
+  });
+
+  // ── Recurring modal ─────────────────────────────────────────────
+  const modal = document.getElementById("recurring-modal") as HTMLElement;
+  const dowEl = document.getElementById("dow-list")!;
+  // Day-of-week chips: 1=Mon … 6=Sat, 0=Sun (display Mon-first)
+  const dowOrder = [1,2,3,4,5,6,0];
+  const selectedDow = new Set<number>([6]); // default: Saturdays
+  function renderDow() {
+    dowEl.innerHTML = dowOrder.map((d) => `
+      <button type="button" class="admin-tag-chip ${selectedDow.has(d) ? "admin-tag-chip--active" : ""}" data-dow="${d}">
+        ${escapeHtml(cfg.daysShort[d])}
+      </button>
+    `).join("");
+    dowEl.querySelectorAll<HTMLButtonElement>("[data-dow]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const d = parseInt(b.dataset.dow!, 10);
+        if (selectedDow.has(d)) selectedDow.delete(d); else selectedDow.add(d);
+        b.classList.toggle("admin-tag-chip--active");
+      });
+    });
+  }
+  renderDow();
+
+  document.getElementById("open-recurring")?.addEventListener("click", () => {
+    modal.hidden = false;
+    // Default to today / +30 days for convenience.
+    const today = new Date();
+    const plus30 = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    (document.getElementById("rec-from") as HTMLInputElement).value = ymd(today.getFullYear(), today.getMonth() + 1, today.getDate());
+    (document.getElementById("rec-to") as HTMLInputElement).value = ymd(plus30.getFullYear(), plus30.getMonth() + 1, plus30.getDate());
+  });
+  document.getElementById("rec-cancel")?.addEventListener("click", () => { modal.hidden = true; });
+
+  document.getElementById("rec-apply-btn")?.addEventListener("click", async () => {
+    const errEl = document.getElementById("rec-error")!;
+    const okEl = document.getElementById("rec-success")!;
+    errEl.textContent = ""; okEl.textContent = "";
+    try {
+      const result = await createRecurringAvailability({
+        daysOfWeek: Array.from(selectedDow),
+        fromDate: (document.getElementById("rec-from") as HTMLInputElement).value,
+        toDate: (document.getElementById("rec-to") as HTMLInputElement).value,
+        startTime: (document.getElementById("rec-start") as HTMLInputElement).value,
+        endTime: (document.getElementById("rec-end") as HTMLInputElement).value,
+        slotDurationMinutes: parseInt((document.getElementById("rec-duration") as HTMLInputElement).value, 10),
+        breakMinutes: parseInt((document.getElementById("rec-break") as HTMLInputElement).value, 10),
+      });
+      okEl.textContent = cfg.recurringDoneTpl
+        .replace("{count}", result.count)
+        .replace("{addedDays}", result.addedDays)
+        .replace("{skippedDays}", result.skippedDays);
+      await refresh();
+    } catch (err: any) { errEl.textContent = err.message; }
+  });
+
+  refresh();
+</script>

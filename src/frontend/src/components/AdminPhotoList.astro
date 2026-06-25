@@ -1,0 +1,125 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props {
+  lang: "sk" | "en";
+}
+
+const { lang } = Astro.props;
+const editPathPrefix = `/${lang}/admin/portfolio/edit`;
+const newPath = `/${lang}/admin/portfolio/upload`;
+const collectionsPath = `/${lang}/admin/portfolio/collections`;
+const tagsPath = `/${lang}/admin/portfolio/tags`;
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin`} class="admin__back">← {t(lang, "admin.title")}</a>
+    <h1 class="admin__title">{t(lang, "admin.portfolio.title")}</h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a class="admin__primary-btn" href={collectionsPath}>{t(lang, "admin.portfolio.collections")}</a>
+      <a class="admin__primary-btn" href={tagsPath}>{t(lang, "admin.portfolio.tags")}</a>
+      <a class="admin__primary-btn" href={newPath}>+ {t(lang, "admin.portfolio.upload")}</a>
+    </div>
+  </header>
+
+  <section class="admin-list">
+    <div id="admin-photos-empty" class="admin-list__empty" hidden>
+      <p>{t(lang, "admin.common.empty")}</p>
+    </div>
+    <ul id="admin-photos" class="admin-list__items"></ul>
+  </section>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="admin-photos-config" type="application/json" set:html={JSON.stringify({
+  lang,
+  editPathPrefix,
+  t: {
+    edit: t(lang, "admin.common.edit"),
+    del: t(lang, "admin.common.delete"),
+    confirmDelete: t(lang, "admin.common.confirmDelete"),
+    published: t(lang, "admin.portfolio.published"),
+    unpublished: t(lang, "admin.portfolio.unpublished"),
+    loading: t(lang, "admin.common.loading"),
+    empty: t(lang, "admin.common.empty"),
+  }
+})}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import { listPhotos, deletePhoto, updatePhoto } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("admin-photos-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const list = document.getElementById("admin-photos") as HTMLUListElement;
+  const empty = document.getElementById("admin-photos-empty") as HTMLElement;
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+
+  function thumbUrl(p: any): string {
+    const v = (p.variants || []).find((x: any) => x.format === "jpeg" || x.format === "jpg") ?? p.variants?.[0];
+    if (!v) return "";
+    return v.blobUrl.replace(/^http:\/\/azurite:10000\/devstoreaccount1/, "http://localhost:10000/devstoreaccount1");
+  }
+
+  async function load() {
+    list.innerHTML = `<li class="admin-list__loading">${cfg.t.loading}</li>`;
+    try {
+      const data = await listPhotos(cfg.lang, { size: 200, includeUnpublished: true });
+      const items = data.items || [];
+      if (items.length === 0) {
+        list.innerHTML = "";
+        empty.hidden = false;
+        return;
+      }
+      empty.hidden = true;
+      list.innerHTML = items.map((p: any) => `
+        <li class="admin-list__item">
+          <div class="admin-list__main">
+            <div style="display:flex;gap:12px;align-items:center;">
+              ${thumbUrl(p) ? `<img src="${escapeHtml(thumbUrl(p))}" alt="" style="width:48px;height:48px;object-fit:cover;border:2px solid #2A2A2A;border-radius:4px;" />` : ""}
+              <div>
+                <a class="admin-list__title" href="${cfg.editPathPrefix}/${escapeHtml(p.slug)}">${escapeHtml(p.title || p.slug)}</a>
+                <div class="admin-list__meta">
+                  <span>${escapeHtml(p.slug)}</span>
+                  ${!p.isPublished ? `<span class="admin-status-pill admin-status-pill--draft">${escapeHtml(cfg.t.unpublished)}</span>` : ""}
+                  ${(p.tags || []).map((t: any) => `<span class="admin-tag-chip" style="cursor:default;">${escapeHtml(t.name)}</span>`).join("")}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="admin-list__actions">
+            <a href="${cfg.editPathPrefix}/${escapeHtml(p.slug)}" class="admin-list__btn">${cfg.t.edit}</a>
+            <button class="admin-list__btn admin-list__btn--danger" data-delete-id="${escapeHtml(p.id)}">${cfg.t.del}</button>
+          </div>
+        </li>
+      `).join("");
+
+      list.querySelectorAll<HTMLButtonElement>("[data-delete-id]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm(cfg.t.confirmDelete)) return;
+          try {
+            await deletePhoto(btn.dataset.deleteId!);
+            btn.closest("li")?.remove();
+            if (list.children.length === 0) empty.hidden = false;
+          } catch (err: any) {
+            alert(err.message);
+          }
+        });
+      });
+    } catch (err: any) {
+      list.innerHTML = `<li class="admin-list__error">${escapeHtml(err.message)}</li>`;
+    }
+  }
+
+  load();
+</script>

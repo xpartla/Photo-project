@@ -80,6 +80,9 @@ app.MapHealthChecks("/health"); // backward compat
 // Auth endpoints
 app.MapAuthEndpoints();
 
+// Account (profile + address book) endpoints
+app.MapAccountEndpoints();
+
 // Image pipeline endpoints
 app.MapImagePipelineEndpoints();
 

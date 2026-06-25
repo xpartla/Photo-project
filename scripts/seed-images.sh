@@ -10,15 +10,17 @@
 #
 # What it does:
 #   1. Logs in as the seeded admin user (admin@dogphoto.sk / admin123)
-#   2. Creates the `dog` and `film` tags
+#   2. Creates the medium tags (film, digital) + thematic tags
 #   3. Uploads img/1.jpeg .. img/14.jpeg via /api/image-pipeline/upload
-#        - Images 1–7  → tagged `dog`
-#        - Images 8–14 → tagged `film`
+#        - Each dog photo gets exactly ONE medium tag (film | digital) plus
+#          thematic tags. The medium tag drives the Film/Digital split that
+#          the home page and portfolio render.
 #   4. Waits for background processing (variants generated)
-#   5. Publishes each photo and assigns its tag
-#   6. Creates two collections:
-#        - "dog-portraits"   (Psie portréty / Dog Portraits)
-#        - "film-collection" (Filmová kolekcia / Film Collection)
+#   5. Publishes each photo and assigns its tags
+#   6. Creates three dog collections:
+#        - "utulkaci" (Útulkáči / Shelter Dogs)
+#        - "turisti"  (Turisti  / Hikers)
+#        - "portrety" (Portréty / Portraits)
 #
 # Re-running the script is safe: existing photos / tags / collections are
 # detected and reused (HTTP 409 from the API is treated as "already exists").
@@ -85,13 +87,18 @@ create_tag() {
 }
 
 log "Creating tags..."
-create_tag "dog"       "Pes"        "Dog"
-create_tag "film"      "Film"       "Film"
-create_tag "street"    "Ulica"      "Street"
-create_tag "urban"     "Mestské"    "Urban"
-create_tag "landscape" "Krajina"    "Landscape"
-create_tag "portrait"  "Portrét"    "Portrait"
-create_tag "analog"    "Analógové"  "Analog"
+# Medium tags — drive the Film / Digital split on the home page and portfolio.
+create_tag "film"       "Film"        "Film"
+create_tag "digital"    "Digitál"     "Digital"
+# Thematic tags — shared vocabulary for filtering and related photos.
+create_tag "outdoor"    "Vonku"       "Outdoor"
+create_tag "nature"     "Príroda"     "Nature"
+create_tag "park"       "Park"        "Park"
+create_tag "studio"     "Štúdio"      "Studio"
+create_tag "training"   "Tréning"     "Training"
+create_tag "action"     "Akcia"       "Action"
+create_tag "bw"         "Čiernobiela" "Black & White"
+create_tag "bratislava" "Bratislava"  "Bratislava"
 
 # ── Helper: upload one image ──────────────────────────────────────────
 # Args: file_path slug title_sk title_en alt_sk alt_en desc_sk desc_en
@@ -179,39 +186,51 @@ publish_and_tag() {
   [[ "$status" == "200" ]] || fail "publish '$slug' failed (HTTP $status): $(http_body "$resp")"
 }
 
-# ── Bilingual metadata for the 14 images ──────────────────────────────
+# ── Bilingual metadata for the 14 dog images ──────────────────────────
 # Index → slug, sk title, en title, sk alt, en alt, sk desc, en desc
 declare -a META=(
-  "dog-portrait-1|Psí portrét I|Dog Portrait I|Detailný portrét psa|Close-up dog portrait|Detailný portrét psa v prirodzenom svetle.|Close-up portrait of a dog in natural light."
-  "dog-portrait-2|Psí portrét II|Dog Portrait II|Pes pri pohľade do diaľky|Dog gazing into the distance|Pes pri pohľade do diaľky, vintage tóny.|Dog gazing into the distance with vintage tones."
-  "dog-portrait-3|Psí portrét III|Dog Portrait III|Štúdiová fotografia psa|Studio photograph of a dog|Štúdiová fotografia psa, jemné svetlo.|Studio photograph of a dog with soft lighting."
-  "dog-portrait-4|Psí portrét IV|Dog Portrait IV|Hravý moment psa|Playful moment of a dog|Hravý moment psa zachytený v exteriéri.|Playful moment of a dog captured outdoors."
-  "dog-portrait-5|Psí portrét V|Dog Portrait V|Pes v zlatej hodine|Dog in golden hour|Portrét psa pri zapadajúcom slnku.|Portrait of a dog at sunset, golden hour light."
-  "dog-portrait-6|Psí portrét VI|Dog Portrait VI|Pes na prechádzke|Dog on a walk|Pes počas prechádzky v Bratislave.|A dog on a walk in Bratislava."
-  "dog-portrait-7|Psí portrét VII|Dog Portrait VII|Verný spoločník|A loyal companion|Portrét verného štvornohého spoločníka.|Portrait of a loyal four-legged companion."
-  "film-frame-1|Filmový záber I|Film Frame I|Záber na 35mm film|35mm film frame|Krajinný záber zachytený na 35mm film.|Landscape shot captured on 35mm film."
-  "film-frame-2|Filmový záber II|Film Frame II|Atmosféra mesta na filme|City atmosphere on film|Atmosféra mesta zachytená na film.|City atmosphere captured on film."
-  "film-frame-3|Filmový záber III|Film Frame III|Analógová fotografia|Analog photograph|Analógová fotografia s jemným zrnom.|Analog photograph with soft grain."
-  "film-frame-4|Filmový záber IV|Film Frame IV|Filmový portrét|Film portrait|Portrét vyfotografovaný na film.|Portrait photographed on film."
-  "film-frame-5|Filmový záber V|Film Frame V|Pohľad cez objektív|Through the lens|Pohľad na svet cez analógový objektív.|A view of the world through an analog lens."
-  "film-frame-6|Filmový záber VI|Film Frame VI|Filmová krajina|Film landscape|Krajinná fotografia na 35mm film.|Landscape photograph on 35mm film."
-  "film-frame-7|Filmový záber VII|Film Frame VII|Vintage atmosféra|Vintage atmosphere|Záber s typickou vintage atmosférou filmu.|A frame with the signature vintage atmosphere of film."
+  "utulkac-1|Útulkáč I|Shelter Dog I|Ateliérový portrét psa z útulku|Studio portrait of a shelter dog|Psík z bratislavského útulku v ateliéri.|A dog from a Bratislava shelter, photographed in the studio."
+  "utulkac-2|Útulkáč II|Shelter Dog II|Pes z útulku na filmovej fotografii|Shelter dog on film|Záber psa z útulku zachytený na film.|A shelter dog captured on film."
+  "utulkac-3|Útulkáč III|Shelter Dog III|Pes z útulku vonku|Shelter dog outdoors|Psík z útulku na prechádzke vonku.|A shelter dog out on a walk."
+  "utulkac-4|Útulkáč IV|Shelter Dog IV|Čiernobiely portrét psa z útulku|Black-and-white shelter dog portrait|Čiernobiely filmový portrét psa z útulku.|A black-and-white film portrait of a shelter dog."
+  "turista-1|Turista I|Hiker I|Pes na horskom chodníku|Dog on a mountain trail|Štvornohý turista na chodníku v prírode pri Bratislave.|A four-legged hiker on a trail in the nature around Bratislava."
+  "turista-2|Turista II|Hiker II|Pes v prírode na filme|Dog in nature on film|Pes v prírode zachytený na film.|A dog in nature captured on film."
+  "turista-3|Turista III|Hiker III|Bežiaci pes na lesnom chodníku|Dog running on a forest trail|Pes v plnom behu na lesnom chodníku.|A dog at full sprint on a forest trail."
+  "turista-4|Turista IV|Hiker IV|Pes na prechádzke v parku|Dog on a walk in the park|Prechádzka so psom v bratislavskom parku, na film.|A walk with a dog in a Bratislava park, on film."
+  "turista-5|Turista V|Hiker V|Tréning psa vonku|Dog training outdoors|Tréningové fotenie psa v prírode.|An outdoor dog training session."
+  "portret-1|Portrét I|Portrait I|Ateliérový portrét psa na film|Studio dog portrait on film|Ateliérový portrét psa zachytený na film.|A studio dog portrait captured on film."
+  "portret-2|Portrét II|Portrait II|Digitálny ateliérový portrét psa|Digital studio dog portrait|Digitálny ateliérový portrét psa.|A digital studio portrait of a dog."
+  "portret-3|Portrét III|Portrait III|Čiernobiely portrét psa|Black-and-white dog portrait|Čiernobiely filmový portrét psa.|A black-and-white film portrait of a dog."
+  "portret-4|Portrét IV|Portrait IV|Portrét psa v meste|Dog portrait in the city|Portrét psa v uliciach Bratislavy.|A dog portrait in the streets of Bratislava."
+  "portret-5|Portrét V|Portrait V|Tréningový portrét psa na film|Training dog portrait on film|Portrét psa počas tréningu, na film.|A portrait of a dog during a training session, on film."
 )
 
-declare -a DOG_IDS=()
-declare -a FILM_IDS=()
-# Theme assignment for the 7 film photos (indices 8..14). Used both for
-# per-photo tagging and to group photos into thematic collections below.
-declare -A FILM_TAGS=(
-  [8]="film,street,urban"     # film-frame-1  → bratislava
-  [9]="film,urban"            # film-frame-2  → bratislava
-  [10]="film,analog,portrait" # film-frame-3  → wildlife-in-motion
-  [11]="film,portrait"        # film-frame-4  → wildlife-in-motion
-  [12]="film,street,urban"    # film-frame-5  → bratislava
-  [13]="film,landscape"       # film-frame-6  → the-alps
-  [14]="film,landscape,analog" # film-frame-7 → the-alps
+# Per-photo tags (index 1..14). Every photo carries exactly ONE medium tag
+# (film | digital) — that is what the Film/Digital split on the home page and
+# portfolio filters on — plus thematic tags from the shared vocabulary.
+declare -a PHOTO_TAGS=(
+  "digital,studio,bratislava"  # 1  utulkac-1
+  "film,bratislava"            # 2  utulkac-2
+  "digital,outdoor"            # 3  utulkac-3
+  "film,bw"                    # 4  utulkac-4
+  "digital,outdoor,nature"     # 5  turista-1
+  "film,nature"                # 6  turista-2
+  "digital,action,nature"      # 7  turista-3
+  "film,park"                  # 8  turista-4
+  "digital,outdoor,training"   # 9  turista-5
+  "film,studio"                # 10 portret-1
+  "digital,studio"             # 11 portret-2
+  "film,bw"                    # 12 portret-3
+  "digital,bratislava"         # 13 portret-4
+  "film,training"              # 14 portret-5
 )
-declare -A FILM_ID_BY_INDEX=()
+
+# Collection membership, by 1-based photo index.
+UTULKACI_INDICES=(1 2 3 4)
+TURISTI_INDICES=(5 6 7 8 9)
+PORTRETY_INDICES=(10 11 12 13 14)
+
+declare -A PHOTO_ID_BY_INDEX=()
 
 log "Uploading and processing images..."
 for i in $(seq 1 14); do
@@ -229,14 +248,8 @@ for i in $(seq 1 14); do
 
   wait_for_processing "$id" "$slug"
 
-  if [[ $i -le 7 ]]; then
-    publish_and_tag "$id" "$slug" "dog" "$i"
-    DOG_IDS+=("$id")
-  else
-    publish_and_tag "$id" "$slug" "${FILM_TAGS[$i]}" "$i"
-    FILM_IDS+=("$id")
-    FILM_ID_BY_INDEX[$i]="$id"
-  fi
+  publish_and_tag "$id" "$slug" "${PHOTO_TAGS[$((i-1))]}" "$i"
+  PHOTO_ID_BY_INDEX[$i]="$id"
 done
 
 # ── Helper: create collection (idempotent) ────────────────────────────
@@ -270,49 +283,41 @@ create_collection() {
 }
 
 log "Creating collections..."
-if (( ${#DOG_IDS[@]} > 0 )); then
-  create_collection "dog-portraits" \
-    "Psie portréty" "Dog Portraits" \
-    "Kolekcia psích portrétov." "A collection of dog portraits." \
-    "${DOG_IDS[@]}"
+
+# Gather the recovered photo ids for a set of indices into the global IDS array.
+collect_ids() {
+  IDS=()
+  local idx
+  for idx in "$@"; do
+    [[ -n "${PHOTO_ID_BY_INDEX[$idx]:-}" ]] && IDS+=("${PHOTO_ID_BY_INDEX[$idx]}")
+  done
+}
+
+collect_ids "${UTULKACI_INDICES[@]}"
+if (( ${#IDS[@]} > 0 )); then
+  create_collection "utulkaci" \
+    "Útulkáči" "Shelter Dogs" \
+    "Psy z bratislavských útulkov, ktoré hľadajú domov." \
+    "Dogs from Bratislava shelters looking for a home." \
+    "${IDS[@]}"
 fi
 
-# Thematic film collections — grouped by photo index so they match the tags
-# assigned above. These drive the shop collection filter and landing pages.
-BRATISLAVA_IDS=()
-for i in 8 9 12; do
-  [[ -n "${FILM_ID_BY_INDEX[$i]:-}" ]] && BRATISLAVA_IDS+=("${FILM_ID_BY_INDEX[$i]}")
-done
-if (( ${#BRATISLAVA_IDS[@]} > 0 )); then
-  create_collection "bratislava-2026" \
-    "Bratislava 2026" "Bratislava 2026" \
-    "Ulice a atmosféra Bratislavy zachytené na 35mm film v roku 2026." \
-    "The streets and atmosphere of Bratislava captured on 35mm film, 2026." \
-    "${BRATISLAVA_IDS[@]}"
+collect_ids "${TURISTI_INDICES[@]}"
+if (( ${#IDS[@]} > 0 )); then
+  create_collection "turisti" \
+    "Turisti" "Hikers" \
+    "Štvornohí parťáci na túrach v prírode okolo Bratislavy." \
+    "Four-legged companions on hikes in the nature around Bratislava." \
+    "${IDS[@]}"
 fi
 
-ALPS_IDS=()
-for i in 13 14; do
-  [[ -n "${FILM_ID_BY_INDEX[$i]:-}" ]] && ALPS_IDS+=("${FILM_ID_BY_INDEX[$i]}")
-done
-if (( ${#ALPS_IDS[@]} > 0 )); then
-  create_collection "the-alps" \
-    "Alpy" "The Alps" \
-    "Krajiny Álp na analógovom filme." \
-    "Alpine landscapes shot on analog film." \
-    "${ALPS_IDS[@]}"
-fi
-
-WILDLIFE_IDS=()
-for i in 10 11; do
-  [[ -n "${FILM_ID_BY_INDEX[$i]:-}" ]] && WILDLIFE_IDS+=("${FILM_ID_BY_INDEX[$i]}")
-done
-if (( ${#WILDLIFE_IDS[@]} > 0 )); then
-  create_collection "wildlife-in-motion" \
-    "Divočina v pohybe" "Wildlife in Motion" \
-    "Portréty a pohyb zachytené na film." \
-    "Portraits and motion captured on film." \
-    "${WILDLIFE_IDS[@]}"
+collect_ids "${PORTRETY_INDICES[@]}"
+if (( ${#IDS[@]} > 0 )); then
+  create_collection "portrety" \
+    "Portréty" "Portraits" \
+    "Charakterové portréty psov v ateliéri aj v exteriéri." \
+    "Character portraits of dogs, in the studio and outdoors." \
+    "${IDS[@]}"
 fi
 
 log "Done. Visit http://localhost:4321/sk/portfolio to see the seeded gallery."

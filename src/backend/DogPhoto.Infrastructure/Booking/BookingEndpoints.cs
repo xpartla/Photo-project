@@ -211,10 +211,16 @@ public static class BookingEndpoints
             return Results.Ok(MapBookingDetail(booking));
         });
 
-        auth.MapPut("/bookings/{id:guid}/cancel", async (Guid id, BookingDbContext db, ICurrentUser currentUser) =>
+        auth.MapPut("/bookings/{id:guid}/cancel", async (
+            Guid id,
+            BookingDbContext db,
+            ICurrentUser currentUser,
+            IEmailService emailService,
+            ILoggerFactory loggerFactory) =>
         {
             var booking = await db.Bookings
                 .Include(b => b.SessionType)
+                .Include(b => b.Slot)
                 .FirstOrDefaultAsync(b => b.Id == id);
 
             if (booking is null) return Results.NotFound();
@@ -229,6 +235,40 @@ public static class BookingEndpoints
             booking.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
 
+            await TrySendStatusEmailAsync(booking, emailService, loggerFactory,
+                isConfirmation: false);
+
+            return Results.Ok(new { id = booking.Id, status = booking.Status });
+        });
+
+        auth.MapPut("/bookings/{id:guid}/confirm", async (
+            Guid id,
+            BookingDbContext db,
+            ICurrentUser currentUser,
+            IEmailService emailService,
+            ILoggerFactory loggerFactory) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+
+            var booking = await db.Bookings
+                .Include(b => b.SessionType)
+                .Include(b => b.Slot)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking is null) return Results.NotFound();
+
+            if (booking.Status == "Confirmed")
+                return Results.BadRequest(new { error = "Booking is already confirmed." });
+            if (booking.Status == "Cancelled")
+                return Results.BadRequest(new { error = "Cannot confirm a cancelled booking." });
+
+            booking.Status = "Confirmed";
+            booking.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            await TrySendStatusEmailAsync(booking, emailService, loggerFactory,
+                isConfirmation: true);
+
             return Results.Ok(new { id = booking.Id, status = booking.Status });
         });
 
@@ -241,6 +281,19 @@ public static class BookingEndpoints
                 .OrderByDescending(b => b.CreatedAt)
                 .ToListAsync();
 
+            return Results.Ok(bookings.Select(MapBookingDetail));
+        });
+
+        // Admin-wide bookings list (includes anonymous bookings + every user's bookings).
+        auth.MapGet("/admin/bookings", async (BookingDbContext db, ICurrentUser currentUser, string? status) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+
+            var query = db.Bookings.Include(b => b.SessionType).Include(b => b.Slot).AsQueryable();
+            if (!string.IsNullOrEmpty(status))
+                query = query.Where(b => b.Status == status);
+
+            var bookings = await query.OrderByDescending(b => b.CreatedAt).Take(200).ToListAsync();
             return Results.Ok(bookings.Select(MapBookingDetail));
         });
 
@@ -307,6 +360,90 @@ public static class BookingEndpoints
             });
         });
 
+        auth.MapPost("/availability/recurring", async (
+            RecurringAvailabilityRequest request,
+            ICurrentUser currentUser,
+            BookingDbContext db) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+
+            if (request.DaysOfWeek is null || request.DaysOfWeek.Count == 0)
+                return Results.BadRequest(new { error = "At least one day of week is required." });
+
+            DateOnly fromDate, toDate;
+            TimeOnly startTime, endTime;
+            try
+            {
+                fromDate = DateOnly.Parse(request.FromDate);
+                toDate = DateOnly.Parse(request.ToDate);
+                startTime = TimeOnly.Parse(request.StartTime);
+                endTime = TimeOnly.Parse(request.EndTime);
+            }
+            catch (FormatException)
+            {
+                return Results.BadRequest(new { error = "Invalid date or time format." });
+            }
+
+            if (toDate < fromDate)
+                return Results.BadRequest(new { error = "toDate must be on or after fromDate." });
+            if (endTime <= startTime)
+                return Results.BadRequest(new { error = "endTime must be after startTime." });
+            if (request.SlotDurationMinutes <= 0)
+                return Results.BadRequest(new { error = "slotDurationMinutes must be positive." });
+
+            var dayHashSet = request.DaysOfWeek.Select(d => (DayOfWeek)d).ToHashSet();
+            var duration = TimeSpan.FromMinutes(request.SlotDurationMinutes);
+            var breakTime = TimeSpan.FromMinutes(request.BreakMinutes ?? 0);
+
+            // Pre-load existing slot dates in range so we can skip days that already
+            // have any slots — avoids accidentally double-booking a previously edited day.
+            var existingDates = await db.AvailabilitySlots
+                .Where(s => s.Date >= fromDate && s.Date <= toDate)
+                .Select(s => s.Date)
+                .Distinct()
+                .ToListAsync();
+            var skipDates = existingDates.ToHashSet();
+
+            var newSlots = new List<AvailabilitySlot>();
+            var skippedDays = 0;
+            var addedDays = 0;
+
+            for (var date = fromDate; date <= toDate; date = date.AddDays(1))
+            {
+                if (!dayHashSet.Contains(date.DayOfWeek)) continue;
+                if (skipDates.Contains(date)) { skippedDays++; continue; }
+
+                var anyAddedForThisDay = false;
+                var current = startTime;
+                while (current.Add(duration) <= endTime)
+                {
+                    newSlots.Add(new AvailabilitySlot
+                    {
+                        Date = date,
+                        StartTime = current,
+                        EndTime = current.Add(duration),
+                        IsBlocked = false
+                    });
+                    anyAddedForThisDay = true;
+                    current = current.Add(duration).Add(breakTime);
+                }
+                if (anyAddedForThisDay) addedDays++;
+            }
+
+            if (newSlots.Count == 0)
+                return Results.Ok(new { count = 0, addedDays = 0, skippedDays, message = "No new slots generated." });
+
+            db.AvailabilitySlots.AddRange(newSlots);
+            await db.SaveChangesAsync();
+
+            return Results.Created("/api/booking/availability", new
+            {
+                count = newSlots.Count,
+                addedDays,
+                skippedDays
+            });
+        });
+
         auth.MapPut("/availability/{id:guid}", async (
             Guid id,
             UpdateAvailabilityRequest request,
@@ -332,6 +469,39 @@ public static class BookingEndpoints
                 endTime = slot.EndTime.ToString("HH:mm"),
                 isBlocked = slot.IsBlocked
             });
+        });
+
+        auth.MapPost("/session-types", async (
+            CreateSessionTypeRequest request,
+            ICurrentUser currentUser,
+            BookingDbContext db) =>
+        {
+            if (!currentUser.IsAdmin) return Results.Forbid();
+
+            if (string.IsNullOrWhiteSpace(request.Slug)) return Results.BadRequest(new { error = "Slug is required." });
+            if (string.IsNullOrWhiteSpace(request.NameSk)) return Results.BadRequest(new { error = "NameSk is required." });
+            if (string.IsNullOrWhiteSpace(request.NameEn)) return Results.BadRequest(new { error = "NameEn is required." });
+            if (await db.SessionTypes.AnyAsync(s => s.Slug == request.Slug))
+                return Results.Conflict(new { error = $"Session type with slug '{request.Slug}' already exists." });
+
+            var st = new SessionType
+            {
+                Slug = request.Slug,
+                NameSk = request.NameSk,
+                NameEn = request.NameEn,
+                DescriptionSk = request.DescriptionSk,
+                DescriptionEn = request.DescriptionEn,
+                DurationMinutes = request.DurationMinutes ?? 60,
+                BasePrice = request.BasePrice ?? 100m,
+                Category = request.Category ?? "portrait",
+                MaxDogs = request.MaxDogs ?? 1,
+                Currency = request.Currency ?? "EUR",
+                IsActive = request.IsActive ?? true,
+                IncludesJson = request.IncludesJson is null ? null : JsonSerializer.Serialize(request.IncludesJson),
+            };
+            db.SessionTypes.Add(st);
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/booking/session-types/{st.Slug}", MapSessionType(st, "en"));
         });
 
         auth.MapPut("/session-types/{id:guid}", async (
@@ -360,6 +530,54 @@ public static class BookingEndpoints
             await db.SaveChangesAsync();
             return Results.Ok(MapSessionType(st, "en"));
         });
+    }
+
+    private static async Task TrySendStatusEmailAsync(
+        BookingEntity booking,
+        IEmailService emailService,
+        ILoggerFactory loggerFactory,
+        bool isConfirmation)
+    {
+        if (string.IsNullOrWhiteSpace(booking.ClientEmail)) return;
+
+        try
+        {
+            var dateStr = booking.Slot?.Date.ToString("dd.MM.yyyy") ?? "TBD";
+            var timeStr = booking.Slot is not null
+                ? $"{booking.Slot.StartTime:HH:mm} - {booking.Slot.EndTime:HH:mm}"
+                : "TBD";
+
+            string subject;
+            string html;
+            if (isConfirmation)
+            {
+                subject = "Your booking is confirmed — PartlPhoto";
+                html = BookingEmailTemplates.CustomerConfirmed(
+                    booking.ClientName,
+                    booking.SessionType.NameEn,
+                    dateStr,
+                    timeStr,
+                    booking.TotalPrice,
+                    booking.SessionType.Currency);
+            }
+            else
+            {
+                subject = "Your booking was cancelled — PartlPhoto";
+                html = BookingEmailTemplates.CustomerCancelled(
+                    booking.ClientName,
+                    booking.SessionType.NameEn,
+                    dateStr,
+                    timeStr);
+            }
+
+            await emailService.SendAsync(booking.ClientEmail, subject, html);
+        }
+        catch (Exception ex)
+        {
+            loggerFactory.CreateLogger("Booking").LogError(ex,
+                "Failed to send booking status email for booking {BookingId} (confirmation={IsConfirmation})",
+                booking.Id, isConfirmation);
+        }
     }
 
     private static object MapSessionType(SessionType st, string lang)
@@ -445,6 +663,15 @@ public record UpdateAvailabilityRequest(
     string? EndTime = null,
     bool? IsBlocked = null);
 
+public record RecurringAvailabilityRequest(
+    List<int> DaysOfWeek,        // 0 = Sunday … 6 = Saturday (matches DayOfWeek enum)
+    string FromDate,             // yyyy-MM-dd inclusive
+    string ToDate,               // yyyy-MM-dd inclusive
+    string StartTime,            // HH:mm
+    string EndTime,              // HH:mm
+    int SlotDurationMinutes,
+    int? BreakMinutes = null);
+
 public record UpdateSessionTypeRequest(
     string? NameSk = null,
     string? NameEn = null,
@@ -455,4 +682,18 @@ public record UpdateSessionTypeRequest(
     string? Category = null,
     List<string>? IncludesJson = null,
     int? MaxDogs = null,
+    bool? IsActive = null);
+
+public record CreateSessionTypeRequest(
+    string Slug,
+    string NameSk,
+    string NameEn,
+    string? DescriptionSk = null,
+    string? DescriptionEn = null,
+    int? DurationMinutes = null,
+    decimal? BasePrice = null,
+    string? Category = null,
+    List<string>? IncludesJson = null,
+    int? MaxDogs = null,
+    string? Currency = null,
     bool? IsActive = null);

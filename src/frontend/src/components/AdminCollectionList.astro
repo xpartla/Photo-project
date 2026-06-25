@@ -1,0 +1,94 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; }
+const { lang } = Astro.props;
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/portfolio`} class="admin__back">← {t(lang, "admin.common.backToList")}</a>
+    <h1 class="admin__title">{t(lang, "admin.portfolio.collectionsTitle")}</h1>
+    <a class="admin__primary-btn" href={`/${lang}/admin/portfolio/collections/new`}>+ {t(lang, "admin.portfolio.newCollection")}</a>
+  </header>
+
+  <section class="admin-list">
+    <ul id="coll-list" class="admin-list__items"></ul>
+    <p id="coll-empty" class="admin-list__empty" hidden>{t(lang, "admin.common.empty")}</p>
+  </section>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="coll-config" type="application/json" set:html={JSON.stringify({
+  lang,
+  editPath: `/${lang}/admin/portfolio/collections/edit`,
+  edit: t(lang, "admin.common.edit"),
+  del: t(lang, "admin.common.delete"),
+  confirmDelete: t(lang, "admin.common.confirmDelete"),
+})}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import { listCollections, deleteCollection } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("coll-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const listEl = document.getElementById("coll-list")!;
+  const emptyEl = document.getElementById("coll-empty")!;
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+
+  async function refresh() {
+    try {
+      const collections = await listCollections(cfg.lang);
+      if (collections.length === 0) {
+        listEl.innerHTML = "";
+        emptyEl.hidden = false;
+        return;
+      }
+      emptyEl.hidden = true;
+      listEl.innerHTML = collections.map((c: any) => `
+        <li class="admin-list__item">
+          <div class="admin-list__main">
+            <div>
+              <a class="admin-list__title" href="${cfg.editPath}/${escapeHtml(c.slug)}">${escapeHtml(c.name)}</a>
+              <div class="admin-list__meta">
+                <span>${escapeHtml(c.slug)}</span>
+                <span>${c.productCount ?? c.photoCount ?? 0}</span>
+              </div>
+            </div>
+          </div>
+          <div class="admin-list__actions">
+            <a href="${cfg.editPath}/${escapeHtml(c.slug)}" class="admin-list__btn">${cfg.edit}</a>
+            <button class="admin-list__btn admin-list__btn--danger" data-delete-id="${escapeHtml(c.id ?? "")}" ${c.id ? "" : "disabled"}>${cfg.del}</button>
+          </div>
+        </li>
+      `).join("");
+
+      listEl.querySelectorAll<HTMLButtonElement>("[data-delete-id]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm(cfg.confirmDelete)) return;
+          try {
+            await deleteCollection(btn.dataset.deleteId!);
+            btn.closest("li")?.remove();
+            if (listEl.children.length === 0) emptyEl.hidden = false;
+          } catch (err: any) {
+            alert(err.message);
+          }
+        });
+      });
+    } catch (err: any) {
+      listEl.innerHTML = `<li class="admin-list__error">${escapeHtml(err.message)}</li>`;
+    }
+  }
+
+  refresh();
+</script>

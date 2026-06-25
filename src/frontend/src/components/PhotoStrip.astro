@@ -1,5 +1,6 @@
 ---
 import { buildSrcset, getFallbackUrl } from "../lib/imageUrl";
+import { STORE_ENABLED } from "../lib/features";
 import type { PhotoSummary } from "../lib/api";
 
 interface Props {
@@ -48,9 +49,11 @@ const rotations = [-1.5, 1, -0.5, 1.5, -1, 0.5, -2, 1.2];
           </div>
           <div class="photo-strip__info">
             <span class="photo-strip__title">{photo.title}</span>
-            <a href={`/${lang}/obchod/${photo.slug}`} class="photo-strip__shop-link">
-              {shopLinkText}
-            </a>
+            {STORE_ENABLED && (
+              <a href={`/${lang}/obchod/${photo.slug}`} class="photo-strip__shop-link">
+                {shopLinkText}
+              </a>
+            )}
           </div>
         </div>
       );

@@ -1,0 +1,127 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import { t } from "../../../../lib/i18n";
+
+const lang = "sk";
+const pageTitle = `${t(lang, "profile.title")} — PartlPhoto`;
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <main class="account" data-account-root hidden>
+    <a href={`/${lang}/ucet`} class="account__back">← {t(lang, "account.backToAccount")}</a>
+    <header class="account__header">
+      <h1 class="account__title">{t(lang, "profile.title")}</h1>
+    </header>
+
+    <form class="account-form" id="profile-form">
+      <h2 class="account-form__section-title">{t(lang, "profile.title")}</h2>
+
+      <div class="account-form__field">
+        <label class="account-form__label" for="email">{t(lang, "profile.email")}</label>
+        <input class="account-form__input" id="email" type="email" readonly />
+        <span class="account-form__hint">{t(lang, "profile.emailHint")}</span>
+      </div>
+
+      <div class="account-form__field">
+        <label class="account-form__label" for="display-name">{t(lang, "profile.displayName")}</label>
+        <input class="account-form__input" id="display-name" type="text" autocomplete="name" />
+      </div>
+
+      <div class="account-form__field">
+        <label class="account-form__label" for="phone">{t(lang, "profile.phone")}</label>
+        <input class="account-form__input" id="phone" type="tel" autocomplete="tel" />
+      </div>
+
+      <h2 class="account-form__section-title">{t(lang, "profile.changePassword")}</h2>
+
+      <div class="account-form__field">
+        <label class="account-form__label" for="current-password">{t(lang, "profile.currentPassword")}</label>
+        <input class="account-form__input" id="current-password" type="password" autocomplete="current-password" />
+      </div>
+
+      <div class="account-form__field">
+        <label class="account-form__label" for="new-password">{t(lang, "profile.newPassword")}</label>
+        <input class="account-form__input" id="new-password" type="password" autocomplete="new-password" minlength="8" />
+        <span class="account-form__hint">{t(lang, "profile.newPasswordHint")}</span>
+      </div>
+
+      <div id="profile-error" class="account-form__error"></div>
+      <div id="profile-success" class="account-form__success"></div>
+
+      <div class="account-form__actions">
+        <button class="account-form__submit" type="submit" id="profile-save">{t(lang, "profile.save")}</button>
+      </div>
+    </form>
+  </main>
+
+  <p class="account__notice" data-account-denied hidden>{t(lang, "account.notAuthorized")}</p>
+
+  <script id="profile-config" type="application/json" set:html={JSON.stringify({
+    lang,
+    saveLabel: t(lang, "profile.save"),
+    savingLabel: t(lang, "profile.saving"),
+    savedLabel: t(lang, "profile.saved"),
+    passwordWrong: t(lang, "profile.passwordWrong"),
+  })}></script>
+
+  <script>
+    import { requireAuth, getProfile, updateProfile } from "../../../../lib/account";
+
+    const cfg = JSON.parse(document.getElementById("profile-config")!.textContent!);
+    const token = requireAuth(cfg.lang);
+    if (!token) throw new Error("not authenticated");
+
+    const root = document.querySelector("[data-account-root]") as HTMLElement;
+    root.hidden = false;
+
+    const emailInput = document.getElementById("email") as HTMLInputElement;
+    const nameInput = document.getElementById("display-name") as HTMLInputElement;
+    const phoneInput = document.getElementById("phone") as HTMLInputElement;
+    const currentPwInput = document.getElementById("current-password") as HTMLInputElement;
+    const newPwInput = document.getElementById("new-password") as HTMLInputElement;
+    const errEl = document.getElementById("profile-error")!;
+    const okEl = document.getElementById("profile-success")!;
+    const btn = document.getElementById("profile-save") as HTMLButtonElement;
+
+    try {
+      const profile = await getProfile();
+      emailInput.value = profile.email;
+      nameInput.value = profile.displayName ?? "";
+      phoneInput.value = profile.phone ?? "";
+    } catch (err: any) {
+      errEl.textContent = err.message;
+    }
+
+    document.getElementById("profile-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errEl.textContent = "";
+      okEl.textContent = "";
+      btn.disabled = true;
+      btn.textContent = cfg.savingLabel;
+
+      try {
+        const input: any = {
+          displayName: nameInput.value.trim() || null,
+          phone: phoneInput.value.trim() || null,
+        };
+        if (newPwInput.value) {
+          input.newPassword = newPwInput.value;
+          input.currentPassword = currentPwInput.value;
+        }
+        await updateProfile(input);
+        okEl.textContent = cfg.savedLabel;
+        currentPwInput.value = "";
+        newPwInput.value = "";
+      } catch (err: any) {
+        errEl.textContent = err.message?.includes("Current password") ? cfg.passwordWrong : err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = cfg.saveLabel;
+      }
+    });
+  </script>
+</BaseLayout>
+
+<style lang="scss" is:global>
+  @use "../../../../styles/components/account";
+</style>

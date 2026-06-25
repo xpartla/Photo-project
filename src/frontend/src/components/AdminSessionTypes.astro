@@ -1,0 +1,260 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; }
+const { lang } = Astro.props;
+const langSlug = lang === "sk" ? "rezervacia" : "booking";
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/${langSlug}`} class="admin__back">← {t(lang, "admin.common.backToList")}</a>
+    <h1 class="admin__title">{t(lang, "admin.booking.sessionTypes")}</h1>
+    <button type="button" class="admin__primary-btn" id="new-type-btn">+ {t(lang, "admin.booking.newSessionType")}</button>
+  </header>
+
+  <!-- Create-new form, toggled by the "new type" button above -->
+  <form class="account-form" id="new-type-form" hidden style="margin-bottom:24px;">
+    <h2 class="account-form__section-title">{t(lang, "admin.booking.newSessionType")}</h2>
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.portfolio.slug")} *</label>
+        <input class="account-form__input" name="slug" pattern="[a-z0-9-]+" required />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "booking.category.portrait")}</label>
+        <select class="account-form__input" name="category">
+          <option value="portrait">portrait</option>
+          <option value="action">action</option>
+          <option value="studio">studio</option>
+          <option value="outdoor">outdoor</option>
+        </select>
+      </div>
+    </div>
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.shop.titleSk")} *</label>
+        <input class="account-form__input" name="nameSk" required />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.shop.titleEn")} *</label>
+        <input class="account-form__input" name="nameEn" required />
+      </div>
+    </div>
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.shop.descriptionSk")}</label>
+        <textarea class="account-form__input" name="descriptionSk" rows="2"></textarea>
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.shop.descriptionEn")}</label>
+        <textarea class="account-form__input" name="descriptionEn" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.booking.duration")}</label>
+        <input class="account-form__input" type="number" name="durationMinutes" value="60" />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.booking.basePrice")}</label>
+        <input class="account-form__input" type="number" step="0.01" name="basePrice" value="100" />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.booking.maxDogs")}</label>
+        <input class="account-form__input" type="number" name="maxDogs" value="1" />
+      </div>
+    </div>
+    <div class="account-form__field">
+      <label class="account-form__label">{t(lang, "admin.booking.includes")}</label>
+      <textarea class="account-form__input" name="includes" rows="3"></textarea>
+    </div>
+    <div id="new-type-error" class="account-form__error"></div>
+    <div class="account-form__actions">
+      <button type="submit" class="account-form__submit">{t(lang, "admin.common.save")}</button>
+      <button type="button" class="account-form__cancel" id="new-type-cancel">{t(lang, "admin.common.cancel")}</button>
+    </div>
+  </form>
+
+  <div id="types-container"></div>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="st-config" type="application/json" set:html={JSON.stringify({
+  lang,
+  t: {
+    nameSk: t(lang, "admin.booking.editSessionType"),
+    duration: t(lang, "admin.booking.duration"),
+    price: t(lang, "admin.booking.basePrice"),
+    maxDogs: t(lang, "admin.booking.maxDogs"),
+    includes: t(lang, "admin.booking.includes"),
+    active: t(lang, "admin.booking.active"),
+    save: t(lang, "admin.common.save"),
+    saving: t(lang, "admin.common.saving"),
+    saved: t(lang, "admin.common.saved"),
+    nameSkLabel: t(lang, "admin.shop.titleSk"),
+    nameEnLabel: t(lang, "admin.shop.titleEn"),
+    descSkLabel: t(lang, "admin.shop.descriptionSk"),
+    descEnLabel: t(lang, "admin.shop.descriptionEn"),
+  }
+})}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import { listSessionTypes, updateSessionType, createSessionType } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("st-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+
+  function render(items: any[]) {
+    const container = document.getElementById("types-container")!;
+    container.innerHTML = items.map((st: any) => `
+      <form class="account-form" data-id="${escapeHtml(st.id)}" style="margin-bottom:16px;">
+        <h2 class="account-form__section-title">${escapeHtml(st.nameSk)} <span style="color:#7EAA92;">${st.basePrice} EUR · ${st.durationMinutes} min</span></h2>
+        <div class="account-form__row">
+          <div class="account-form__field">
+            <label class="account-form__label">${escapeHtml(cfg.t.nameSkLabel)}</label>
+            <input class="account-form__input" data-field="nameSk" value="${escapeHtml(st.nameSk ?? "")}" />
+          </div>
+          <div class="account-form__field">
+            <label class="account-form__label">${escapeHtml(cfg.t.nameEnLabel)}</label>
+            <input class="account-form__input" data-field="nameEn" value="${escapeHtml(st.nameEn ?? "")}" />
+          </div>
+        </div>
+        <div class="account-form__row">
+          <div class="account-form__field">
+            <label class="account-form__label">${escapeHtml(cfg.t.descSkLabel)}</label>
+            <textarea class="account-form__input" data-field="descriptionSk" rows="2">${escapeHtml(st.descriptionSk ?? "")}</textarea>
+          </div>
+          <div class="account-form__field">
+            <label class="account-form__label">${escapeHtml(cfg.t.descEnLabel)}</label>
+            <textarea class="account-form__input" data-field="descriptionEn" rows="2">${escapeHtml(st.descriptionEn ?? "")}</textarea>
+          </div>
+        </div>
+        <div class="account-form__row">
+          <div class="account-form__field">
+            <label class="account-form__label">${escapeHtml(cfg.t.duration)}</label>
+            <input class="account-form__input" type="number" data-field="durationMinutes" value="${st.durationMinutes}" />
+          </div>
+          <div class="account-form__field">
+            <label class="account-form__label">${escapeHtml(cfg.t.price)}</label>
+            <input class="account-form__input" type="number" step="0.01" data-field="basePrice" value="${st.basePrice}" />
+          </div>
+          <div class="account-form__field">
+            <label class="account-form__label">${escapeHtml(cfg.t.maxDogs)}</label>
+            <input class="account-form__input" type="number" data-field="maxDogs" value="${st.maxDogs}" />
+          </div>
+        </div>
+        <div class="account-form__field">
+          <label class="account-form__label">${escapeHtml(cfg.t.includes)}</label>
+          <textarea class="account-form__input" data-field="includes" rows="3">${escapeHtml((st.includes || []).join("\n"))}</textarea>
+        </div>
+        <label class="account-form__checkbox">
+          <input type="checkbox" data-field="isActive" ${st.isActive ? "checked" : ""} />
+          ${escapeHtml(cfg.t.active)}
+        </label>
+        <div class="account-form__error" data-error></div>
+        <div class="account-form__success" data-success></div>
+        <div class="account-form__actions">
+          <button type="submit" class="account-form__submit">${escapeHtml(cfg.t.save)}</button>
+        </div>
+      </form>
+    `).join("");
+
+    container.querySelectorAll<HTMLFormElement>("form[data-id]").forEach((form) => {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const errEl = form.querySelector("[data-error]") as HTMLElement;
+        const okEl = form.querySelector("[data-success]") as HTMLElement;
+        const btn = form.querySelector("button[type=submit]") as HTMLButtonElement;
+        errEl.textContent = "";
+        okEl.textContent = "";
+        btn.disabled = true;
+        btn.textContent = cfg.t.saving;
+        try {
+          const f = (name: string) => form.querySelector(`[data-field='${name}']`) as HTMLInputElement | HTMLTextAreaElement;
+          const includesText = (f("includes") as HTMLTextAreaElement).value;
+          await updateSessionType(form.dataset.id!, {
+            nameSk: (f("nameSk") as HTMLInputElement).value,
+            nameEn: (f("nameEn") as HTMLInputElement).value,
+            descriptionSk: (f("descriptionSk") as HTMLTextAreaElement).value || null,
+            descriptionEn: (f("descriptionEn") as HTMLTextAreaElement).value || null,
+            durationMinutes: parseInt((f("durationMinutes") as HTMLInputElement).value, 10),
+            basePrice: parseFloat((f("basePrice") as HTMLInputElement).value),
+            maxDogs: parseInt((f("maxDogs") as HTMLInputElement).value, 10),
+            includesJson: includesText.split("\n").map((s) => s.trim()).filter(Boolean),
+            isActive: (form.querySelector("[data-field='isActive']") as HTMLInputElement).checked,
+          });
+          okEl.textContent = cfg.t.saved;
+        } catch (err: any) {
+          errEl.textContent = err.message;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = cfg.t.save;
+        }
+      });
+    });
+  }
+
+  async function reload() {
+    try {
+      const items = await listSessionTypes(cfg.lang);
+      render(items);
+    } catch (err: any) {
+      document.getElementById("types-container")!.innerHTML = `<p class="account-form__error">${escapeHtml(err.message)}</p>`;
+    }
+  }
+
+  // New session-type form wiring.
+  const newBtn = document.getElementById("new-type-btn") as HTMLButtonElement;
+  const newForm = document.getElementById("new-type-form") as HTMLFormElement;
+  const newCancel = document.getElementById("new-type-cancel") as HTMLButtonElement;
+  newBtn.addEventListener("click", () => {
+    newForm.hidden = false;
+    newBtn.hidden = true;
+  });
+  newCancel.addEventListener("click", () => {
+    newForm.hidden = true;
+    newBtn.hidden = false;
+    newForm.reset();
+  });
+  newForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById("new-type-error")!;
+    errEl.textContent = "";
+    const fd = new FormData(newForm);
+    const includesText = String(fd.get("includes") ?? "");
+    try {
+      await createSessionType({
+        slug: String(fd.get("slug") ?? "").trim(),
+        nameSk: String(fd.get("nameSk") ?? "").trim(),
+        nameEn: String(fd.get("nameEn") ?? "").trim(),
+        descriptionSk: (String(fd.get("descriptionSk") ?? "") || null) as any,
+        descriptionEn: (String(fd.get("descriptionEn") ?? "") || null) as any,
+        durationMinutes: parseInt(String(fd.get("durationMinutes") ?? "60"), 10),
+        basePrice: parseFloat(String(fd.get("basePrice") ?? "100")),
+        category: String(fd.get("category") ?? "portrait"),
+        maxDogs: parseInt(String(fd.get("maxDogs") ?? "1"), 10),
+        includesJson: includesText.split("\n").map((s: string) => s.trim()).filter(Boolean),
+        isActive: true,
+      });
+      newForm.hidden = true;
+      newBtn.hidden = false;
+      newForm.reset();
+      await reload();
+    } catch (err: any) {
+      errEl.textContent = err.message;
+    }
+  });
+
+  reload();
+</script>

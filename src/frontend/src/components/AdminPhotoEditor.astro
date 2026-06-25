@@ -1,0 +1,185 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; slug: string; }
+const { lang, slug } = Astro.props;
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/portfolio`} class="admin__back">← {t(lang, "admin.common.backToList")}</a>
+    <h1 class="admin__title">{t(lang, "admin.portfolio.editPhoto")}</h1>
+  </header>
+
+  <form class="account-form" id="photo-form">
+    <div id="photo-preview" style="margin-bottom:16px;"></div>
+
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label" for="title-sk">{t(lang, "admin.portfolio.titleSk")}</label>
+        <input class="account-form__input" id="title-sk" type="text" />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label" for="title-en">{t(lang, "admin.portfolio.titleEn")}</label>
+        <input class="account-form__input" id="title-en" type="text" />
+      </div>
+    </div>
+
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label" for="alt-sk">{t(lang, "admin.portfolio.altSk")}</label>
+        <input class="account-form__input" id="alt-sk" type="text" />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label" for="alt-en">{t(lang, "admin.portfolio.altEn")}</label>
+        <input class="account-form__input" id="alt-en" type="text" />
+      </div>
+    </div>
+
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label" for="desc-sk">{t(lang, "admin.portfolio.descriptionSk")}</label>
+        <textarea class="account-form__input" id="desc-sk" rows="2"></textarea>
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label" for="desc-en">{t(lang, "admin.portfolio.descriptionEn")}</label>
+        <textarea class="account-form__input" id="desc-en" rows="2"></textarea>
+      </div>
+    </div>
+
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label" for="location">{t(lang, "admin.portfolio.location")}</label>
+        <input class="account-form__input" id="location" type="text" />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label" for="sort-order">{t(lang, "admin.portfolio.sortOrder")}</label>
+        <input class="account-form__input" id="sort-order" type="number" step="1" />
+      </div>
+    </div>
+
+    <label class="account-form__checkbox">
+      <input type="checkbox" id="is-published" />
+      {t(lang, "admin.portfolio.published")}
+    </label>
+
+    <div class="account-form__field">
+      <label class="account-form__label">{t(lang, "admin.portfolio.tags")}</label>
+      <div class="admin-tag-list" id="tag-list"></div>
+      <span class="account-form__hint">{t(lang, "admin.portfolio.tagsHelp")}</span>
+    </div>
+
+    <div id="photo-error" class="account-form__error"></div>
+    <div id="photo-success" class="account-form__success"></div>
+
+    <div class="account-form__actions">
+      <button class="account-form__submit" type="submit" id="save-btn">{t(lang, "admin.common.save")}</button>
+    </div>
+  </form>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="editor-config" type="application/json" set:html={JSON.stringify({
+  lang,
+  slug,
+  save: t(lang, "admin.common.save"),
+  saving: t(lang, "admin.common.saving"),
+  saved: t(lang, "admin.common.saved"),
+})}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import { getPhoto, updatePhoto, listTags } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("editor-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const errEl = document.getElementById("photo-error")!;
+  const okEl = document.getElementById("photo-success")!;
+  const btn = document.getElementById("save-btn") as HTMLButtonElement;
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+
+  let photoId: string | null = null;
+  const selectedTags = new Set<string>();
+
+  (async () => {
+    try {
+      const photo: any = await getPhoto(cfg.slug, cfg.lang, true);
+      photoId = photo.id;
+      (document.getElementById("title-sk") as HTMLInputElement).value = photo.titleSk ?? "";
+      (document.getElementById("title-en") as HTMLInputElement).value = photo.titleEn ?? "";
+      (document.getElementById("alt-sk") as HTMLInputElement).value = photo.altTextSk ?? "";
+      (document.getElementById("alt-en") as HTMLInputElement).value = photo.altTextEn ?? "";
+      (document.getElementById("desc-sk") as HTMLTextAreaElement).value = photo.descriptionSk ?? "";
+      (document.getElementById("desc-en") as HTMLTextAreaElement).value = photo.descriptionEn ?? "";
+      (document.getElementById("location") as HTMLInputElement).value = photo.location ?? "";
+      (document.getElementById("sort-order") as HTMLInputElement).value = String(photo.sortOrder ?? 0);
+      (document.getElementById("is-published") as HTMLInputElement).checked = !!photo.isPublished;
+
+      const thumb = (photo.variants || []).find((v: any) => v.format === "jpeg" || v.format === "jpg") ?? photo.variants?.[0];
+      if (thumb) {
+        const url = thumb.blobUrl.replace(/^http:\/\/azurite:10000\/devstoreaccount1/, "http://localhost:10000/devstoreaccount1");
+        document.getElementById("photo-preview")!.innerHTML =
+          `<img src="${escapeHtml(url)}" alt="" style="max-width:360px;border:4px solid #2A2A2A;border-radius:12px;box-shadow:5px 5px 0 #2A2A2A;" />`;
+      }
+
+      (photo.tags || []).forEach((t: any) => selectedTags.add(t.slug));
+
+      const allTags = await listTags(cfg.lang);
+      const tagListEl = document.getElementById("tag-list")!;
+      tagListEl.innerHTML = allTags.map((tag) => `
+        <button type="button" class="admin-tag-chip ${selectedTags.has(tag.slug) ? "admin-tag-chip--active" : ""}" data-tag="${escapeHtml(tag.slug)}">
+          ${escapeHtml(tag.name)}
+        </button>
+      `).join("");
+      tagListEl.querySelectorAll<HTMLButtonElement>("[data-tag]").forEach((b) => {
+        b.addEventListener("click", () => {
+          const s = b.dataset.tag!;
+          if (selectedTags.has(s)) selectedTags.delete(s);
+          else selectedTags.add(s);
+          b.classList.toggle("admin-tag-chip--active");
+        });
+      });
+    } catch (err: any) {
+      errEl.textContent = err.message;
+    }
+  })();
+
+  document.getElementById("photo-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!photoId) return;
+    errEl.textContent = "";
+    okEl.textContent = "";
+    btn.disabled = true;
+    btn.textContent = cfg.saving;
+
+    try {
+      await updatePhoto(photoId, {
+        titleSk: (document.getElementById("title-sk") as HTMLInputElement).value,
+        titleEn: (document.getElementById("title-en") as HTMLInputElement).value,
+        descriptionSk: (document.getElementById("desc-sk") as HTMLTextAreaElement).value || null,
+        descriptionEn: (document.getElementById("desc-en") as HTMLTextAreaElement).value || null,
+        altTextSk: (document.getElementById("alt-sk") as HTMLInputElement).value || null,
+        altTextEn: (document.getElementById("alt-en") as HTMLInputElement).value || null,
+        location: (document.getElementById("location") as HTMLInputElement).value || null,
+        isPublished: (document.getElementById("is-published") as HTMLInputElement).checked,
+        sortOrder: parseInt((document.getElementById("sort-order") as HTMLInputElement).value, 10) || 0,
+        tagSlugs: Array.from(selectedTags),
+      });
+      okEl.textContent = cfg.saved;
+    } catch (err: any) {
+      errEl.textContent = err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = cfg.save;
+    }
+  });
+</script>

@@ -1,0 +1,286 @@
+---
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import { t } from "../../../../lib/i18n";
+
+const lang = "sk";
+const pageTitle = `${t(lang, "addresses.title")} — PartlPhoto`;
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <main class="account" data-account-root hidden>
+    <a href={`/${lang}/ucet`} class="account__back">← {t(lang, "account.backToAccount")}</a>
+    <header class="account__header">
+      <h1 class="account__title">{t(lang, "addresses.title")}</h1>
+      <p class="account__subtitle">{t(lang, "addresses.subtitle")}</p>
+    </header>
+
+    <section data-list-section>
+      <div class="address-list" id="address-list"></div>
+      <div class="address-empty" id="address-empty" hidden>{t(lang, "addresses.empty")}</div>
+      <button type="button" class="address-add-btn" id="add-address-btn">+ {t(lang, "addresses.addNew")}</button>
+    </section>
+
+    <section data-form-section hidden>
+      <form class="account-form" id="address-form" novalidate>
+        <h2 class="account-form__section-title" id="form-title">{t(lang, "addresses.addNew")}</h2>
+
+        <div class="account-form__field">
+          <label class="account-form__label" for="addr-label">{t(lang, "addresses.label")}</label>
+          <input class="account-form__input" id="addr-label" type="text" maxlength="64" />
+        </div>
+
+        <div class="account-form__field">
+          <label class="account-form__label" for="addr-name">{t(lang, "addresses.name")} *</label>
+          <input class="account-form__input" id="addr-name" type="text" required autocomplete="name" />
+        </div>
+
+        <div class="account-form__field">
+          <label class="account-form__label" for="addr-street">{t(lang, "addresses.street")} *</label>
+          <input class="account-form__input" id="addr-street" type="text" required autocomplete="street-address" />
+        </div>
+
+        <div class="account-form__row">
+          <div class="account-form__field">
+            <label class="account-form__label" for="addr-city">{t(lang, "addresses.city")} *</label>
+            <input class="account-form__input" id="addr-city" type="text" required autocomplete="address-level2" />
+          </div>
+          <div class="account-form__field">
+            <label class="account-form__label" for="addr-postal">{t(lang, "addresses.postalCode")} *</label>
+            <input class="account-form__input" id="addr-postal" type="text" required autocomplete="postal-code" />
+          </div>
+        </div>
+
+        <div class="account-form__field">
+          <label class="account-form__label" for="addr-country">{t(lang, "addresses.country")}</label>
+          <input class="account-form__input" id="addr-country" type="text" maxlength="2" value="SK" autocomplete="country" />
+        </div>
+
+        <label class="account-form__checkbox">
+          <input type="checkbox" id="addr-shipping" />
+          {t(lang, "addresses.defaultShipping")}
+        </label>
+        <label class="account-form__checkbox">
+          <input type="checkbox" id="addr-billing" />
+          {t(lang, "addresses.defaultBilling")}
+        </label>
+        <label class="account-form__checkbox">
+          <input type="checkbox" id="addr-both" />
+          {t(lang, "addresses.useAsBoth")}
+        </label>
+
+        <div id="address-error" class="account-form__error"></div>
+
+        <div class="account-form__actions">
+          <button class="account-form__submit" type="submit" id="address-save">{t(lang, "addresses.save")}</button>
+          <button class="account-form__cancel" type="button" id="address-cancel">{t(lang, "addresses.cancel")}</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <p class="account__notice" data-account-denied hidden>{t(lang, "account.notAuthorized")}</p>
+
+  <script id="address-config" type="application/json" set:html={JSON.stringify({
+    lang,
+    t: {
+      addNew: t(lang, "addresses.addNew"),
+      edit: t(lang, "addresses.edit"),
+      del: t(lang, "addresses.delete"),
+      confirmDelete: t(lang, "addresses.confirmDelete"),
+      setShipping: t(lang, "addresses.setDefaultShipping"),
+      setBilling: t(lang, "addresses.setDefaultBilling"),
+      defaultShipping: t(lang, "addresses.defaultShipping"),
+      defaultBilling: t(lang, "addresses.defaultBilling"),
+      required: t(lang, "addresses.required"),
+      empty: t(lang, "addresses.empty"),
+      saving: t(lang, "profile.saving"),
+      save: t(lang, "addresses.save"),
+    }
+  })}></script>
+
+  <script>
+    import { requireAuth, listAddresses, createAddress, updateAddress, deleteAddress, setDefaultAddress } from "../../../../lib/account";
+    import type { Address, AddressInput } from "../../../../lib/account";
+
+    const cfg = JSON.parse(document.getElementById("address-config")!.textContent!);
+    const token = requireAuth(cfg.lang);
+    if (!token) throw new Error("not authenticated");
+
+    const root = document.querySelector("[data-account-root]") as HTMLElement;
+    root.hidden = false;
+
+    const listSection = document.querySelector("[data-list-section]") as HTMLElement;
+    const formSection = document.querySelector("[data-form-section]") as HTMLElement;
+    const listEl = document.getElementById("address-list") as HTMLElement;
+    const emptyEl = document.getElementById("address-empty") as HTMLElement;
+    const formEl = document.getElementById("address-form") as HTMLFormElement;
+    const formTitle = document.getElementById("form-title") as HTMLElement;
+    const errEl = document.getElementById("address-error") as HTMLElement;
+    const saveBtn = document.getElementById("address-save") as HTMLButtonElement;
+
+    let editingId: string | null = null;
+    let cache: Address[] = [];
+
+    function escapeHtml(s: string): string {
+      return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+    }
+
+    function showList() {
+      listSection.hidden = false;
+      formSection.hidden = true;
+      formEl.reset();
+      editingId = null;
+      errEl.textContent = "";
+    }
+
+    function showForm(a: Address | null) {
+      listSection.hidden = true;
+      formSection.hidden = false;
+      errEl.textContent = "";
+      editingId = a?.id ?? null;
+      formTitle.textContent = a ? cfg.t.edit : cfg.t.addNew;
+      (document.getElementById("addr-label") as HTMLInputElement).value = a?.label ?? "";
+      (document.getElementById("addr-name") as HTMLInputElement).value = a?.name ?? "";
+      (document.getElementById("addr-street") as HTMLInputElement).value = a?.street ?? "";
+      (document.getElementById("addr-city") as HTMLInputElement).value = a?.city ?? "";
+      (document.getElementById("addr-postal") as HTMLInputElement).value = a?.postalCode ?? "";
+      (document.getElementById("addr-country") as HTMLInputElement).value = a?.country ?? "SK";
+      (document.getElementById("addr-shipping") as HTMLInputElement).checked = a?.isDefaultShipping ?? false;
+      (document.getElementById("addr-billing") as HTMLInputElement).checked = a?.isDefaultBilling ?? false;
+      (document.getElementById("addr-both") as HTMLInputElement).checked =
+        (a?.isDefaultShipping ?? false) && (a?.isDefaultBilling ?? false);
+    }
+
+    function renderCards() {
+      if (cache.length === 0) {
+        listEl.innerHTML = "";
+        emptyEl.hidden = false;
+        return;
+      }
+      emptyEl.hidden = true;
+      listEl.innerHTML = cache.map((a) => {
+        const badges: string[] = [];
+        if (a.isDefaultShipping) badges.push(`<span class="address-card__badge">${cfg.t.defaultShipping}</span>`);
+        if (a.isDefaultBilling) badges.push(`<span class="address-card__badge address-card__badge--billing">${cfg.t.defaultBilling}</span>`);
+        return `
+          <article class="address-card" data-id="${a.id}">
+            ${a.label ? `<div class="address-card__label">${escapeHtml(a.label)}</div>` : ""}
+            <h3 class="address-card__name">${escapeHtml(a.name)}</h3>
+            <div class="address-card__lines">
+              <span>${escapeHtml(a.street)}</span>
+              <span>${escapeHtml(a.postalCode)} ${escapeHtml(a.city)}</span>
+              <span>${escapeHtml(a.country)}</span>
+            </div>
+            ${badges.length ? `<div class="address-card__badges">${badges.join("")}</div>` : ""}
+            <div class="address-card__actions">
+              ${!a.isDefaultShipping ? `<button class="address-card__btn" data-action="default-shipping" data-id="${a.id}">${cfg.t.setShipping}</button>` : ""}
+              ${!a.isDefaultBilling ? `<button class="address-card__btn" data-action="default-billing" data-id="${a.id}">${cfg.t.setBilling}</button>` : ""}
+              <button class="address-card__btn address-card__btn--primary" data-action="edit" data-id="${a.id}">${cfg.t.edit}</button>
+              <button class="address-card__btn address-card__btn--danger" data-action="delete" data-id="${a.id}">${cfg.t.del}</button>
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      listEl.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((btn) => {
+        btn.addEventListener("click", () => handleAction(btn.dataset.action!, btn.dataset.id!));
+      });
+    }
+
+    async function refresh() {
+      try {
+        cache = await listAddresses();
+        renderCards();
+      } catch (err: any) {
+        listEl.innerHTML = `<p class="account-form__error">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    async function handleAction(action: string, id: string) {
+      const target = cache.find((a) => a.id === id);
+      if (!target) return;
+
+      if (action === "edit") {
+        showForm(target);
+        return;
+      }
+      if (action === "delete") {
+        if (!confirm(cfg.t.confirmDelete)) return;
+        try {
+          await deleteAddress(id);
+          await refresh();
+        } catch (err: any) {
+          alert(err.message);
+        }
+        return;
+      }
+      if (action === "default-shipping" || action === "default-billing") {
+        try {
+          await setDefaultAddress(id, {
+            shipping: action === "default-shipping",
+            billing: action === "default-billing",
+          });
+          await refresh();
+        } catch (err: any) {
+          alert(err.message);
+        }
+      }
+    }
+
+    document.getElementById("add-address-btn")?.addEventListener("click", () => showForm(null));
+    document.getElementById("address-cancel")?.addEventListener("click", () => showList());
+
+    // "Use for both" master toggle: keep the two checkboxes in sync.
+    const bothCb = document.getElementById("addr-both") as HTMLInputElement;
+    const shipCb = document.getElementById("addr-shipping") as HTMLInputElement;
+    const billCb = document.getElementById("addr-billing") as HTMLInputElement;
+    bothCb.addEventListener("change", () => {
+      if (bothCb.checked) { shipCb.checked = true; billCb.checked = true; }
+    });
+    [shipCb, billCb].forEach((cb) => cb.addEventListener("change", () => {
+      if (!shipCb.checked || !billCb.checked) bothCb.checked = false;
+      if (shipCb.checked && billCb.checked) bothCb.checked = true;
+    }));
+
+    formEl.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errEl.textContent = "";
+
+      const input: AddressInput = {
+        label: (document.getElementById("addr-label") as HTMLInputElement).value.trim() || null,
+        name: (document.getElementById("addr-name") as HTMLInputElement).value.trim(),
+        street: (document.getElementById("addr-street") as HTMLInputElement).value.trim(),
+        city: (document.getElementById("addr-city") as HTMLInputElement).value.trim(),
+        postalCode: (document.getElementById("addr-postal") as HTMLInputElement).value.trim(),
+        country: (document.getElementById("addr-country") as HTMLInputElement).value.trim().toUpperCase() || "SK",
+        isDefaultShipping: shipCb.checked,
+        isDefaultBilling: billCb.checked,
+      };
+
+      if (!input.name || !input.street || !input.city || !input.postalCode) {
+        errEl.textContent = cfg.t.required;
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = cfg.t.saving;
+      try {
+        if (editingId) await updateAddress(editingId, input);
+        else await createAddress(input);
+        showList();
+        await refresh();
+      } catch (err: any) {
+        errEl.textContent = err.message;
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = cfg.t.save;
+      }
+    });
+
+    refresh();
+  </script>
+</BaseLayout>
+
+<style lang="scss" is:global>
+  @use "../../../../styles/components/account";
+</style>

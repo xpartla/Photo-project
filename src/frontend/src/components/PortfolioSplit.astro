@@ -1,17 +1,18 @@
 ---
 import ResponsiveImage from "./ResponsiveImage.astro";
 import { buildSrcset, getFallbackUrl } from "../lib/imageUrl";
+import { STORE_ENABLED } from "../lib/features";
 import type { PhotoSummary } from "../lib/api";
 
 interface Props {
   lang: string;
-  dogPhotos: PhotoSummary[];
   filmPhotos: PhotoSummary[];
+  digitalPhotos: PhotoSummary[];
   labels: {
     title: string;
     subtitle: string;
-    dogSection: string;
     filmSection: string;
+    digitalSection: string;
     viewDetail: string;
     buyAsPrint: string;
     close: string;
@@ -19,7 +20,7 @@ interface Props {
   };
 }
 
-const { lang, dogPhotos, filmPhotos, labels } = Astro.props;
+const { lang, filmPhotos, digitalPhotos, labels } = Astro.props;
 
 const rotations = [-2, 1.5, -1, 2.5, -0.5, 1, -1.5, 0.5, -2.5, 1.8];
 
@@ -36,8 +37,8 @@ function photoData(photo: PhotoSummary) {
 
 const shopBase = lang === "sk" ? `/${lang}/obchod` : `/${lang}/shop`;
 const detailBase = `/${lang}/portfolio`;
-const hasDogs = dogPhotos.length > 0;
 const hasFilm = filmPhotos.length > 0;
+const hasDigital = digitalPhotos.length > 0;
 ---
 
 <!-- Hero -->
@@ -54,7 +55,7 @@ const hasFilm = filmPhotos.length > 0;
   <p class="portfolio-hero__subtitle">{labels.subtitle}</p>
 </section>
 
-{(!hasDogs && !hasFilm) ? (
+{(!hasFilm && !hasDigital) ? (
   <p class="portfolio-empty">{labels.noPhotos}</p>
 ) : (
   <>
@@ -62,32 +63,32 @@ const hasFilm = filmPhotos.length > 0;
     <div class="portfolio-tabs" role="tablist">
       <button
         class="portfolio-tabs__btn portfolio-tabs__btn--active"
-        data-tab-btn="dog"
-        role="tab"
-        aria-selected="true"
-        aria-controls="col-dog"
-      >
-        {labels.dogSection}
-      </button>
-      <button
-        class="portfolio-tabs__btn"
         data-tab-btn="film"
         role="tab"
-        aria-selected="false"
+        aria-selected="true"
         aria-controls="col-film"
       >
         {labels.filmSection}
+      </button>
+      <button
+        class="portfolio-tabs__btn"
+        data-tab-btn="digital"
+        role="tab"
+        aria-selected="false"
+        aria-controls="col-digital"
+      >
+        {labels.digitalSection}
       </button>
     </div>
 
     <!-- Split gallery -->
     <section class="portfolio-split">
-      <!-- Dog column -->
-      <div class="split-column split-column--dog" id="col-dog" data-column="dog" role="tabpanel">
-        <h2 class="split-column__heading">{labels.dogSection}</h2>
-        {hasDogs ? (
+      <!-- Film column -->
+      <div class="split-column split-column--film" id="col-film" data-column="film" role="tabpanel">
+        <h2 class="split-column__heading">{labels.filmSection}</h2>
+        {hasFilm ? (
           <div class="split-column__grid">
-            {dogPhotos.map((photo, i) => (
+            {filmPhotos.map((photo, i) => (
               <button
                 class="portfolio-card"
                 type="button"
@@ -121,12 +122,12 @@ const hasFilm = filmPhotos.length > 0;
         <div class="portfolio-divider__line"></div>
       </div>
 
-      <!-- Film column -->
-      <div class="split-column split-column--film" id="col-film" data-column="film" role="tabpanel">
-        <h2 class="split-column__heading">{labels.filmSection}</h2>
-        {hasFilm ? (
+      <!-- Digital column -->
+      <div class="split-column split-column--digital" id="col-digital" data-column="digital" role="tabpanel">
+        <h2 class="split-column__heading">{labels.digitalSection}</h2>
+        {hasDigital ? (
           <div class="split-column__grid">
-            {filmPhotos.map((photo, i) => (
+            {digitalPhotos.map((photo, i) => (
               <button
                 class="portfolio-card"
                 type="button"
@@ -182,9 +183,11 @@ const hasFilm = filmPhotos.length > 0;
             <a id="lightbox-detail" class="lightbox__btn lightbox__btn--detail" href="#">
               {labels.viewDetail}
             </a>
-            <a id="lightbox-shop" class="lightbox__btn lightbox__btn--shop" href="#">
-              {labels.buyAsPrint}
-            </a>
+            {STORE_ENABLED && (
+              <a id="lightbox-shop" class="lightbox__btn lightbox__btn--shop" href="#">
+                {labels.buyAsPrint}
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -237,9 +240,10 @@ const hasFilm = filmPhotos.length > 0;
     const lightboxDetail = document.getElementById(
       "lightbox-detail"
     ) as HTMLAnchorElement;
+    // The shop button is only rendered when the store feature is enabled.
     const lightboxShop = document.getElementById(
       "lightbox-shop"
-    ) as HTMLAnchorElement;
+    ) as HTMLAnchorElement | null;
 
     const detailBase = lightbox.dataset.detailBase || "";
     const shopBase = lightbox.dataset.shopBase || "";
@@ -274,7 +278,7 @@ const hasFilm = filmPhotos.length > 0;
       });
 
       lightboxDetail.href = `${detailBase}/${data.slug}`;
-      lightboxShop.href = `${shopBase}/${data.slug}`;
+      if (lightboxShop) lightboxShop.href = `${shopBase}/${data.slug}`;
 
       lightbox.setAttribute("aria-hidden", "false");
       lightbox.classList.add("is-open");

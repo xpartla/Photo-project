@@ -4,15 +4,15 @@ import type { PhotoSummary } from "../lib/api";
 
 interface Props {
   lang: string;
-  dogPhotos: PhotoSummary[];
   filmPhotos: PhotoSummary[];
+  digitalPhotos: PhotoSummary[];
   labels: {
     tagline: string;
     subtitle: string;
     ctaPortfolio: string;
     ctaBooking: string;
-    dogPhotos: string;
     filmPhotos: string;
+    digitalPhotos: string;
     shopLinkText: string;
     ctaBanner: string;
     ctaBannerSub: string;
@@ -20,12 +20,12 @@ interface Props {
   };
 }
 
-const { lang, dogPhotos, filmPhotos, labels } = Astro.props;
+const { lang, filmPhotos, digitalPhotos, labels } = Astro.props;
 
 const bookingHref = lang === "sk" ? `/${lang}/rezervacia` : `/${lang}/booking`;
 const portfolioHref = `/${lang}/portfolio`;
-const hasDog = dogPhotos.length > 0;
 const hasFilm = filmPhotos.length > 0;
+const hasDigital = digitalPhotos.length > 0;
 ---
 
 <!-- ── Hero ───────────────────────────────────────────── -->
@@ -83,17 +83,17 @@ const hasFilm = filmPhotos.length > 0;
 
 <!-- ── Photo Strips ──────────────────────────────────── -->
 <div class="home-strips">
-  {hasDog && (
+  {hasFilm && (
     <PhotoStrip
-      photos={dogPhotos}
-      label={labels.dogPhotos}
+      photos={filmPhotos}
+      label={labels.filmPhotos}
       lang={lang}
       shopLinkText={labels.shopLinkText}
-      accent="#F2B880"
+      accent="#B8A0C8"
     />
   )}
 
-  {hasDog && hasFilm && (
+  {hasFilm && hasDigital && (
     <div class="section-ornament" data-reveal-section aria-hidden="true">
       <svg viewBox="0 0 200 24">
         <line x1="20" y1="12" x2="90" y2="12" stroke="#2A2A2A" stroke-width="2.5" stroke-linecap="round" />
@@ -103,13 +103,13 @@ const hasFilm = filmPhotos.length > 0;
     </div>
   )}
 
-  {hasFilm && (
+  {hasDigital && (
     <PhotoStrip
-      photos={filmPhotos}
-      label={labels.filmPhotos}
+      photos={digitalPhotos}
+      label={labels.digitalPhotos}
       lang={lang}
       shopLinkText={labels.shopLinkText}
-      accent="#B8A0C8"
+      accent="#F2B880"
     />
   )}
 </div>

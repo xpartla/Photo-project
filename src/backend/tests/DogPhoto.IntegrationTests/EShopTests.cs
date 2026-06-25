@@ -591,6 +591,131 @@ public sealed class EShopTests : ApiTestBase
         Assert.Contains(productSlug, products);
     }
 
+    // ── Address-aware checkout (Epic 8) ─────────────────────────────
+
+    [Fact]
+    public async Task CreateOrder_WithSavedShippingAddressId_UsesIt()
+    {
+        var admin = await CreateAdminClientAsync();
+        var slug = $"addr-prod-{Guid.NewGuid():N}"[..25];
+        var (_, _, variantIds) = await CreateTestProductAsync(admin, slug, isLimitedEdition: false, editionSize: null,
+            variants: new object[] { new { formatCode = "a4", paperTypeCode = "matte-200", price = 25m } });
+
+        var customer = await CreateCustomerClientAsync();
+
+        // Save an address.
+        var saved = await customer.PostAsJsonAsync("/api/account/addresses", new
+        {
+            label = "Home",
+            name = "Saved Customer",
+            street = "Saved Street 9",
+            city = "Bratislava",
+            postalCode = "82102",
+            country = "SK"
+        });
+        var addressId = (await saved.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString()!;
+
+        await customer.PostAsJsonAsync("/api/shop/cart/items", new { variantId = variantIds[0], quantity = 1 });
+
+        var orderResp = await customer.PostAsJsonAsync("/api/shop/orders", new
+        {
+            shippingAddressId = addressId
+        });
+        Assert.Equal(HttpStatusCode.Created, orderResp.StatusCode);
+        var orderId = (await orderResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString()!;
+
+        var detail = await customer.GetFromJsonAsync<JsonElement>($"/api/shop/orders/{orderId}");
+        var shippingJson = detail.GetProperty("shippingAddress").GetString()!;
+        Assert.Contains("Saved Street 9", shippingJson);
+        Assert.Contains("82102", shippingJson);
+    }
+
+    [Fact]
+    public async Task CreateOrder_WithSaveShippingAddress_PersistsAddress()
+    {
+        var admin = await CreateAdminClientAsync();
+        var slug = $"save-addr-{Guid.NewGuid():N}"[..25];
+        var (_, _, variantIds) = await CreateTestProductAsync(admin, slug, isLimitedEdition: false, editionSize: null,
+            variants: new object[] { new { formatCode = "a4", paperTypeCode = "matte-200", price = 25m } });
+
+        var customer = await CreateCustomerClientAsync();
+        await customer.PostAsJsonAsync("/api/shop/cart/items", new { variantId = variantIds[0], quantity = 1 });
+
+        var orderResp = await customer.PostAsJsonAsync("/api/shop/orders", new
+        {
+            shippingAddress = new
+            {
+                name = "Persisted Buyer",
+                street = "Persisted 5",
+                city = "Bratislava",
+                postalCode = "84105",
+                country = "SK"
+            },
+            saveShippingAddress = true
+        });
+        Assert.Equal(HttpStatusCode.Created, orderResp.StatusCode);
+
+        var listed = await customer.GetFromJsonAsync<JsonElement>("/api/account/addresses");
+        var match = listed.EnumerateArray()
+            .FirstOrDefault(a => a.GetProperty("street").GetString() == "Persisted 5");
+        Assert.NotEqual(JsonValueKind.Undefined, match.ValueKind);
+    }
+
+    [Fact]
+    public async Task CreateOrder_WithBogusShippingAddressId_Returns400()
+    {
+        var admin = await CreateAdminClientAsync();
+        var slug = $"bogus-addr-{Guid.NewGuid():N}"[..25];
+        var (_, _, variantIds) = await CreateTestProductAsync(admin, slug, isLimitedEdition: false, editionSize: null,
+            variants: new object[] { new { formatCode = "a4", paperTypeCode = "matte-200", price = 10m } });
+
+        var customer = await CreateCustomerClientAsync();
+        await customer.PostAsJsonAsync("/api/shop/cart/items", new { variantId = variantIds[0], quantity = 1 });
+
+        var orderResp = await customer.PostAsJsonAsync("/api/shop/orders", new
+        {
+            shippingAddressId = Guid.NewGuid()
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, orderResp.StatusCode);
+    }
+
+    // ── Admin-wide orders endpoint ──────────────────────────────────
+
+    [Fact]
+    public async Task AdminOrders_RequiresAdmin()
+    {
+        var customer = await CreateCustomerClientAsync();
+        var response = await customer.GetAsync("/api/shop/admin/orders");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminOrders_ListsAcrossUsers_AndFiltersByStatus()
+    {
+        var admin = await CreateAdminClientAsync();
+        var slug = $"adm-list-{Guid.NewGuid():N}"[..25];
+        var (_, _, variantIds) = await CreateTestProductAsync(admin, slug, isLimitedEdition: false, editionSize: null,
+            variants: new object[] { new { formatCode = "a4", paperTypeCode = "matte-200", price = 10m } });
+
+        var customer = await CreateCustomerClientAsync();
+        await customer.PostAsJsonAsync("/api/shop/cart/items", new { variantId = variantIds[0], quantity = 1 });
+        var orderResp = await customer.PostAsJsonAsync("/api/shop/orders", new
+        {
+            shippingAddress = new { name = "X", street = "X", city = "X", postalCode = "X", country = "SK" }
+        });
+        var customerOrderId = (await orderResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("orderId").GetString()!;
+
+        // Admin-wide listing should include the customer's order.
+        var all = await admin.GetFromJsonAsync<JsonElement>("/api/shop/admin/orders");
+        var ids = all.EnumerateArray().Select(o => o.GetProperty("id").GetString()!).ToList();
+        Assert.Contains(customerOrderId, ids);
+
+        // Filtered to only paid → not present (still pending_payment).
+        var paid = await admin.GetFromJsonAsync<JsonElement>("/api/shop/admin/orders?status=paid");
+        var paidIds = paid.EnumerateArray().Select(o => o.GetProperty("id").GetString()!).ToList();
+        Assert.DoesNotContain(customerOrderId, paidIds);
+    }
+
     [Fact]
     public async Task GetTags_ReturnsTagsWithProductCounts()
     {

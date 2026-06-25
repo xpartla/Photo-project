@@ -70,5 +70,41 @@ describe("i18n", () => {
       expect(getAlternateUrl("en", "/en/booking/confirmation/abc-123"))
         .toBe("/sk/rezervacia/potvrdenie/abc-123");
     });
+
+    it("rewrites registration routes (registracia ↔ register)", () => {
+      expect(getAlternateUrl("sk", "/sk/registracia")).toBe("/en/register");
+      expect(getAlternateUrl("en", "/en/register")).toBe("/sk/registracia");
+    });
+
+    it("rewrites account routes (ucet ↔ account)", () => {
+      expect(getAlternateUrl("sk", "/sk/ucet")).toBe("/en/account");
+      expect(getAlternateUrl("en", "/en/account")).toBe("/sk/ucet");
+    });
+
+    it("rewrites account profile routes (ucet/profil ↔ account/profile)", () => {
+      expect(getAlternateUrl("sk", "/sk/ucet/profil")).toBe("/en/account/profile");
+      expect(getAlternateUrl("en", "/en/account/profile")).toBe("/sk/ucet/profil");
+    });
+
+    it("rewrites account address routes (ucet/adresy ↔ account/addresses)", () => {
+      expect(getAlternateUrl("sk", "/sk/ucet/adresy")).toBe("/en/account/addresses");
+      expect(getAlternateUrl("en", "/en/account/addresses")).toBe("/sk/ucet/adresy");
+    });
+
+    it("rewrites admin shop section (admin/obchod ↔ admin/shop) including sub-routes", () => {
+      expect(getAlternateUrl("sk", "/sk/admin/obchod")).toBe("/en/admin/shop");
+      expect(getAlternateUrl("en", "/en/admin/shop")).toBe("/sk/admin/obchod");
+      expect(getAlternateUrl("sk", "/sk/admin/obchod/orders/abc"))
+        .toBe("/en/admin/shop/orders/abc");
+      expect(getAlternateUrl("en", "/en/admin/shop/orders/abc"))
+        .toBe("/sk/admin/obchod/orders/abc");
+    });
+
+    it("rewrites admin booking section (admin/rezervacia ↔ admin/booking) including sub-routes", () => {
+      expect(getAlternateUrl("sk", "/sk/admin/rezervacia")).toBe("/en/admin/booking");
+      expect(getAlternateUrl("en", "/en/admin/booking")).toBe("/sk/admin/rezervacia");
+      expect(getAlternateUrl("sk", "/sk/admin/rezervacia/calendar"))
+        .toBe("/en/admin/booking/calendar");
+    });
   });
 });

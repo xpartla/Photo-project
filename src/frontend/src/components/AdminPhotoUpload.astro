@@ -1,0 +1,213 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; }
+const { lang } = Astro.props;
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/portfolio`} class="admin__back">← {t(lang, "admin.common.backToList")}</a>
+    <h1 class="admin__title">{t(lang, "admin.portfolio.upload")}</h1>
+  </header>
+
+  <label class="admin-dropzone" data-dropzone>
+    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/tiff" multiple />
+    <p>{t(lang, "admin.portfolio.uploadHint")}</p>
+  </label>
+
+  <div class="admin-upload-queue" id="upload-queue"></div>
+
+  <div class="account-form__actions" id="upload-actions" hidden>
+    <button class="account-form__submit" type="button" id="upload-all">{t(lang, "admin.portfolio.uploadAll")}</button>
+  </div>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="upload-config" type="application/json" set:html={JSON.stringify({
+  lang,
+  t: {
+    queued: t(lang, "admin.portfolio.queued"),
+    inProgress: t(lang, "admin.portfolio.uploadInProgress"),
+    processing: t(lang, "admin.portfolio.processing"),
+    done: t(lang, "admin.portfolio.uploadDone"),
+    failed: t(lang, "admin.portfolio.uploadFailed"),
+    titleSk: t(lang, "admin.portfolio.titleSk"),
+    titleEn: t(lang, "admin.portfolio.titleEn"),
+    altSk: t(lang, "admin.portfolio.altSk"),
+    altEn: t(lang, "admin.portfolio.altEn"),
+    location: t(lang, "admin.portfolio.location"),
+    slug: t(lang, "admin.portfolio.slug"),
+  }
+})}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import { uploadPhoto, getUploadStatus } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("upload-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const dropzone = document.querySelector("[data-dropzone]") as HTMLElement;
+  const fileInput = document.getElementById("file-input") as HTMLInputElement;
+  const queueEl = document.getElementById("upload-queue") as HTMLElement;
+  const actions = document.getElementById("upload-actions") as HTMLElement;
+  const uploadAllBtn = document.getElementById("upload-all") as HTMLButtonElement;
+
+  type Item = {
+    file: File;
+    slug: string;
+    titleSk: string;
+    titleEn: string;
+    altSk: string;
+    altEn: string;
+    location: string;
+    status: "queued" | "uploading" | "processing" | "done" | "error";
+    error?: string;
+    photoId?: string;
+  };
+  const queue: Item[] = [];
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+
+  function slugify(name: string): string {
+    return name.toLowerCase()
+      .replace(/\.[^/.]+$/, "")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || `photo-${Date.now()}`;
+  }
+
+  function statusLabel(item: Item): string {
+    switch (item.status) {
+      case "queued": return cfg.t.queued;
+      case "uploading": return cfg.t.inProgress;
+      case "processing": return cfg.t.processing;
+      case "done": return cfg.t.done;
+      case "error": return `${cfg.t.failed}: ${item.error ?? ""}`;
+    }
+  }
+
+  function statusClass(item: Item): string {
+    if (item.status === "done") return "admin-upload-item__status admin-upload-item__status--done";
+    if (item.status === "error") return "admin-upload-item__status admin-upload-item__status--error";
+    return "admin-upload-item__status";
+  }
+
+  function render() {
+    if (queue.length === 0) {
+      queueEl.innerHTML = "";
+      actions.hidden = true;
+      return;
+    }
+    actions.hidden = false;
+    queueEl.innerHTML = queue.map((item, i) => {
+      const blobUrl = URL.createObjectURL(item.file);
+      return `
+        <div class="admin-upload-item" data-i="${i}">
+          <img class="admin-upload-item__thumb" src="${blobUrl}" alt="" />
+          <div>
+            <div class="admin-upload-item__name">${escapeHtml(item.file.name)}</div>
+            <div class="admin-upload-item__meta">${(item.file.size / 1024).toFixed(0)} KB</div>
+          </div>
+          <div class="${statusClass(item)}">${escapeHtml(statusLabel(item))}</div>
+          <div class="admin-upload-fields">
+            <input data-field="slug" data-i="${i}" value="${escapeHtml(item.slug)}" placeholder="${escapeHtml(cfg.t.slug)}" />
+            <input data-field="titleSk" data-i="${i}" value="${escapeHtml(item.titleSk)}" placeholder="${escapeHtml(cfg.t.titleSk)}" />
+            <input data-field="titleEn" data-i="${i}" value="${escapeHtml(item.titleEn)}" placeholder="${escapeHtml(cfg.t.titleEn)}" />
+            <input data-field="location" data-i="${i}" value="${escapeHtml(item.location)}" placeholder="${escapeHtml(cfg.t.location)}" />
+            <input data-field="altSk" data-i="${i}" value="${escapeHtml(item.altSk)}" placeholder="${escapeHtml(cfg.t.altSk)}" />
+            <input data-field="altEn" data-i="${i}" value="${escapeHtml(item.altEn)}" placeholder="${escapeHtml(cfg.t.altEn)}" />
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    queueEl.querySelectorAll<HTMLInputElement>("input[data-field]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const i = parseInt(input.dataset.i!, 10);
+        const f = input.dataset.field! as keyof Item;
+        (queue[i] as any)[f] = input.value;
+      });
+    });
+  }
+
+  function addFiles(files: FileList | File[]) {
+    const arr = Array.from(files);
+    for (const f of arr) {
+      const slug = slugify(f.name);
+      queue.push({
+        file: f, slug,
+        titleSk: "", titleEn: "", altSk: "", altEn: "", location: "",
+        status: "queued",
+      });
+    }
+    render();
+  }
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files) addFiles(fileInput.files);
+    fileInput.value = "";
+  });
+
+  ["dragover", "dragenter"].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add("admin-dropzone--active");
+  }));
+  ["dragleave", "drop"].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("admin-dropzone--active");
+  }));
+  dropzone.addEventListener("drop", (e: DragEvent) => {
+    if (e.dataTransfer?.files) addFiles(e.dataTransfer.files);
+  });
+
+  async function uploadOne(item: Item): Promise<void> {
+    item.status = "uploading";
+    render();
+    try {
+      const res = await uploadPhoto({
+        file: item.file,
+        slug: item.slug,
+        titleSk: item.titleSk || undefined,
+        titleEn: item.titleEn || undefined,
+        altTextSk: item.altSk || undefined,
+        altTextEn: item.altEn || undefined,
+        location: item.location || undefined,
+      });
+      item.photoId = res.id;
+      item.status = "processing";
+      render();
+
+      // Poll for processing complete (cap at ~30s).
+      for (let n = 0; n < 30; n++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        try {
+          const status = await getUploadStatus(res.id);
+          if (status.isProcessed) break;
+        } catch { /* keep polling */ }
+      }
+      item.status = "done";
+    } catch (err: any) {
+      item.status = "error";
+      item.error = err.message;
+    }
+    render();
+  }
+
+  uploadAllBtn.addEventListener("click", async () => {
+    uploadAllBtn.disabled = true;
+    for (const item of queue) {
+      if (item.status === "queued") await uploadOne(item);
+    }
+    uploadAllBtn.disabled = false;
+  });
+</script>

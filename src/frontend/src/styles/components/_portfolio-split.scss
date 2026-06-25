@@ -84,16 +84,16 @@
   min-width: 0;
 }
 
-.split-column--dog {
-  --accent: #{$peach};
-  background: linear-gradient(135deg, rgba($peach, 0.04) 0%, transparent 60%);
+.split-column--film {
+  --accent: #{$lavender};
+  background: linear-gradient(135deg, rgba($lavender, 0.04) 0%, transparent 60%);
   border-radius: 12px;
   padding: 0 0.5rem;
 }
 
-.split-column--film {
-  --accent: #{$lavender};
-  background: linear-gradient(225deg, rgba($lavender, 0.04) 0%, transparent 60%);
+.split-column--digital {
+  --accent: #{$peach};
+  background: linear-gradient(225deg, rgba($peach, 0.04) 0%, transparent 60%);
   border-radius: 12px;
   padding: 0 0.5rem;
 }

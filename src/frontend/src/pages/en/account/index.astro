@@ -1,0 +1,68 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { t } from "../../../lib/i18n";
+import { STORE_ENABLED } from "../../../lib/features";
+
+const lang = "en";
+const pageTitle = `${t(lang, "account.title")} — PartlPhoto`;
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <main class="account" data-account-root hidden>
+    <header class="account__header">
+      <p class="account__eyebrow">{t(lang, "account.title")}</p>
+      <h1 class="account__title">
+        <span data-greeting>{t(lang, "account.greeting")}</span>
+      </h1>
+      <p class="account__subtitle">{t(lang, "account.subtitle")}</p>
+    </header>
+
+    <section class="account__grid">
+      <a class="account__card" href={`/${lang}/account/profile`}>
+        <h2 class="account__card-title">{t(lang, "account.profile")}</h2>
+        <p class="account__card-desc">{t(lang, "account.profile.description")}</p>
+      </a>
+      <a class="account__card" href={`/${lang}/account/addresses`}>
+        <h2 class="account__card-title">{t(lang, "account.addresses")}</h2>
+        <p class="account__card-desc">{t(lang, "account.addresses.description")}</p>
+      </a>
+      {STORE_ENABLED && (
+        <a class="account__card" href={`/${lang}/shop/orders`}>
+          <h2 class="account__card-title">{t(lang, "account.orders")}</h2>
+          <p class="account__card-desc">{t(lang, "account.orders.description")}</p>
+        </a>
+      )}
+    </section>
+
+    <button class="account__signout" data-signout>{t(lang, "account.signOut")}</button>
+  </main>
+
+  <p class="account__notice" data-account-denied hidden>{t(lang, "account.notAuthorized")}</p>
+
+  <script>
+    import { requireAuth } from "../../../lib/account";
+    import { getStoredUser } from "../../../lib/admin";
+
+    const token = requireAuth("en");
+    if (token) {
+      const root = document.querySelector("[data-account-root]") as HTMLElement | null;
+      if (root) root.hidden = false;
+
+      const user = getStoredUser();
+      const greeting = document.querySelector("[data-greeting]");
+      if (greeting && user?.email) {
+        greeting.textContent = `${greeting.textContent}, ${user.email}`;
+      }
+
+      document.querySelector("[data-signout]")?.addEventListener("click", () => {
+        localStorage.removeItem("partlphoto_token");
+        localStorage.removeItem("partlphoto_user");
+        window.location.href = "/en";
+      });
+    }
+  </script>
+</BaseLayout>
+
+<style lang="scss" is:global>
+  @use "../../../styles/components/account";
+</style>

@@ -6,16 +6,16 @@ import { t } from "../../lib/i18n";
 
 const lang = "en";
 
-let dogPhotos = [];
 let filmPhotos = [];
+let digitalPhotos = [];
 
 try {
-  const [dogResult, filmResult] = await Promise.all([
-    getPhotos({ tag: "dog", size: 7, lang }),
+  const [filmResult, digitalResult] = await Promise.all([
     getPhotos({ tag: "film", size: 7, lang }),
+    getPhotos({ tag: "digital", size: 7, lang }),
   ]);
-  dogPhotos = dogResult.items;
   filmPhotos = filmResult.items;
+  digitalPhotos = digitalResult.items;
 } catch (e) {
   console.error("Failed to fetch home photos:", e);
 }
@@ -24,15 +24,15 @@ try {
 <BaseLayout title={t(lang, "site.title")} lang={lang}>
   <HomeContent
     lang={lang}
-    dogPhotos={dogPhotos}
     filmPhotos={filmPhotos}
+    digitalPhotos={digitalPhotos}
     labels={{
       tagline: t(lang, "home.tagline"),
       subtitle: t(lang, "home.subtitle"),
       ctaPortfolio: t(lang, "home.ctaPortfolio"),
       ctaBooking: t(lang, "home.ctaBooking"),
-      dogPhotos: t(lang, "home.dogPhotos"),
       filmPhotos: t(lang, "home.filmPhotos"),
+      digitalPhotos: t(lang, "home.digitalPhotos"),
       shopLinkText: t(lang, "home.viewInShop"),
       ctaBanner: t(lang, "home.ctaBanner"),
       ctaBannerSub: t(lang, "home.ctaBannerSub"),

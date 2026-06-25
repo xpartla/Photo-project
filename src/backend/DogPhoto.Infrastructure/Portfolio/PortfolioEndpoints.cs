@@ -17,17 +17,23 @@ public static class PortfolioEndpoints
 
         group.MapGet("/photos", async (
             PortfolioDbContext db,
+            ICurrentUser currentUser,
             int? page,
             int? size,
             string? tag,
             string? collection,
-            string? lang) =>
+            string? lang,
+            bool? includeUnpublished) =>
         {
             var pageNum = Math.Max(page ?? 1, 1);
             var pageSize = Math.Clamp(size ?? 20, 1, 100);
 
+            // includeUnpublished=true is honored only for admins so the admin CMS
+            // can surface freshly-uploaded (still unpublished) photos.
+            var showUnpublished = includeUnpublished == true && currentUser.IsAdmin;
+
             var query = db.Photos
-                .Where(p => p.IsPublished)
+                .Where(p => showUnpublished || p.IsPublished)
                 .Include(p => p.Variants)
                 .Include(p => p.PhotoTags).ThenInclude(pt => pt.Tag)
                 .Include(p => p.CollectionPhotos).ThenInclude(cp => cp.Collection)
@@ -61,10 +67,14 @@ public static class PortfolioEndpoints
         group.MapGet("/photos/{slug}", async (
             string slug,
             PortfolioDbContext db,
-            string? lang) =>
+            ICurrentUser currentUser,
+            string? lang,
+            bool? includeUnpublished) =>
         {
+            var showUnpublished = includeUnpublished == true && currentUser.IsAdmin;
+
             var photo = await db.Photos
-                .Where(p => p.IsPublished)
+                .Where(p => showUnpublished || p.IsPublished)
                 .Include(p => p.Variants)
                 .Include(p => p.PhotoTags).ThenInclude(pt => pt.Tag)
                 .Include(p => p.CollectionPhotos).ThenInclude(cp => cp.Collection)

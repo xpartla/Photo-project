@@ -400,3 +400,381 @@
     font-size: 0.95rem;
   }
 }
+
+/* ── Dashboard live counts ─────────────────────────────────────── */
+.admin__counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.admin__count-card {
+  border: $outline-width solid $outline;
+  border-radius: 12px;
+  background: $cream;
+  box-shadow: 4px 4px 0 $outline;
+  padding: 16px 20px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  text-decoration: none;
+  color: $dark;
+  transition: transform $transition-base, box-shadow $transition-base;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 6px 6px 0 $outline;
+  }
+
+  strong {
+    font-family: $font-heading;
+    font-size: 2rem;
+    color: $terracotta;
+  }
+  span {
+    font-family: $font-body;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba($dark, 0.8);
+  }
+}
+
+/* ── Drag & drop upload zone ───────────────────────────────────── */
+.admin-dropzone {
+  border: 3px dashed rgba($dark, 0.3);
+  border-radius: 12px;
+  background: rgba($cream, 0.5);
+  padding: 64px 24px;
+  text-align: center;
+  font-family: $font-body;
+  color: rgba($dark, 0.7);
+  cursor: pointer;
+  transition: background $transition-fast, border-color $transition-fast;
+  margin-bottom: 24px;
+
+  &--active {
+    border-color: $sage;
+    background: rgba($sage, 0.1);
+    color: $dark;
+  }
+
+  input[type="file"] {
+    display: none;
+  }
+}
+
+.admin-upload-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.admin-upload-item {
+  border: $outline-width solid $outline;
+  border-radius: 8px;
+  background: $white;
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 12px;
+  align-items: center;
+
+  &__thumb {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border: 2px solid $outline;
+    border-radius: 4px;
+  }
+
+  &__name {
+    font-weight: 700;
+  }
+
+  &__meta {
+    font-size: 0.8rem;
+    color: rgba($dark, 0.7);
+  }
+
+  &__status {
+    font-family: $font-body;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: $terracotta;
+
+    &--done { color: $sage; }
+    &--error { color: $rose; }
+  }
+}
+
+.admin-upload-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+  grid-column: 1 / -1;
+
+  input {
+    font-family: $font-body;
+    font-size: 0.85rem;
+    padding: 6px 8px;
+    border: 2px solid rgba($dark, 0.4);
+    border-radius: 4px;
+    background: $white;
+    color: $dark;
+  }
+
+  @media (max-width: $breakpoint-md) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Tag chip selector ─────────────────────────────────────────── */
+.admin-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-tag-chip {
+  font-family: $font-body;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border: 2px solid $outline;
+  border-radius: 999px;
+  background: $white;
+  color: $dark;
+  cursor: pointer;
+  user-select: none;
+
+  &--active {
+    background: $lavender;
+    color: $dark;
+  }
+}
+
+/* ── Variants table ───────────────────────────────────────────── */
+.admin-variants-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 12px;
+
+  th, td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba($dark, 0.15);
+    text-align: left;
+    font-family: $font-body;
+    font-size: 0.9rem;
+  }
+  th {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.75rem;
+    color: rgba($dark, 0.7);
+  }
+  input, select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 2px solid rgba($dark, 0.4);
+    border-radius: 4px;
+    font-family: $font-body;
+    background: $white;
+  }
+  button {
+    font-family: $font-body;
+    font-weight: 700;
+    background: $rose;
+    color: $white;
+    border: 2px solid $outline;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+}
+
+/* ── Status pills ─────────────────────────────────────────────── */
+.admin-status-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border: 2px solid $outline;
+  border-radius: 999px;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: $cream;
+  color: $dark;
+
+  &--paid, &--confirmed, &--published, &--processing { background: $sage; color: $white; }
+  &--shipped, &--scheduled { background: $lavender; }
+  &--completed { background: $peach; }
+  &--cancelled, &--refunded { background: $rose; color: $white; }
+  &--pending, &--pending_payment, &--draft { background: $cream; }
+}
+
+/* ── Calendar editor ──────────────────────────────────────────── */
+.admin-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+.admin-calendar__day {
+  border: 2px solid $outline;
+  border-radius: 6px;
+  background: $white;
+  min-height: 110px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: $font-body;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform $transition-fast;
+
+  &:hover { transform: translateY(-2px); }
+
+  &--past { background: rgba($cream, 0.4); cursor: default; opacity: 0.6; &:hover { transform: none; } }
+  &--has-slots { background: rgba($sage, 0.2); }
+  &--blocked { background: rgba($rose, 0.15); }
+  &--outside { visibility: hidden; }
+
+  &__date { font-weight: 700; }
+  &__count { font-size: 0.7rem; color: rgba($dark, 0.7); }
+}
+
+.admin-calendar__nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+
+  h2 {
+    font-family: $font-heading;
+    font-size: 1.5rem;
+    margin: 0;
+  }
+
+  button {
+    font-family: $font-body;
+    font-weight: 700;
+    border: 2px solid $outline;
+    border-radius: 6px;
+    padding: 6px 14px;
+    background: $white;
+    cursor: pointer;
+  }
+}
+
+.admin-day-detail {
+  border: $outline-width solid $outline;
+  border-radius: 8px;
+  background: $cream;
+  padding: 16px;
+  margin-bottom: 16px;
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  li {
+    background: $white;
+    border: 2px solid $outline;
+    border-radius: 6px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: space-between;
+  }
+}
+
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba($dark, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+
+  // Explicit display override — `display: flex` above has higher specificity than
+  // the UA's `[hidden] { display: none }` rule, so without this the `hidden`
+  // attribute would be ineffective and the modal would stay visible on load.
+  &[hidden] {
+    display: none;
+  }
+}
+
+.admin-modal {
+  background: $white;
+  border: $outline-width-thick solid $outline;
+  border-radius: 16px;
+  box-shadow: 6px 6px 0 $outline;
+  padding: 24px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  h3 {
+    font-family: $font-heading;
+    margin: 0 0 8px;
+    font-size: 1.4rem;
+  }
+}
+
+/* ── Photo picker grid (used in product editor + collection editor) ── */
+.admin-photo-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 2px solid rgba($dark, 0.2);
+  border-radius: 8px;
+  background: rgba($cream, 0.4);
+}
+
+.admin-photo-picker__item {
+  position: relative;
+  border: 2px solid $outline;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  aspect-ratio: 1;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  &--selected {
+    outline: 3px solid $sage;
+    outline-offset: 2px;
+  }
+}

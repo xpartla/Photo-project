@@ -1,0 +1,129 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; }
+const { lang } = Astro.props;
+const langSlug = lang === "sk" ? "rezervacia" : "booking";
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/${langSlug}`} class="admin__back">← {t(lang, "admin.common.backToList")}</a>
+    <h1 class="admin__title">{t(lang, "admin.booking.allBookings")}</h1>
+  </header>
+
+  <div style="margin-bottom:16px;">
+    <label class="account-form__label" for="status-filter" style="display:inline-block;margin-right:8px;">{t(lang, "admin.shop.statusFilter")}</label>
+    <select id="status-filter" class="account-form__input" style="display:inline-block;width:auto;">
+      <option value="">{t(lang, "admin.shop.allStatuses")}</option>
+      <option value="Pending">{t(lang, "booking.status.pending")}</option>
+      <option value="Confirmed">{t(lang, "booking.status.confirmed")}</option>
+      <option value="Cancelled">{t(lang, "booking.status.cancelled")}</option>
+    </select>
+  </div>
+
+  <section class="admin-list">
+    <ul id="b-list" class="admin-list__items"></ul>
+    <p id="b-empty" class="admin-list__empty" hidden>{t(lang, "admin.common.empty")}</p>
+  </section>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="b-config" type="application/json" set:html={JSON.stringify({
+  lang,
+  cancel: t(lang, "admin.booking.cancelBooking"),
+  confirmCancel: t(lang, "admin.booking.confirmCancel"),
+  confirm: t(lang, "admin.booking.confirmBooking"),
+  confirmConfirm: t(lang, "admin.booking.confirmConfirm"),
+  statusLabels: {
+    Pending: t(lang, "booking.status.pending"),
+    Confirmed: t(lang, "booking.status.confirmed"),
+    Cancelled: t(lang, "booking.status.cancelled"),
+  },
+})}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import { adminListBookings, cancelBooking, confirmBooking } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("b-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const listEl = document.getElementById("b-list")!;
+  const emptyEl = document.getElementById("b-empty")!;
+  const filter = document.getElementById("status-filter") as HTMLSelectElement;
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+
+  async function load() {
+    try {
+      const items = await adminListBookings(filter.value || undefined);
+      if (items.length === 0) {
+        listEl.innerHTML = "";
+        emptyEl.hidden = false;
+        return;
+      }
+      emptyEl.hidden = true;
+      listEl.innerHTML = items.map((b: any) => {
+        const slot = b.slot ? `${b.slot.date} ${b.slot.startTime}–${b.slot.endTime}` : "—";
+        const statusKey = (b.status || "").toLowerCase();
+        return `
+          <li class="admin-list__item">
+            <div class="admin-list__main">
+              <div>
+                <span class="admin-list__title">${escapeHtml(b.clientName)} · ${escapeHtml(b.sessionType?.name ?? "")}</span>
+                <div class="admin-list__meta">
+                  <span class="admin-status-pill admin-status-pill--${escapeHtml(statusKey)}">${escapeHtml(cfg.statusLabels[b.status] ?? b.status)}</span>
+                  <span>${escapeHtml(slot)}</span>
+                  <span>${escapeHtml(b.clientEmail)}</span>
+                  <span>${b.dogCount} 🐕</span>
+                  <span>${b.totalPrice} EUR</span>
+                </div>
+              </div>
+            </div>
+            <div class="admin-list__actions">
+              ${b.status === "Pending" ? `<button class="admin-list__btn" data-confirm-id="${escapeHtml(b.id)}">${escapeHtml(cfg.confirm)}</button>` : ""}
+              ${b.status !== "Cancelled" ? `<button class="admin-list__btn admin-list__btn--danger" data-cancel-id="${escapeHtml(b.id)}">${escapeHtml(cfg.cancel)}</button>` : ""}
+            </div>
+          </li>
+        `;
+      }).join("");
+
+      listEl.querySelectorAll<HTMLButtonElement>("[data-confirm-id]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm(cfg.confirmConfirm)) return;
+          try {
+            await confirmBooking(btn.dataset.confirmId!);
+            await load();
+          } catch (err: any) {
+            alert(err.message);
+          }
+        });
+      });
+
+      listEl.querySelectorAll<HTMLButtonElement>("[data-cancel-id]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm(cfg.confirmCancel)) return;
+          try {
+            await cancelBooking(btn.dataset.cancelId!);
+            await load();
+          } catch (err: any) {
+            alert(err.message);
+          }
+        });
+      });
+    } catch (err: any) {
+      listEl.innerHTML = `<li class="admin-list__error">${escapeHtml(err.message)}</li>`;
+    }
+  }
+
+  filter.addEventListener("change", load);
+  load();
+</script>

@@ -130,51 +130,57 @@ create_product() {
 log ""
 log "Creating shop products from seeded portfolio photos..."
 
-# Bratislava 2026 — limited-edition street frames
+# NOTE: the store is hidden for the dog-photography launch (PUBLIC_STORE_ENABLED).
+# These are sample dog-print products pointing at photos seeded by
+# seed-images.sh. They only become visible once the store is re-enabled —
+# see docs/store-reenable.md.
+
+# Studio dog portrait on film — limited edition
 create_product \
-  "bratislava-film-1" \
-  "Bratislava I — Limitovaná edícia" \
-  "Bratislava I — Limited Edition" \
-  "Uličný záber Bratislavy na 35mm film. Limitovaná edícia 10 kusov." \
-  "A Bratislava street frame on 35mm film. Limited edition of 10." \
+  "dog-portrait-print-1" \
+  "Psí portrét I — Limitovaná edícia" \
+  "Dog Portrait I — Limited Edition" \
+  "Ateliérový psí portrét na 35mm film. Limitovaná edícia 10 kusov." \
+  "A studio dog portrait on 35mm film. Limited edition of 10." \
   true \
   10 \
-  "film-frame-1" \
+  "portret-1" \
   '[{"formatCode":"30x40","paperTypeCode":"fine-art-310","price":89}]'
 
+# Black & white dog portrait on film — limited edition
 create_product \
-  "bratislava-film-2" \
-  "Bratislava II — Limitovaná edícia" \
-  "Bratislava II — Limited Edition" \
-  "Mestská atmosféra Bratislavy zachytená na film. Limitovaná edícia 15 kusov." \
-  "Bratislava city atmosphere captured on film. Limited edition of 15." \
+  "dog-portrait-print-2" \
+  "Čiernobiely psí portrét — Limitovaná edícia" \
+  "Black & White Dog Portrait — Limited Edition" \
+  "Čiernobiely psí portrét na film. Limitovaná edícia 15 kusov." \
+  "A black-and-white dog portrait on film. Limited edition of 15." \
   true \
   15 \
-  "film-frame-2" \
+  "portret-3" \
   '[{"formatCode":"40x60","paperTypeCode":"fine-art-310","price":120}]'
 
-# The Alps — baryta paper, medium edition
+# Dog in nature — baryta paper, medium edition
 create_product \
-  "alps-landscape-1" \
-  "Alpy I — Limitovaná edícia" \
-  "The Alps I — Limited Edition" \
-  "Alpská krajina na 35mm filme a bryte. Limitovaná edícia 20 kusov." \
-  "Alpine landscape on 35mm film and baryta. Limited edition of 20." \
+  "dog-nature-print-1" \
+  "Pes v prírode — Limitovaná edícia" \
+  "Dog in Nature — Limited Edition" \
+  "Pes v prírode na 35mm filme a bryte. Limitovaná edícia 20 kusov." \
+  "A dog in nature on 35mm film and baryta. Limited edition of 20." \
   true \
   20 \
-  "film-frame-6" \
+  "turista-2" \
   '[{"formatCode":"30x40","paperTypeCode":"baryta","price":75}]'
 
-# Wildlife in motion — open edition with multiple variants (drives dropdowns)
+# Digital dog portrait — open edition with multiple variants (drives dropdowns)
 create_product \
-  "wildlife-motion-1" \
-  "Divočina v pohybe — Otvorená edícia" \
-  "Wildlife in Motion — Open Edition" \
-  "Filmový portrét v pohybe. Vyberte si formát a papier podľa potreby." \
-  "A film portrait in motion. Pick the format and paper you prefer." \
+  "dog-portrait-open-1" \
+  "Psí portrét — Otvorená edícia" \
+  "Dog Portrait — Open Edition" \
+  "Digitálny psí portrét. Vyberte si formát a papier podľa potreby." \
+  "A digital dog portrait. Pick the format and paper you prefer." \
   false \
   null \
-  "film-frame-3" \
+  "portret-2" \
   '[
     {"formatCode":"a4","paperTypeCode":"glossy-premium","price":45},
     {"formatCode":"a4","paperTypeCode":"fine-art-310","price":55},
@@ -185,7 +191,8 @@ create_product \
 
 # ── Summary ──────────────────────────────────────────────────────────
 log ""
-log "Done! You can now test the shop flow:"
+log "Done! NOTE: the store is hidden unless PUBLIC_STORE_ENABLED=true (see"
+log "docs/store-reenable.md). With it enabled you can test the shop flow:"
 log "  1. Browse http://localhost:4321/sk/obchod"
 log "  2. Click a product → Select variant (open editions) → Add to cart"
 log "  3. Go to cart → Proceed to checkout"

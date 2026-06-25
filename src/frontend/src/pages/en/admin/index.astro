@@ -1,6 +1,7 @@
 ---
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import { t } from "../../../lib/i18n";
+import { STORE_ENABLED } from "../../../lib/features";
 
 const lang = "en";
 const pageTitle = `${t(lang, "admin.title")} — PartlPhoto`;
@@ -14,27 +15,42 @@ const pageTitle = `${t(lang, "admin.title")} — PartlPhoto`;
       <p class="admin__subtitle">{t(lang, "admin.welcomeDescription")}</p>
     </header>
 
+    <section class="admin__counts">
+      <a class="admin__count-card" href={`/${lang}/admin/booking`}>
+        <strong data-count="bookings">—</strong>
+        <span>{t(lang, "admin.dashboard.pendingBookings")}</span>
+      </a>
+      {STORE_ENABLED && (
+        <a class="admin__count-card" href={`/${lang}/admin/shop/orders`}>
+          <strong data-count="orders">—</strong>
+          <span>{t(lang, "admin.dashboard.pendingOrders")}</span>
+        </a>
+      )}
+      <a class="admin__count-card" href={`/${lang}/admin/blog`}>
+        <strong data-count="drafts">—</strong>
+        <span>{t(lang, "admin.dashboard.draftPosts")}</span>
+      </a>
+    </section>
+
     <section class="admin__grid">
       <a class="admin__card admin__card--primary" href={`/${lang}/admin/blog`}>
         <h2 class="admin__card-title">{t(lang, "admin.blog")}</h2>
         <p class="admin__card-desc">{t(lang, "admin.blog.description")}</p>
       </a>
-
-      <div class="admin__card admin__card--disabled">
+      <a class="admin__card" href={`/${lang}/admin/portfolio`}>
         <h2 class="admin__card-title">{t(lang, "admin.portfolio")}</h2>
         <p class="admin__card-desc">{t(lang, "admin.portfolio.description")}</p>
-        <span class="admin__card-badge">{t(lang, "admin.comingSoon")}</span>
-      </div>
-      <div class="admin__card admin__card--disabled">
-        <h2 class="admin__card-title">{t(lang, "admin.shop")}</h2>
-        <p class="admin__card-desc">{t(lang, "admin.shop.description")}</p>
-        <span class="admin__card-badge">{t(lang, "admin.comingSoon")}</span>
-      </div>
-      <div class="admin__card admin__card--disabled">
+      </a>
+      {STORE_ENABLED && (
+        <a class="admin__card" href={`/${lang}/admin/shop`}>
+          <h2 class="admin__card-title">{t(lang, "admin.shop")}</h2>
+          <p class="admin__card-desc">{t(lang, "admin.shop.description")}</p>
+        </a>
+      )}
+      <a class="admin__card" href={`/${lang}/admin/booking`}>
         <h2 class="admin__card-title">{t(lang, "admin.booking")}</h2>
         <p class="admin__card-desc">{t(lang, "admin.booking.description")}</p>
-        <span class="admin__card-badge">{t(lang, "admin.comingSoon")}</span>
-      </div>
+      </a>
     </section>
   </main>
 
@@ -42,10 +58,27 @@ const pageTitle = `${t(lang, "admin.title")} — PartlPhoto`;
 
   <script>
     import { requireAdmin } from "../../../lib/admin";
+    import { listMyBookings, listBlogDrafts } from "../../../lib/admin-api";
+
     const token = requireAdmin("en");
     if (token) {
       const root = document.querySelector("[data-admin-root]") as HTMLElement | null;
       if (root) root.hidden = false;
+
+      (async () => {
+        try {
+          const bookings = await listMyBookings();
+          const pending = bookings.filter((b) => b.status === "Pending").length;
+          const el = document.querySelector("[data-count='bookings']");
+          if (el) el.textContent = String(pending);
+        } catch { /* leave em-dash */ }
+        try {
+          const drafts = await listBlogDrafts();
+          const draftCount = (drafts.items || []).filter((p: any) => p.status === "Draft").length;
+          const el = document.querySelector("[data-count='drafts']");
+          if (el) el.textContent = String(draftCount);
+        } catch { /* leave em-dash */ }
+      })();
     }
   </script>
 </BaseLayout>

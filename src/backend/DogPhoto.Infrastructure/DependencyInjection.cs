@@ -119,6 +119,31 @@ public static class DependencyInjection
             // Ensure database exists using first context
             await contexts[0].Database.EnsureCreatedAsync();
 
+            // Dev-only schema patches for identity: additive changes (new column,
+            // new table) that EnsureCreated skips on an already-existing schema.
+            // Kept idempotent via IF NOT EXISTS so re-runs are safe.
+            var identityDb = sp.GetRequiredService<IdentityDbContext>();
+            await identityDb.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE identity.users ADD COLUMN IF NOT EXISTS \"Phone\" varchar(50)");
+            await identityDb.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS identity.addresses (
+                    "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    "UserId" uuid NOT NULL REFERENCES identity.users("Id") ON DELETE CASCADE,
+                    "Label" varchar(64),
+                    "Name" varchar(256) NOT NULL,
+                    "Street" varchar(256) NOT NULL,
+                    "City" varchar(128) NOT NULL,
+                    "PostalCode" varchar(32) NOT NULL,
+                    "Country" varchar(2) NOT NULL DEFAULT 'SK',
+                    "IsDefaultShipping" boolean NOT NULL DEFAULT false,
+                    "IsDefaultBilling" boolean NOT NULL DEFAULT false,
+                    "CreatedAt" timestamptz NOT NULL DEFAULT now(),
+                    "UpdatedAt" timestamptz NOT NULL DEFAULT now()
+                )
+                """);
+            await identityDb.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS \"IX_addresses_UserId\" ON identity.addresses(\"UserId\")");
+
             // Dev-only: rebuild the eshop schema when its model has changed in a
             // backwards-incompatible way. Detection is by presence of a table that
             // only exists in the latest model. Product data is re-seeded by seed-shop.sh.

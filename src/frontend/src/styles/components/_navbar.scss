@@ -239,6 +239,14 @@
     color: $dark;
     transition: background-color $transition-fast;
 
+    // `display: block` above has equal specificity to the UA's
+    // `[hidden] { display: none }` rule and appears later in the cascade, so
+    // without this the `hidden` attribute would be ineffective (admin link
+    // would be visible to non-admins).
+    &[hidden] {
+      display: none;
+    }
+
     &:hover {
       background-color: $cream;
     }
@@ -392,6 +400,12 @@
     border-radius: 10px;
     border: $outline-width solid transparent;
     transition: all $transition-fast;
+
+    // Same ties-broken-by-order story as `__dropdown-item`: without this,
+    // the `hidden` attribute on logged-out admin/account links wouldn't hide them.
+    &[hidden] {
+      display: none;
+    }
 
     &:hover, &--active {
       border-color: $outline;

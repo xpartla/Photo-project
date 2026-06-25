@@ -8,18 +8,18 @@ import type { PhotoSummary } from "../../../lib/api";
 
 const lang = "en";
 
-let dogPhotos: PhotoSummary[];
 let filmPhotos: PhotoSummary[];
+let digitalPhotos: PhotoSummary[];
 try {
-  const [dogs, films] = await Promise.all([
-    getPhotos({ size: 50, tag: "dog", lang }),
+  const [films, digitals] = await Promise.all([
     getPhotos({ size: 50, tag: "film", lang }),
+    getPhotos({ size: 50, tag: "digital", lang }),
   ]);
-  dogPhotos = dogs.items;
   filmPhotos = films.items;
+  digitalPhotos = digitals.items;
 } catch {
-  dogPhotos = [];
   filmPhotos = [];
+  digitalPhotos = [];
 }
 
 const pageTitle = `${t(lang, "portfolio.title")} — DogPhoto`;
@@ -47,13 +47,13 @@ const jsonLd = {
 
   <PortfolioSplit
     lang={lang}
-    dogPhotos={dogPhotos}
     filmPhotos={filmPhotos}
+    digitalPhotos={digitalPhotos}
     labels={{
       title: t(lang, "portfolio.title"),
       subtitle: t(lang, "portfolio.heroSubtitle"),
-      dogSection: t(lang, "portfolio.dogSection"),
       filmSection: t(lang, "portfolio.filmSection"),
+      digitalSection: t(lang, "portfolio.digitalSection"),
       viewDetail: t(lang, "portfolio.viewDetail"),
       buyAsPrint: t(lang, "portfolio.buyAsPrint"),
       close: t(lang, "portfolio.close"),

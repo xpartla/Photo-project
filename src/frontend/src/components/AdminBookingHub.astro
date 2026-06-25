@@ -1,0 +1,40 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; }
+const { lang } = Astro.props;
+const langSlug = lang === "sk" ? "rezervacia" : "booking";
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin`} class="admin__back">← {t(lang, "admin.title")}</a>
+    <h1 class="admin__title">{t(lang, "admin.booking.title")}</h1>
+  </header>
+
+  <section class="admin__grid">
+    <a class="admin__card" href={`/${lang}/admin/${langSlug}/bookings`}>
+      <h2 class="admin__card-title">{t(lang, "admin.booking.bookings")}</h2>
+      <p class="admin__card-desc">{t(lang, "admin.booking.allBookings")}</p>
+    </a>
+    <a class="admin__card" href={`/${lang}/admin/${langSlug}/calendar`}>
+      <h2 class="admin__card-title">{t(lang, "admin.booking.calendar")}</h2>
+      <p class="admin__card-desc">{t(lang, "admin.booking.recurring")} · {t(lang, "admin.booking.bulkDay")} · {t(lang, "admin.booking.blockDay")}</p>
+    </a>
+    <a class="admin__card" href={`/${lang}/admin/${langSlug}/types`}>
+      <h2 class="admin__card-title">{t(lang, "admin.booking.sessionTypes")}</h2>
+      <p class="admin__card-desc">{t(lang, "admin.booking.editSessionType")}</p>
+    </a>
+  </section>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  const token = requireAdmin(document.documentElement.lang === "sk" ? "sk" : "en");
+  if (token) {
+    const root = document.querySelector("[data-admin-root]") as HTMLElement;
+    root.hidden = false;
+  }
+</script>

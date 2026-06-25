@@ -516,6 +516,161 @@ public sealed class BookingTests : ApiTestBase
         Assert.Equal("14:30", slots[3].GetProperty("endTime").GetString());
     }
 
+    // ── Recurring availability (Epic 8) ─────────────────────────────
+
+    [Fact]
+    public async Task RecurringAvailability_RequiresAdmin()
+    {
+        var customer = await CreateCustomerClientAsync();
+        var resp = await customer.PostAsJsonAsync("/api/booking/availability/recurring", new
+        {
+            daysOfWeek = new[] { 6 },
+            fromDate = "2027-04-03",
+            toDate = "2027-04-24",
+            startTime = "09:00",
+            endTime = "12:00",
+            slotDurationMinutes = 60
+        });
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task RecurringAvailability_GeneratesSlotsForMatchingWeekdays()
+    {
+        var admin = await CreateAdminClientAsync();
+        // 2027-04-03 .. 2027-04-24 inclusive contains 4 Saturdays (3, 10, 17, 24).
+        // 09:00–12:00 with 60-min slots and no break → 3 slots/day × 4 days = 12 slots.
+        var resp = await admin.PostAsJsonAsync("/api/booking/availability/recurring", new
+        {
+            daysOfWeek = new[] { 6 }, // 6 = Saturday (matches DayOfWeek enum)
+            fromDate = "2027-04-03",
+            toDate = "2027-04-24",
+            startTime = "09:00",
+            endTime = "12:00",
+            slotDurationMinutes = 60
+        });
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        Assert.Equal(12, doc.RootElement.GetProperty("count").GetInt32());
+        Assert.Equal(4, doc.RootElement.GetProperty("addedDays").GetInt32());
+        Assert.Equal(0, doc.RootElement.GetProperty("skippedDays").GetInt32());
+    }
+
+    [Fact]
+    public async Task RecurringAvailability_SkipsDaysThatAlreadyHaveSlots()
+    {
+        var admin = await CreateAdminClientAsync();
+        // Pre-create a slot on the first Friday of the run; the recurring call
+        // should skip that day entirely (whole-day skip, not per-slot).
+        await admin.PostAsJsonAsync("/api/booking/availability", new
+        {
+            date = "2027-05-07",
+            startTime = "10:00",
+            endTime = "11:00"
+        });
+
+        // 2027-05-07 .. 2027-05-21 has 3 Fridays (7, 14, 21). One is pre-occupied → 2 days × 3 hrs/day @ 60-min = 6 slots.
+        var resp = await admin.PostAsJsonAsync("/api/booking/availability/recurring", new
+        {
+            daysOfWeek = new[] { 5 }, // 5 = Friday
+            fromDate = "2027-05-07",
+            toDate = "2027-05-21",
+            startTime = "09:00",
+            endTime = "12:00",
+            slotDurationMinutes = 60
+        });
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        Assert.Equal(6, doc.RootElement.GetProperty("count").GetInt32());
+        Assert.Equal(2, doc.RootElement.GetProperty("addedDays").GetInt32());
+        Assert.Equal(1, doc.RootElement.GetProperty("skippedDays").GetInt32());
+    }
+
+    [Fact]
+    public async Task RecurringAvailability_RejectsInvertedDateRange()
+    {
+        var admin = await CreateAdminClientAsync();
+        var resp = await admin.PostAsJsonAsync("/api/booking/availability/recurring", new
+        {
+            daysOfWeek = new[] { 6 },
+            fromDate = "2027-06-30",
+            toDate = "2027-06-01",
+            startTime = "09:00",
+            endTime = "12:00",
+            slotDurationMinutes = 60
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task RecurringAvailability_RejectsEmptyDayList()
+    {
+        var admin = await CreateAdminClientAsync();
+        var resp = await admin.PostAsJsonAsync("/api/booking/availability/recurring", new
+        {
+            daysOfWeek = Array.Empty<int>(),
+            fromDate = "2027-07-01",
+            toDate = "2027-07-31",
+            startTime = "09:00",
+            endTime = "12:00",
+            slotDurationMinutes = 60
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    // ── Admin-wide bookings endpoint ────────────────────────────────
+
+    [Fact]
+    public async Task AdminBookings_RequiresAdmin()
+    {
+        var customer = await CreateCustomerClientAsync();
+        var resp = await customer.GetAsync("/api/booking/admin/bookings");
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminBookings_ListsAcrossUsers_AndFiltersByStatus()
+    {
+        var admin = await CreateAdminClientAsync();
+
+        // Set up a session type + slot owned by the admin-created world.
+        var sessionTypes = await admin.GetFromJsonAsync<JsonElement>("/api/booking/session-types");
+        var sessionId = sessionTypes.EnumerateArray().First().GetProperty("id").GetString()!;
+
+        var slotResp = await admin.PostAsJsonAsync("/api/booking/availability", new
+        {
+            date = "2027-08-07",
+            startTime = "10:00",
+            endTime = "11:00"
+        });
+        var slotId = (await slotResp.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("slots").EnumerateArray().First().GetProperty("id").GetString()!;
+
+        // Customer makes a booking.
+        var customer = await CreateCustomerClientAsync();
+        var bookResp = await customer.PostAsJsonAsync("/api/booking/bookings", new
+        {
+            sessionTypeId = sessionId,
+            slotId,
+            clientName = "Customer A",
+            clientEmail = "customer-a@example.test",
+            dogCount = 1
+        });
+        bookResp.EnsureSuccessStatusCode();
+
+        // Admin sees it in /admin/bookings.
+        var all = await admin.GetFromJsonAsync<JsonElement>("/api/booking/admin/bookings");
+        var emails = all.EnumerateArray().Select(b => b.GetProperty("clientEmail").GetString()!).ToList();
+        Assert.Contains("customer-a@example.test", emails);
+
+        // Filtered to Cancelled → not present (still Pending).
+        var cancelled = await admin.GetFromJsonAsync<JsonElement>("/api/booking/admin/bookings?status=Cancelled");
+        var cancelledEmails = cancelled.EnumerateArray().Select(b => b.GetProperty("clientEmail").GetString()!).ToList();
+        Assert.DoesNotContain("customer-a@example.test", cancelledEmails);
+    }
+
     [Fact]
     public async Task GetSessionTypes_LanguageParameter_ReturnsLocalizedNames()
     {

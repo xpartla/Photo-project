@@ -38,6 +38,8 @@ pnpm-debug.log*
 
 # Docker
 docker-compose.override.yml
+# Compose auto-merges this name when the base file is compose.yml (per-machine port remaps etc.)
+compose.override.yml
 
 # IDE
 .idea/

@@ -1,0 +1,313 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; mode: "create" | "edit"; slug?: string; }
+const { lang, mode, slug } = Astro.props;
+const langSlug = lang === "sk" ? "obchod" : "shop";
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/${langSlug}`} class="admin__back">← {t(lang, "admin.common.backToList")}</a>
+    <h1 class="admin__title">
+      {mode === "create" ? t(lang, "admin.shop.newProduct") : t(lang, "admin.shop.editProduct")}
+    </h1>
+  </header>
+
+  <form class="account-form" id="prod-form">
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label" for="title-sk">{t(lang, "admin.shop.titleSk")} *</label>
+        <input class="account-form__input" id="title-sk" type="text" required />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label" for="title-en">{t(lang, "admin.shop.titleEn")} *</label>
+        <input class="account-form__input" id="title-en" type="text" required />
+      </div>
+    </div>
+
+    <div class="account-form__field">
+      <label class="account-form__label" for="slug">{t(lang, "admin.shop.slug")} *</label>
+      <input class="account-form__input" id="slug" type="text" pattern="[a-z0-9-]+" required />
+    </div>
+
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label" for="desc-sk">{t(lang, "admin.shop.descriptionSk")}</label>
+        <textarea class="account-form__input" id="desc-sk" rows="2"></textarea>
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label" for="desc-en">{t(lang, "admin.shop.descriptionEn")}</label>
+        <textarea class="account-form__input" id="desc-en" rows="2"></textarea>
+      </div>
+    </div>
+
+    <div class="account-form__field">
+      <label class="account-form__label">{t(lang, "admin.shop.photo")}</label>
+      <div id="picked-photo" style="margin-bottom:8px;color:rgba(42,42,42,0.7);font-size:0.85rem;"></div>
+      <div class="admin-photo-picker" id="photo-picker"></div>
+    </div>
+
+    <label class="account-form__checkbox">
+      <input type="checkbox" id="is-limited" />
+      {t(lang, "admin.shop.isLimited")}
+    </label>
+
+    <div class="account-form__field" id="edition-size-field" hidden>
+      <label class="account-form__label" for="edition-size">{t(lang, "admin.shop.editionSize")}</label>
+      <input class="account-form__input" id="edition-size" type="number" min="1" step="1" />
+    </div>
+
+    <label class="account-form__checkbox">
+      <input type="checkbox" id="is-available" checked />
+      {t(lang, "admin.shop.isAvailable")}
+    </label>
+
+    <h2 class="account-form__section-title">{t(lang, "admin.shop.variants")}</h2>
+    <p class="account-form__hint">{t(lang, "admin.shop.variantsHint")}</p>
+
+    <table class="admin-variants-table">
+      <thead>
+        <tr>
+          <th>{t(lang, "admin.shop.format")}</th>
+          <th>{t(lang, "admin.shop.paperType")}</th>
+          <th>{t(lang, "admin.shop.price")}</th>
+          <th>{t(lang, "admin.shop.sku")}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="variants-body"></tbody>
+    </table>
+
+    <button type="button" class="admin-list__btn" id="add-variant">+ {t(lang, "admin.shop.addVariant")}</button>
+
+    <div id="prod-error" class="account-form__error"></div>
+    <div id="prod-success" class="account-form__success"></div>
+
+    <div class="account-form__actions">
+      <button type="submit" class="account-form__submit" id="save-btn">{t(lang, "admin.common.save")}</button>
+    </div>
+  </form>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="prod-config" type="application/json" set:html={JSON.stringify({
+  lang, mode, slug: slug ?? null,
+  remove: t(lang, "admin.shop.removeVariant"),
+  save: t(lang, "admin.common.save"),
+  saving: t(lang, "admin.common.saving"),
+  redirect: `/${lang}/admin/${langSlug}`,
+})}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import {
+    getProductBySlug, createProduct, updateProduct,
+    addProductVariant, updateVariant, deleteVariant,
+    listFormats, listPaperTypes, listPhotos,
+  } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("prod-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const errEl = document.getElementById("prod-error")!;
+  const okEl = document.getElementById("prod-success")!;
+  const btn = document.getElementById("save-btn") as HTMLButtonElement;
+  const limitedCb = document.getElementById("is-limited") as HTMLInputElement;
+  const editionField = document.getElementById("edition-size-field") as HTMLElement;
+
+  let productId: string | null = null;
+  let pickedPhotoId: string | null = null;
+  let formats: any[] = [];
+  let papers: any[] = [];
+
+  // Variants in memory:
+  // - existing variants have an `id` (from server); changes call updateVariant on save
+  // - new variants have no id; on save call addProductVariant (or post in the create body)
+  // - removed existing variants tracked in `removed` for delete-on-save
+  type V = { id?: string; formatCode: string; paperTypeCode: string; price: number; sku: string; isAvailable: boolean; isNew?: boolean };
+  let variants: V[] = [];
+  const removedVariantIds = new Set<string>();
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+  function thumb(p: any): string {
+    const v = (p.variants || []).find((x: any) => x.format === "jpeg" || x.format === "jpg") ?? p.variants?.[0];
+    return v ? v.blobUrl.replace(/^http:\/\/azurite:10000\/devstoreaccount1/, "http://localhost:10000/devstoreaccount1") : "";
+  }
+
+  function renderVariants() {
+    const tbody = document.getElementById("variants-body")!;
+    if (limitedCb.checked && variants.length > 1) variants = variants.slice(0, 1);
+    tbody.innerHTML = variants.map((v, i) => `
+      <tr data-i="${i}">
+        <td><select data-field="formatCode">
+          ${formats.map((f) => `<option value="${escapeHtml(f.code)}" ${v.formatCode === f.code ? "selected" : ""}>${escapeHtml(f.nameEn)}</option>`).join("")}
+        </select></td>
+        <td><select data-field="paperTypeCode">
+          ${papers.map((p) => `<option value="${escapeHtml(p.code)}" ${v.paperTypeCode === p.code ? "selected" : ""}>${escapeHtml(p.nameEn)}</option>`).join("")}
+        </select></td>
+        <td><input type="number" data-field="price" step="0.01" min="0" value="${v.price}" /></td>
+        <td><input type="text" data-field="sku" value="${escapeHtml(v.sku || "")}" /></td>
+        <td><button type="button" data-remove="${i}">${escapeHtml(cfg.remove)}</button></td>
+      </tr>
+    `).join("");
+
+    tbody.querySelectorAll<HTMLElement>("tr").forEach((row) => {
+      const i = parseInt(row.dataset.i!, 10);
+      row.querySelectorAll<HTMLElement>("[data-field]").forEach((el) => {
+        const inp = el as HTMLInputElement | HTMLSelectElement;
+        inp.addEventListener("input", () => {
+          const f = inp.dataset.field! as keyof V;
+          if (f === "price") (variants[i] as any)[f] = parseFloat(inp.value);
+          else (variants[i] as any)[f] = inp.value;
+        });
+      });
+      row.querySelector("[data-remove]")?.addEventListener("click", () => {
+        const v = variants[i];
+        if (v.id) removedVariantIds.add(v.id);
+        variants.splice(i, 1);
+        renderVariants();
+      });
+    });
+  }
+
+  function renderPickedPhoto(photo: any) {
+    const el = document.getElementById("picked-photo")!;
+    if (!photo) { el.textContent = ""; return; }
+    el.innerHTML = `<img src="${escapeHtml(thumb(photo))}" alt="" style="width:96px;height:96px;object-fit:cover;border:2px solid #2A2A2A;border-radius:6px;" />`;
+  }
+
+  async function renderPicker() {
+    const data = await listPhotos(cfg.lang, { size: 200, includeUnpublished: true });
+    const pickerEl = document.getElementById("photo-picker")!;
+    pickerEl.innerHTML = (data.items || []).map((p: any) => `
+      <div class="admin-photo-picker__item ${pickedPhotoId === p.id ? "admin-photo-picker__item--selected" : ""}" data-photo-id="${escapeHtml(p.id)}" title="${escapeHtml(p.title || p.slug)}">
+        <img src="${escapeHtml(thumb(p))}" alt="" loading="lazy" />
+      </div>
+    `).join("");
+    pickerEl.querySelectorAll<HTMLElement>("[data-photo-id]").forEach((el) => {
+      el.addEventListener("click", () => {
+        pickerEl.querySelectorAll(".admin-photo-picker__item--selected").forEach((s) => s.classList.remove("admin-photo-picker__item--selected"));
+        pickedPhotoId = el.dataset.photoId!;
+        el.classList.add("admin-photo-picker__item--selected");
+        const photo = (data.items || []).find((p: any) => p.id === pickedPhotoId);
+        renderPickedPhoto(photo);
+      });
+    });
+    if (pickedPhotoId) {
+      const photo = (data.items || []).find((p: any) => p.id === pickedPhotoId);
+      renderPickedPhoto(photo);
+    }
+  }
+
+  limitedCb.addEventListener("change", () => {
+    editionField.hidden = !limitedCb.checked;
+    renderVariants();
+  });
+
+  document.getElementById("add-variant")?.addEventListener("click", () => {
+    if (limitedCb.checked && variants.length >= 1) return;
+    const defaultFmt = formats[0]?.code ?? "";
+    const defaultPap = papers[0]?.code ?? "";
+    variants.push({ formatCode: defaultFmt, paperTypeCode: defaultPap, price: 0, sku: "", isAvailable: true, isNew: true });
+    renderVariants();
+  });
+
+  (async () => {
+    [formats, papers] = await Promise.all([listFormats(), listPaperTypes()]);
+
+    if (cfg.mode === "edit" && cfg.slug) {
+      try {
+        const product: any = await getProductBySlug(cfg.slug, cfg.lang);
+        productId = product.id;
+        pickedPhotoId = product.photoId ?? null;
+        (document.getElementById("title-sk") as HTMLInputElement).value = product.titleSk ?? "";
+        (document.getElementById("title-en") as HTMLInputElement).value = product.titleEn ?? "";
+        (document.getElementById("slug") as HTMLInputElement).value = product.slug ?? "";
+        (document.getElementById("desc-sk") as HTMLTextAreaElement).value = product.descriptionSk ?? "";
+        (document.getElementById("desc-en") as HTMLTextAreaElement).value = product.descriptionEn ?? "";
+        (document.getElementById("is-limited") as HTMLInputElement).checked = !!product.isLimitedEdition;
+        editionField.hidden = !product.isLimitedEdition;
+        if (product.editionSize != null) (document.getElementById("edition-size") as HTMLInputElement).value = String(product.editionSize);
+        (document.getElementById("is-available") as HTMLInputElement).checked = !!product.isAvailable;
+
+        variants = (product.productVariants || []).map((v: any) => ({
+          id: v.id, formatCode: v.formatCode, paperTypeCode: v.paperTypeCode,
+          price: v.price, sku: v.sku ?? "", isAvailable: v.isAvailable,
+        }));
+      } catch (err: any) {
+        errEl.textContent = err.message;
+      }
+    }
+
+    renderVariants();
+    renderPicker();
+  })();
+
+  document.getElementById("prod-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errEl.textContent = "";
+    okEl.textContent = "";
+    btn.disabled = true;
+    btn.textContent = cfg.saving;
+
+    try {
+      const titleSk = (document.getElementById("title-sk") as HTMLInputElement).value.trim();
+      const titleEn = (document.getElementById("title-en") as HTMLInputElement).value.trim();
+      const slug = (document.getElementById("slug") as HTMLInputElement).value.trim();
+      const descSk = (document.getElementById("desc-sk") as HTMLTextAreaElement).value || null;
+      const descEn = (document.getElementById("desc-en") as HTMLTextAreaElement).value || null;
+      const isLimited = (document.getElementById("is-limited") as HTMLInputElement).checked;
+      const editionSize = isLimited ? parseInt((document.getElementById("edition-size") as HTMLInputElement).value, 10) || null : null;
+      const isAvailable = (document.getElementById("is-available") as HTMLInputElement).checked;
+
+      if (variants.length === 0) throw new Error("At least one variant required.");
+
+      if (cfg.mode === "create") {
+        await createProduct({
+          titleSk, titleEn, slug,
+          photoId: pickedPhotoId,
+          descriptionSk: descSk, descriptionEn: descEn,
+          isLimitedEdition: isLimited, editionSize, isAvailable,
+          variants: variants.map((v) => ({
+            formatCode: v.formatCode, paperTypeCode: v.paperTypeCode,
+            price: v.price, sku: v.sku || null, isAvailable: v.isAvailable,
+          })),
+        });
+      } else if (productId) {
+        await updateProduct(productId, {
+          titleSk, titleEn,
+          descriptionSk: descSk, descriptionEn: descEn,
+          editionSize: editionSize ?? undefined,
+          isAvailable,
+        });
+        // Variants: delete removed, update existing, add new
+        for (const id of removedVariantIds) {
+          try { await deleteVariant(id); } catch (e) { /* continue */ }
+        }
+        for (const v of variants) {
+          if (v.id) {
+            await updateVariant(v.id, { price: v.price, sku: v.sku || null, isAvailable: v.isAvailable });
+          } else {
+            await addProductVariant(productId, {
+              formatCode: v.formatCode, paperTypeCode: v.paperTypeCode,
+              price: v.price, sku: v.sku || null, isAvailable: v.isAvailable,
+            });
+          }
+        }
+      }
+      window.location.href = cfg.redirect;
+    } catch (err: any) {
+      errEl.textContent = err.message;
+      btn.disabled = false;
+      btn.textContent = cfg.save;
+    }
+  });
+</script>

@@ -1,0 +1,159 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; }
+const { lang } = Astro.props;
+const langSlug = lang === "sk" ? "obchod" : "shop";
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/${langSlug}`} class="admin__back">← {t(lang, "admin.common.backToList")}</a>
+    <h1 class="admin__title">{t(lang, "admin.shop.lookups")}</h1>
+  </header>
+
+  <section style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+    <div>
+      <h2 class="account-form__section-title">{t(lang, "admin.shop.formats")}</h2>
+      <ul id="formats-list" class="admin-list__items" style="margin-bottom:16px;"></ul>
+      <form class="account-form" id="format-form">
+        <div class="account-form__row">
+          <div class="account-form__field">
+            <label class="account-form__label">{t(lang, "admin.shop.lookupCode")}</label>
+            <input class="account-form__input" name="code" required />
+          </div>
+          <div class="account-form__field">
+            <label class="account-form__label">{t(lang, "admin.shop.lookupNameSk")}</label>
+            <input class="account-form__input" name="nameSk" required />
+          </div>
+        </div>
+        <div class="account-form__row">
+          <div class="account-form__field">
+            <label class="account-form__label">{t(lang, "admin.shop.lookupNameEn")}</label>
+            <input class="account-form__input" name="nameEn" required />
+          </div>
+          <div class="account-form__field">
+            <label class="account-form__label">{t(lang, "admin.shop.lookupDisplayOrder")}</label>
+            <input class="account-form__input" name="displayOrder" type="number" />
+          </div>
+        </div>
+        <div id="format-error" class="account-form__error"></div>
+        <div class="account-form__actions">
+          <button type="submit" class="account-form__submit">{t(lang, "admin.shop.add")}</button>
+        </div>
+      </form>
+    </div>
+
+    <div>
+      <h2 class="account-form__section-title">{t(lang, "admin.shop.paperTypes")}</h2>
+      <ul id="papers-list" class="admin-list__items" style="margin-bottom:16px;"></ul>
+      <form class="account-form" id="paper-form">
+        <div class="account-form__row">
+          <div class="account-form__field">
+            <label class="account-form__label">{t(lang, "admin.shop.lookupCode")}</label>
+            <input class="account-form__input" name="code" required />
+          </div>
+          <div class="account-form__field">
+            <label class="account-form__label">{t(lang, "admin.shop.lookupNameSk")}</label>
+            <input class="account-form__input" name="nameSk" required />
+          </div>
+        </div>
+        <div class="account-form__row">
+          <div class="account-form__field">
+            <label class="account-form__label">{t(lang, "admin.shop.lookupNameEn")}</label>
+            <input class="account-form__input" name="nameEn" required />
+          </div>
+          <div class="account-form__field">
+            <label class="account-form__label">{t(lang, "admin.shop.lookupDisplayOrder")}</label>
+            <input class="account-form__input" name="displayOrder" type="number" />
+          </div>
+        </div>
+        <div id="paper-error" class="account-form__error"></div>
+        <div class="account-form__actions">
+          <button type="submit" class="account-form__submit">{t(lang, "admin.shop.add")}</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="lookup-config" type="application/json" set:html={JSON.stringify({ lang })}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import { listFormats, listPaperTypes, createFormat, createPaperType } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("lookup-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+
+  async function refreshFormats() {
+    const items = await listFormats();
+    document.getElementById("formats-list")!.innerHTML = items.map((f: any) => `
+      <li class="admin-list__item">
+        <div class="admin-list__main">
+          <div>
+            <span class="admin-list__title">${escapeHtml(f.nameEn)}</span>
+            <div class="admin-list__meta"><span>${escapeHtml(f.code)}</span></div>
+          </div>
+        </div>
+      </li>
+    `).join("");
+  }
+
+  async function refreshPapers() {
+    const items = await listPaperTypes();
+    document.getElementById("papers-list")!.innerHTML = items.map((p: any) => `
+      <li class="admin-list__item">
+        <div class="admin-list__main">
+          <div>
+            <span class="admin-list__title">${escapeHtml(p.nameEn)}</span>
+            <div class="admin-list__meta"><span>${escapeHtml(p.code)}</span></div>
+          </div>
+        </div>
+      </li>
+    `).join("");
+  }
+
+  function readForm(form: HTMLFormElement): any {
+    const fd = new FormData(form);
+    const o: any = {};
+    fd.forEach((v, k) => { o[k] = v; });
+    if (o.displayOrder) o.displayOrder = parseInt(o.displayOrder, 10);
+    return o;
+  }
+
+  document.getElementById("format-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById("format-error")!;
+    errEl.textContent = "";
+    try {
+      await createFormat(readForm(e.target as HTMLFormElement));
+      (e.target as HTMLFormElement).reset();
+      await refreshFormats();
+    } catch (err: any) { errEl.textContent = err.message; }
+  });
+
+  document.getElementById("paper-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById("paper-error")!;
+    errEl.textContent = "";
+    try {
+      await createPaperType(readForm(e.target as HTMLFormElement));
+      (e.target as HTMLFormElement).reset();
+      await refreshPapers();
+    } catch (err: any) { errEl.textContent = err.message; }
+  });
+
+  refreshFormats();
+  refreshPapers();
+</script>

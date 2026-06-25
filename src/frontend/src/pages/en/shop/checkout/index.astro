@@ -14,6 +14,14 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
     <div class="checkout__form" id="checkout-form">
       <h2 class="checkout__section-title">{t(lang, "checkout.shipping")}</h2>
 
+      <div class="checkout__field" id="address-picker-field" hidden>
+        <label class="checkout__label" for="address-picker">{t(lang, "checkout.savedAddress")}</label>
+        <select class="checkout__input" id="address-picker"></select>
+        <a href={`/${lang}/account/addresses`} style="font-size:0.85rem;margin-top:4px;display:inline-block;">{t(lang, "checkout.manageAddresses")}</a>
+      </div>
+
+      <div id="inline-address-fields">
+
       <div class="checkout__field">
         <label class="checkout__label" for="ship-name">{t(lang, "checkout.name")}</label>
         <input class="checkout__input" id="ship-name" type="text" required />
@@ -34,6 +42,13 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
         <label class="checkout__label" for="ship-country">{t(lang, "checkout.country")}</label>
         <input class="checkout__input" id="ship-country" type="text" value="SK" />
       </div>
+
+      <label class="checkout__checkbox" id="save-address-row">
+        <input type="checkbox" id="save-address" />
+        {t(lang, "checkout.saveAddress")}
+      </label>
+
+      </div><!-- /#inline-address-fields -->
 
       <label class="checkout__checkbox">
         <input type="checkbox" id="same-billing" checked />
@@ -86,20 +101,76 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
     processingText: t(lang, "checkout.processing"),
     requiredText: t(lang, "checkout.required"),
     payText: t(lang, "checkout.payNow"),
+    useNewLabel: t(lang, "checkout.useNewAddress"),
   })}></script>
 
   <script>
     import { getCart } from "../../../../lib/cart";
+    import { listAddresses } from "../../../../lib/account";
+    import type { Address } from "../../../../lib/account";
 
     const cfg = JSON.parse(document.getElementById("checkout-config")!.textContent!);
 
-    // Redirect to login if not authenticated — return-url points back here so
-    // the user lands back on checkout after login, with their cart already
-    // synced server-side.
     const token = localStorage.getItem("partlphoto_token");
     if (!token) {
       window.location.href = cfg.loginUrl;
       throw new Error("redirect");
+    }
+
+    // ── Saved-address picker ─────────────────────────────────────
+    const pickerField = document.getElementById("address-picker-field") as HTMLElement;
+    const pickerSelect = document.getElementById("address-picker") as HTMLSelectElement;
+    const inlineFields = document.getElementById("inline-address-fields") as HTMLElement;
+    const saveAddressRow = document.getElementById("save-address-row") as HTMLElement;
+    const saveAddressCb = document.getElementById("save-address") as HTMLInputElement;
+    let savedAddresses: Address[] = [];
+
+    function escAttr(s: string) {
+      return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+    }
+
+    function fillInlineFromAddress(a: Address | null) {
+      const set = (id: string, v: string) => { (document.getElementById(id) as HTMLInputElement).value = v; };
+      if (!a) { ["ship-name","ship-street","ship-city","ship-postal"].forEach((id) => set(id, "")); set("ship-country","SK"); return; }
+      set("ship-name", a.name);
+      set("ship-street", a.street);
+      set("ship-city", a.city);
+      set("ship-postal", a.postalCode);
+      set("ship-country", a.country);
+    }
+
+    function applyPickerSelection() {
+      const value = pickerSelect.value;
+      if (value === "__new__") {
+        inlineFields.hidden = false;
+        saveAddressRow.hidden = false;
+        fillInlineFromAddress(null);
+      } else {
+        const a = savedAddresses.find((x) => x.id === value);
+        inlineFields.hidden = false;
+        saveAddressRow.hidden = true;
+        saveAddressCb.checked = false;
+        fillInlineFromAddress(a ?? null);
+      }
+    }
+
+    try {
+      savedAddresses = await listAddresses();
+    } catch { savedAddresses = []; }
+
+    if (savedAddresses.length > 0) {
+      pickerField.hidden = false;
+      const defaultId = savedAddresses.find((a) => a.isDefaultShipping)?.id ?? savedAddresses[0].id;
+      pickerSelect.innerHTML = savedAddresses.map((a) => {
+        const lbl = a.label ? `${escAttr(a.label)} — ` : "";
+        return `<option value="${a.id}">${lbl}${escAttr(a.name)}, ${escAttr(a.street)}, ${escAttr(a.city)}</option>`;
+      }).join("") + `<option value="__new__">${escAttr(cfg.useNewLabel)}</option>`;
+      pickerSelect.value = defaultId;
+      pickerSelect.addEventListener("change", applyPickerSelection);
+      applyPickerSelection();
+    } else {
+      pickerField.hidden = true;
+      saveAddressRow.hidden = false;
     }
 
     // Always read from the cart service — server cart for authed users.
@@ -156,6 +227,8 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
 
     payBtn?.addEventListener("click", async () => {
       const errEl = document.getElementById("checkout-error");
+      const usingSaved = pickerField.hidden === false && pickerSelect.value !== "__new__";
+
       const name = (document.getElementById("ship-name") as HTMLInputElement).value.trim();
       const street = (document.getElementById("ship-street") as HTMLInputElement).value.trim();
       const city = (document.getElementById("ship-city") as HTMLInputElement).value.trim();
@@ -180,6 +253,19 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
         country: (document.getElementById("bill-country") as HTMLInputElement).value.trim() || country,
       };
 
+      const orderBody: any = {
+        billingAddress: sameBilling ? null : billingAddress,
+        returnUrl: cfg.returnUrlTemplate,
+        cancelUrl: cfg.cancelUrl,
+      };
+
+      if (usingSaved) {
+        orderBody.shippingAddressId = pickerSelect.value;
+      } else {
+        orderBody.shippingAddress = { name, street, city, postalCode: postal, country };
+        if (saveAddressCb.checked) orderBody.saveShippingAddress = true;
+      }
+
       try {
         const res = await fetch(`${cfg.apiBase}/api/shop/orders`, {
           method: "POST",
@@ -187,12 +273,7 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("partlphoto_token")}`,
           },
-          body: JSON.stringify({
-            shippingAddress: { name, street, city, postalCode: postal, country },
-            billingAddress,
-            returnUrl: cfg.returnUrlTemplate,
-            cancelUrl: cfg.cancelUrl,
-          }),
+          body: JSON.stringify(orderBody),
         });
 
         if (!res.ok) {

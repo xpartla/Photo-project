@@ -42,6 +42,15 @@ async function ensureProduct(
 }
 
 test.describe("shop", () => {
+  // The store is hidden for the dog-photography launch. While it is hidden the
+  // /shop and /obchod routes redirect to the home page, so every shop spec
+  // would fail. Run these only when the store is enabled for the test build
+  // (PUBLIC_STORE_ENABLED=true) — see docs/store-reenable.md.
+  test.skip(
+    process.env.PUBLIC_STORE_ENABLED !== "true",
+    "store is hidden (set PUBLIC_STORE_ENABLED=true to run shop specs)",
+  );
+
   // ── Product listing ────────────────────────────────────────
 
   test("shop page loads and shows products", async ({ page, request }) => {

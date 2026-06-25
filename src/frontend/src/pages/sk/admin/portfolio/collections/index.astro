@@ -1,0 +1,18 @@
+---
+import BaseLayout from "../../../../../layouts/BaseLayout.astro";
+import AdminCollectionList from "../../../../../components/AdminCollectionList.astro";
+import { t } from "../../../../../lib/i18n";
+
+const lang = "sk";
+const pageTitle = `${t(lang, "admin.portfolio.collectionsTitle")} — PartlPhoto`;
+---
+
+<BaseLayout title={pageTitle} lang={lang}>
+  <main class="admin">
+    <AdminCollectionList lang={lang} />
+  </main>
+</BaseLayout>
+
+<style lang="scss" is:global>
+  @use "../../../../../styles/components/admin";
+</style>

@@ -1,5 +1,6 @@
 ---
 import { t } from "../lib/i18n";
+import { STORE_ENABLED } from "../lib/features";
 
 interface Props {
   lang: string;
@@ -9,7 +10,10 @@ interface Props {
 const { lang, currentPath } = Astro.props;
 
 const leftLinks = [
-  { href: `/${lang === "sk" ? "sk/obchod" : "en/shop"}`, label: t(lang, "nav.shop") },
+  // Shop link is only present while the store feature is enabled.
+  ...(STORE_ENABLED
+    ? [{ href: `/${lang === "sk" ? "sk/obchod" : "en/shop"}`, label: t(lang, "nav.shop") }]
+    : []),
   { href: `/${lang === "sk" ? "sk/rezervacia" : "en/booking"}`, label: t(lang, "nav.booking") },
   { href: `/${lang}/portfolio`, label: t(lang, "nav.portfolio") },
 ];
@@ -84,9 +88,20 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
             <a href={`/${lang}/admin`} class="navbar__dropdown-item navbar__dropdown-item--admin" data-admin-link hidden>
               {t(lang, "nav.admin")}
             </a>
-            <a href={`/${lang === "sk" ? "sk/obchod/objednavky" : "en/shop/orders"}`} class="navbar__dropdown-item">
-              {t(lang, "order.myOrders")}
+            <a href={`/${lang === "sk" ? "sk/ucet" : "en/account"}`} class="navbar__dropdown-item">
+              {t(lang, "account.title")}
             </a>
+            <a href={`/${lang === "sk" ? "sk/ucet/profil" : "en/account/profile"}`} class="navbar__dropdown-item">
+              {t(lang, "account.profile")}
+            </a>
+            <a href={`/${lang === "sk" ? "sk/ucet/adresy" : "en/account/addresses"}`} class="navbar__dropdown-item">
+              {t(lang, "account.addresses")}
+            </a>
+            {STORE_ENABLED && (
+              <a href={`/${lang === "sk" ? "sk/obchod/objednavky" : "en/shop/orders"}`} class="navbar__dropdown-item">
+                {t(lang, "order.myOrders")}
+              </a>
+            )}
             <hr class="navbar__dropdown-divider" />
             <button class="navbar__dropdown-item navbar__dropdown-item--logout" data-logout-btn>
               {t(lang, "nav.logout")}
@@ -95,32 +110,36 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
         </div>
       </li>
 
-      <!-- Cart icon with badge (always visible) -->
-      <li>
-        <a href={`/${lang === "sk" ? "sk/obchod/kosik" : "en/shop/cart"}`} class="navbar__cart-btn" data-cart-link>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Cart icon with badge (only while the store is enabled) -->
+      {STORE_ENABLED && (
+        <li>
+          <a href={`/${lang === "sk" ? "sk/obchod/kosik" : "en/shop/cart"}`} class="navbar__cart-btn" data-cart-link>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+            <span class="navbar__cart-badge" id="cart-count-badge" data-cart-badge style="display:none;">0</span>
+          </a>
+        </li>
+      )}
+    </ul>
+
+    <!-- Mobile-only action bar: cart (store only) + account, reachable without opening the menu. -->
+    <div class="navbar__mobile-actions">
+      {STORE_ENABLED && (
+        <a
+          href={`/${lang === "sk" ? "sk/obchod/kosik" : "en/shop/cart"}`}
+          class="navbar__mobile-cart"
+          data-cart-link
+          aria-label={t(lang, "nav.cart")}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
           </svg>
-          <span class="navbar__cart-badge" id="cart-count-badge" data-cart-badge style="display:none;">0</span>
+          <span class="navbar__cart-badge" data-cart-badge style="display:none;">0</span>
         </a>
-      </li>
-    </ul>
-
-    <!-- Mobile-only action bar: cart + account always reachable without opening the menu. -->
-    <div class="navbar__mobile-actions">
-      <a
-        href={`/${lang === "sk" ? "sk/obchod/kosik" : "en/shop/cart"}`}
-        class="navbar__mobile-cart"
-        data-cart-link
-        aria-label={t(lang, "nav.cart")}
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-        </svg>
-        <span class="navbar__cart-badge" data-cart-badge style="display:none;">0</span>
-      </a>
+      )}
 
       <a
         href={`/${lang === "sk" ? "sk/prihlasenie" : "en/login"}`}
@@ -163,6 +182,11 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
       <li data-mobile-auth>
         <a href={`/${lang === "sk" ? "sk/prihlasenie" : "en/login"}`} class="navbar__mobile-link" data-mobile-login-btn>
           {t(lang, "nav.login")}
+        </a>
+      </li>
+      <li>
+        <a href={`/${lang === "sk" ? "sk/ucet" : "en/account"}`} class="navbar__mobile-link" data-mobile-account-link hidden>
+          {t(lang, "account.title")}
         </a>
       </li>
       <li>
@@ -215,12 +239,14 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
     const adminLink = navbar.querySelector("[data-admin-link]") as HTMLElement | null;
     const adminChip = navbar.querySelector("[data-admin-chip]") as HTMLElement | null;
     const mobileAdminLink = navbar.querySelector("[data-mobile-admin-link]") as HTMLElement | null;
+    const mobileAccountLink = navbar.querySelector("[data-mobile-account-link]") as HTMLElement | null;
 
-    // Mobile account icon redirects straight to "my orders" when logged in
-    // (no dropdown on mobile) — otherwise to the login page.
+    // Mobile account icon lands on /admin for admins, the customer account
+    // dashboard for regular users, and login for anonymous visitors (no
+    // dropdown on mobile).
     const mobileAccount = navbar.querySelector("[data-mobile-account]") as HTMLAnchorElement | null;
     const lang = document.documentElement.lang === "sk" ? "sk" : "en";
-    const ordersHref = lang === "sk" ? "/sk/obchod/objednavky" : "/en/shop/orders";
+    const accountHref = lang === "sk" ? "/sk/ucet" : "/en/account";
     const loginHref = lang === "sk" ? "/sk/prihlasenie" : "/en/login";
     const adminHref = lang === "sk" ? "/sk/admin" : "/en/admin";
 
@@ -228,10 +254,11 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
       if (loginBtn) loginBtn.style.display = "none";
       if (accountMenu) accountMenu.hidden = false;
       if (mobileLoginBtn) mobileLoginBtn.textContent = "Account";
-      if (mobileAccount) mobileAccount.href = isAdmin ? adminHref : ordersHref;
+      if (mobileAccount) mobileAccount.href = isAdmin ? adminHref : accountHref;
       if (adminLink) adminLink.hidden = !isAdmin;
       if (adminChip) adminChip.hidden = !isAdmin;
       if (mobileAdminLink) mobileAdminLink.hidden = !isAdmin;
+      if (mobileAccountLink) mobileAccountLink.hidden = false;
     } else {
       if (loginBtn) loginBtn.style.display = "";
       if (accountMenu) accountMenu.hidden = true;
@@ -239,6 +266,7 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
       if (adminLink) adminLink.hidden = true;
       if (adminChip) adminChip.hidden = true;
       if (mobileAdminLink) mobileAdminLink.hidden = true;
+      if (mobileAccountLink) mobileAccountLink.hidden = true;
     }
 
     // ── Cart badge ──────────────────────────────────────────────

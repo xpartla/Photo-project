@@ -58,7 +58,11 @@ services:
       - "10002:10002"
     volumes:
       - azurite_data:/data
-    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
+    # `--location /data` is required: without it Azurite persists to its WORKDIR
+    # (/opt/azurite) inside the container's ephemeral layer, so every container
+    # recreate silently drops all blobs while pgdata survives — leaving the DB
+    # pointing at processed images that 404. Keep it aligned with the mounted volume.
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck --location /data
 
   mailpit:
     image: axllent/mailpit

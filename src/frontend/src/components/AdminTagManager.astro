@@ -1,0 +1,105 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; }
+const { lang } = Astro.props;
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/portfolio`} class="admin__back">← {t(lang, "admin.common.backToList")}</a>
+    <h1 class="admin__title">{t(lang, "admin.portfolio.tags")}</h1>
+  </header>
+
+  <section class="admin-list" style="margin-bottom:32px;">
+    <ul id="tag-list" class="admin-list__items"></ul>
+    <p id="tag-empty" class="admin-list__empty" hidden>{t(lang, "admin.common.empty")}</p>
+  </section>
+
+  <form class="account-form" id="tag-form">
+    <h2 class="account-form__section-title">{t(lang, "admin.portfolio.createTag")}</h2>
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label" for="tag-slug">{t(lang, "admin.portfolio.tagSlug")}</label>
+        <input class="account-form__input" id="tag-slug" type="text" pattern="[a-z0-9-]+" required />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label" for="tag-name-sk">{t(lang, "admin.portfolio.tagNameSk")}</label>
+        <input class="account-form__input" id="tag-name-sk" type="text" required />
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label" for="tag-name-en">{t(lang, "admin.portfolio.tagNameEn")}</label>
+        <input class="account-form__input" id="tag-name-en" type="text" required />
+      </div>
+    </div>
+    <div id="tag-error" class="account-form__error"></div>
+    <div class="account-form__actions">
+      <button type="submit" class="account-form__submit">{t(lang, "admin.shop.add")}</button>
+    </div>
+  </form>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="tag-config" type="application/json" set:html={JSON.stringify({ lang })}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import { listTags, createTag } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("tag-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const listEl = document.getElementById("tag-list")!;
+  const emptyEl = document.getElementById("tag-empty")!;
+  const errEl = document.getElementById("tag-error")!;
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+
+  async function refresh() {
+    const tags = await listTags(cfg.lang);
+    if (tags.length === 0) {
+      listEl.innerHTML = "";
+      emptyEl.hidden = false;
+      return;
+    }
+    emptyEl.hidden = true;
+    listEl.innerHTML = tags.map((t: any) => `
+      <li class="admin-list__item">
+        <div class="admin-list__main">
+          <div>
+            <span class="admin-list__title">${escapeHtml(t.name)}</span>
+            <div class="admin-list__meta">
+              <span>${escapeHtml(t.slug)}</span>
+              <span>${t.photoCount ?? 0}</span>
+            </div>
+          </div>
+        </div>
+      </li>
+    `).join("");
+  }
+
+  document.getElementById("tag-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errEl.textContent = "";
+    try {
+      await createTag({
+        slug: (document.getElementById("tag-slug") as HTMLInputElement).value.trim(),
+        nameSk: (document.getElementById("tag-name-sk") as HTMLInputElement).value.trim(),
+        nameEn: (document.getElementById("tag-name-en") as HTMLInputElement).value.trim(),
+      });
+      (document.getElementById("tag-form") as HTMLFormElement).reset();
+      await refresh();
+    } catch (err: any) {
+      errEl.textContent = err.message;
+    }
+  });
+
+  refresh();
+</script>

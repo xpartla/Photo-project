@@ -1,0 +1,174 @@
+---
+import { t } from "../lib/i18n";
+
+interface Props { lang: "sk" | "en"; id: string; }
+const { lang, id } = Astro.props;
+const langSlug = lang === "sk" ? "obchod" : "shop";
+---
+
+<div data-admin-root hidden>
+  <header class="admin__header">
+    <a href={`/${lang}/admin/${langSlug}/orders`} class="admin__back">← {t(lang, "admin.common.backToList")}</a>
+    <h1 class="admin__title">#<span data-order-short>—</span></h1>
+  </header>
+
+  <div id="order-error" class="account-form__error"></div>
+
+  <section class="account-form">
+    <h2 class="account-form__section-title">{t(lang, "order.status")}</h2>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <span data-current-status class="admin-status-pill">—</span>
+      <select id="status-select" class="account-form__input" style="width:auto;display:inline-block;"></select>
+      <button class="account-form__submit" id="status-update-btn">{t(lang, "admin.shop.changeStatus")}</button>
+    </div>
+    <div id="status-success" class="account-form__success"></div>
+
+    <h2 class="account-form__section-title">{t(lang, "admin.shop.orderItems")}</h2>
+    <div id="items-block"></div>
+
+    <h2 class="account-form__section-title">{t(lang, "admin.shop.shippingAddress")}</h2>
+    <pre id="shipping-block" style="font-family:inherit;white-space:pre-wrap;background:#FFF3E0;border:2px solid #2A2A2A;border-radius:6px;padding:12px;"></pre>
+
+    <h2 class="account-form__section-title">{t(lang, "admin.shop.billingAddress")}</h2>
+    <pre id="billing-block" style="font-family:inherit;white-space:pre-wrap;background:#FFF3E0;border:2px solid #2A2A2A;border-radius:6px;padding:12px;"></pre>
+  </section>
+</div>
+
+<p class="admin__notice" data-admin-denied hidden>{t(lang, "admin.notAuthorized")}</p>
+
+<script id="order-detail-config" type="application/json" set:html={JSON.stringify({
+  lang, id,
+  statusUpdated: t(lang, "admin.shop.statusUpdated"),
+  statusLabels: {
+    pending_payment: t(lang, "order.status.pending_payment"),
+    paid: t(lang, "order.status.paid"),
+    processing: t(lang, "order.status.processing"),
+    shipped: t(lang, "order.status.shipped"),
+    completed: t(lang, "order.status.completed"),
+    cancelled: t(lang, "order.status.cancelled"),
+    refunded: t(lang, "order.status.refunded"),
+  },
+})}></script>
+
+<script>
+  import { requireAdmin } from "../lib/admin";
+  import { adminGetOrder, updateOrderStatus } from "../lib/admin-api";
+
+  const cfg = JSON.parse(document.getElementById("order-detail-config")!.textContent!);
+  const token = requireAdmin(cfg.lang);
+  if (!token) throw new Error("not admin");
+
+  const root = document.querySelector("[data-admin-root]") as HTMLElement;
+  root.hidden = false;
+
+  const errEl = document.getElementById("order-error")!;
+  const okEl = document.getElementById("status-success")!;
+  const statusSelect = document.getElementById("status-select") as HTMLSelectElement;
+  const updateBtn = document.getElementById("status-update-btn") as HTMLButtonElement;
+  const currentPill = document.querySelector("[data-current-status]") as HTMLElement;
+
+  // Status state machine — must mirror the backend's ValidTransitions table.
+  const transitions: Record<string, string[]> = {
+    pending_payment: ["paid", "cancelled"],
+    paid: ["processing", "cancelled", "refunded"],
+    processing: ["shipped"],
+    shipped: ["completed"],
+  };
+
+  function escapeHtml(s: string): string {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
+  }
+  function statusLabel(s: string): string { return cfg.statusLabels[s] ?? s; }
+
+  function renderStatusPill(s: string) {
+    currentPill.className = `admin-status-pill admin-status-pill--${s}`;
+    currentPill.textContent = statusLabel(s);
+  }
+
+  function renderTransitions(currentStatus: string) {
+    const allowed = transitions[currentStatus] ?? [];
+    if (allowed.length === 0) {
+      statusSelect.innerHTML = `<option value="">—</option>`;
+      statusSelect.disabled = true;
+      updateBtn.disabled = true;
+      return;
+    }
+    statusSelect.disabled = false;
+    updateBtn.disabled = false;
+    statusSelect.innerHTML = allowed.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(statusLabel(s))}</option>`).join("");
+  }
+
+  // Reads a field case-insensitively so legacy orders persisted before the
+  // camelCase fix (PascalCase keys) still render.
+  function pick(obj: any, key: string): string | undefined {
+    if (!obj) return undefined;
+    const lower = key.charAt(0).toLowerCase() + key.slice(1);
+    const upper = key.charAt(0).toUpperCase() + key.slice(1);
+    return obj[lower] ?? obj[upper];
+  }
+
+  function safeAddress(json: string | null | undefined): string {
+    if (!json) return "—";
+    try {
+      const a = JSON.parse(json);
+      const postal = pick(a, "postalCode") ?? "";
+      const city = pick(a, "city") ?? "";
+      return [
+        pick(a, "name"),
+        pick(a, "street"),
+        `${postal} ${city}`.trim(),
+        pick(a, "country"),
+      ].filter(Boolean).join("\n");
+    } catch { return json ?? "—"; }
+  }
+
+  let currentStatus = "";
+
+  async function load() {
+    try {
+      const o: any = await adminGetOrder(cfg.id);
+      currentStatus = o.status;
+      document.querySelector("[data-order-short]")!.textContent = o.id.slice(0, 8);
+      renderStatusPill(o.status);
+      renderTransitions(o.status);
+
+      document.getElementById("items-block")!.innerHTML = (o.items || []).map((it: any) => `
+        <div style="border:2px solid #2A2A2A;border-radius:6px;padding:8px 12px;margin-bottom:6px;background:#FFF;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div>
+            <strong>${escapeHtml(it.productTitle)}</strong>
+            ${it.formatNameEn ? ` · ${escapeHtml(it.formatNameEn)}` : ""}
+            ${it.paperTypeNameEn ? ` · ${escapeHtml(it.paperTypeNameEn)}` : ""}
+            ${it.editionNumber != null ? ` · #${it.editionNumber}` : ""}
+          </div>
+          <div>${it.quantity} × ${it.unitPrice} ${escapeHtml(o.currency)}</div>
+        </div>
+      `).join("");
+
+      document.getElementById("shipping-block")!.textContent = safeAddress(o.shippingAddress);
+      document.getElementById("billing-block")!.textContent = safeAddress(o.billingAddress);
+    } catch (err: any) {
+      errEl.textContent = err.message;
+    }
+  }
+
+  updateBtn.addEventListener("click", async () => {
+    const newStatus = statusSelect.value;
+    if (!newStatus) return;
+    okEl.textContent = "";
+    errEl.textContent = "";
+    updateBtn.disabled = true;
+    try {
+      const res = await updateOrderStatus(cfg.id, newStatus);
+      currentStatus = res.newStatus;
+      renderStatusPill(currentStatus);
+      renderTransitions(currentStatus);
+      okEl.textContent = cfg.statusUpdated;
+    } catch (err: any) {
+      errEl.textContent = err.message;
+    } finally {
+      updateBtn.disabled = false;
+    }
+  });
+
+  load();
+</script>
