@@ -133,7 +133,7 @@ const jsonLd = [
         {photo.tags.length > 0 && (
           <div class="info__tags">
             {photo.tags.map((tag) => (
-              <a href={`/en/portfolio?tag=${tag.slug}`} class="tag-pill">{tag.name}</a>
+              <a href={`/en/portfolio/tags/${tag.slug}`} class="tag-pill">{tag.name}</a>
             ))}
           </div>
         )}

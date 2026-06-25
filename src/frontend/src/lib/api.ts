@@ -28,6 +28,12 @@ export interface TagRef {
   name: string;
 }
 
+export interface TagSummary {
+  slug: string;
+  name: string;
+  photoCount: number;
+}
+
 export interface PhotoSummary {
   id: string;
   slug: string;
@@ -324,6 +330,11 @@ export async function getPhoto(slug: string, lang?: string): Promise<PhotoDetail
 export async function getCollections(lang?: string): Promise<CollectionSummary[]> {
   const qs = lang ? `?lang=${lang}` : "";
   return fetchApi(`/api/portfolio/collections${qs}`);
+}
+
+export async function getTags(lang?: string): Promise<TagSummary[]> {
+  const qs = lang ? `?lang=${lang}` : "";
+  return fetchApi(`/api/portfolio/tags${qs}`);
 }
 
 export async function getCollection(

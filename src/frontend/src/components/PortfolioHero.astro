@@ -1,0 +1,46 @@
+---
+// Shared hero for portfolio sub-pages (tag + collection): big title, animated
+// hand-drawn underline, optional subtitle. Mirrors the index portfolio hero.
+interface Props {
+  title: string;
+  subtitle?: string;
+  accent?: string;
+}
+const { title, subtitle, accent = "#F2B880" } = Astro.props;
+---
+
+<section class="pf-hero">
+  <!-- Background decorations (sparkles + dashed circles), like the home hero -->
+  <div class="pf-hero__deco" aria-hidden="true">
+    <svg class="pf-hero__sparkle pf-hero__sparkle--1" viewBox="0 0 24 24">
+      <path d="M12 0 L14 10 L24 12 L14 14 L12 24 L10 14 L0 12 L10 10 Z" fill="#F2B880" />
+    </svg>
+    <svg class="pf-hero__sparkle pf-hero__sparkle--2" viewBox="0 0 24 24">
+      <path d="M12 0 L14 10 L24 12 L14 14 L12 24 L10 14 L0 12 L10 10 Z" fill="#B8A0C8" />
+    </svg>
+    <svg class="pf-hero__sparkle pf-hero__sparkle--3" viewBox="0 0 24 24">
+      <path d="M12 0 L14 10 L24 12 L14 14 L12 24 L10 14 L0 12 L10 10 Z" fill="#D97B8F" />
+    </svg>
+    <svg class="pf-hero__circle pf-hero__circle--1" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="45" stroke="#F2B880" stroke-width="3" fill="none" stroke-dasharray="8 6" />
+    </svg>
+    <svg class="pf-hero__circle pf-hero__circle--2" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="45" stroke="#B8A0C8" stroke-width="3" fill="none" stroke-dasharray="8 6" />
+    </svg>
+  </div>
+
+  <h1 class="pf-hero__title">{title}</h1>
+  <svg class="pf-hero__underline" viewBox="0 0 300 12" fill="none" aria-hidden="true">
+    <path
+      d="M0 6 Q25 0 50 6 Q75 12 100 6 Q125 0 150 6 Q175 12 200 6 Q225 0 250 6 Q275 12 300 6"
+      stroke={accent}
+      stroke-width="4"
+      stroke-linecap="round"
+    />
+  </svg>
+  {subtitle && <p class="pf-hero__subtitle">{subtitle}</p>}
+</section>
+
+<style lang="scss">
+  @use "../styles/components/portfolio-hero";
+</style>

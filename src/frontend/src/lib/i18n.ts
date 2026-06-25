@@ -26,6 +26,13 @@ export function getAlternateUrl(lang: string, path: string): string {
     if (lang === "en" && rest.startsWith("portfolio/collections/")) {
       return `/${altLang}/portfolio/kolekcie/${rest.slice("portfolio/collections/".length)}`;
     }
+    // Portfolio tag pages: tags ↔ znacky
+    if (lang === "sk" && rest.startsWith("portfolio/znacky/")) {
+      return `/${altLang}/portfolio/tags/${rest.slice("portfolio/znacky/".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("portfolio/tags/")) {
+      return `/${altLang}/portfolio/znacky/${rest.slice("portfolio/tags/".length)}`;
+    }
     // Booking routes: rezervacia ↔ booking
     if (lang === "sk" && rest.startsWith("rezervacia/kalendar")) {
       return `/${altLang}/booking/schedule${rest.slice("rezervacia/kalendar".length)}`;

@@ -55,6 +55,9 @@ const hasDigital = digitalPhotos.length > 0;
   <p class="portfolio-hero__subtitle">{labels.subtitle}</p>
 </section>
 
+<!-- Filter bar (passed in by the page) -->
+<slot />
+
 {(!hasFilm && !hasDigital) ? (
   <p class="portfolio-empty">{labels.noPhotos}</p>
 ) : (

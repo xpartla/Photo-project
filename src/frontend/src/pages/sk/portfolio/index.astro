@@ -2,21 +2,28 @@
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import SeoMeta from "../../../components/SeoMeta.astro";
 import PortfolioSplit from "../../../components/PortfolioSplit.astro";
-import { getPhotos } from "../../../lib/api";
+import PortfolioFilter from "../../../components/PortfolioFilter.astro";
+import { getPhotos, getTags, getCollections } from "../../../lib/api";
 import { t } from "../../../lib/i18n";
-import type { PhotoSummary } from "../../../lib/api";
+import type { PhotoSummary, TagSummary, CollectionSummary } from "../../../lib/api";
 
 const lang = "sk";
 
-let filmPhotos: PhotoSummary[];
-let digitalPhotos: PhotoSummary[];
+let filmPhotos: PhotoSummary[] = [];
+let digitalPhotos: PhotoSummary[] = [];
+let tags: TagSummary[] = [];
+let collections: CollectionSummary[] = [];
 try {
-  const [films, digitals] = await Promise.all([
+  const [films, digitals, tg, cols] = await Promise.all([
     getPhotos({ size: 50, tag: "film", lang }),
     getPhotos({ size: 50, tag: "digital", lang }),
+    getTags(lang),
+    getCollections(lang),
   ]);
   filmPhotos = films.items;
   digitalPhotos = digitals.items;
+  tags = tg;
+  collections = cols;
 } catch {
   filmPhotos = [];
   digitalPhotos = [];
@@ -59,5 +66,17 @@ const jsonLd = {
       close: t(lang, "portfolio.close"),
       noPhotos: t(lang, "portfolio.noPhotos"),
     }}
-  />
+  >
+    <PortfolioFilter
+      lang={lang}
+      collections={collections}
+      tags={tags}
+      labels={{
+        filter: t(lang, "portfolio.filter"),
+        allPhotos: t(lang, "portfolio.allPhotos"),
+        collections: t(lang, "portfolio.collections"),
+        tags: t(lang, "portfolio.tags"),
+      }}
+    />
+  </PortfolioSplit>
 </BaseLayout>

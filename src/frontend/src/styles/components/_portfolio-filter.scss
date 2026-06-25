@@ -1,0 +1,175 @@
+@use "sass:color";
+@use "../variables" as *;
+
+// ── Compact portfolio filter ──────────────────────────
+.pf-filter {
+  max-width: 1400px;
+  margin: 0 auto 1.5rem;
+  padding: 0 2rem;
+  text-align: center;
+}
+
+.pf-filter__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: $dark;
+  background: $white;
+  border: $outline-width solid $outline;
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 $outline;
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+  transition: transform $transition-fast, box-shadow $transition-fast;
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 4px 5px 0 $outline;
+  }
+
+  &:focus-visible {
+    outline: 3px solid $sage;
+    outline-offset: 2px;
+  }
+}
+
+.pf-filter__icon {
+  flex-shrink: 0;
+}
+
+.pf-filter__active {
+  font-weight: 800;
+  color: $terracotta;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-filter__chevron {
+  flex-shrink: 0;
+  transition: transform $transition-fast;
+}
+
+.pf-filter--open .pf-filter__chevron {
+  transform: rotate(180deg);
+}
+
+// ── Expanded panel ────────────────────────────────────
+.pf-filter__panel {
+  margin-top: 1rem;
+  padding: 1.25rem 1.4rem;
+  background: rgba($cream, 0.7);
+  border: $outline-width solid $outline;
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 $outline;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  animation: pf-filter-in 0.25s ease;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+@keyframes pf-filter-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pf-filter__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.pf-filter__group-label {
+  font-family: $font-heading;
+  font-size: 0.95rem;
+  color: $dark;
+  margin-right: 0.4rem;
+  min-width: 96px;
+}
+
+.pf-filter__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: $font-body;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-decoration: none;
+  color: $dark;
+  background: $white;
+  border: 2px solid $outline;
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  transition: transform $transition-fast, background $transition-fast, color $transition-fast;
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-2px);
+    background: rgba($peach, 0.3);
+  }
+
+  &:focus-visible {
+    outline: 3px solid $sage;
+    outline-offset: 2px;
+  }
+}
+
+.pf-filter__chip--active {
+  background: $sage;
+  color: $white;
+  border-color: $outline;
+
+  &:hover,
+  &:focus-visible {
+    background: color.adjust($sage, $lightness: -8%);
+    color: $white;
+  }
+}
+
+.pf-filter__chip--all {
+  align-self: center;
+  background: $peach;
+}
+
+.pf-filter__count {
+  font-weight: 600;
+  font-size: 0.75rem;
+  opacity: 0.65;
+}
+
+// ── Responsive ────────────────────────────────────────
+@media (max-width: $breakpoint-md) {
+  .pf-filter {
+    padding: 0 1.25rem;
+  }
+
+  .pf-filter__group-label {
+    min-width: 0;
+    width: 100%;
+    margin-bottom: 0.15rem;
+  }
+}
+
+// ── Reduced motion ────────────────────────────────────
+@media (prefers-reduced-motion: reduce) {
+  .pf-filter__panel {
+    animation: none;
+  }
+
+  .pf-filter__toggle,
+  .pf-filter__chip {
+    transition: none;
+  }
+}

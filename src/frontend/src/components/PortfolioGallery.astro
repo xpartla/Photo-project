@@ -1,0 +1,231 @@
+---
+// Shared animated gallery used by the tag & collection sub-pages. Renders a
+// masonry grid of cartoon-framed cards with scroll-reveal + a lightbox — the
+// same feel as the index portfolio's columns, as a single full-width list.
+import ResponsiveImage from "./ResponsiveImage.astro";
+import { buildSrcset, getFallbackUrl } from "../lib/imageUrl";
+import { STORE_ENABLED } from "../lib/features";
+import type { PhotoSummary } from "../lib/api";
+
+interface Props {
+  lang: string;
+  photos: PhotoSummary[];
+  labels: {
+    viewDetail: string;
+    buyAsPrint: string;
+    close: string;
+    noPhotos: string;
+  };
+}
+
+const { lang, photos, labels } = Astro.props;
+
+const rotations = [-2, 1.5, -1, 2.5, -0.5, 1, -1.5, 0.5, -2.5, 1.8];
+
+function photoData(photo: PhotoSummary) {
+  return JSON.stringify({
+    slug: photo.slug,
+    title: photo.title || "",
+    alt: photo.altText || photo.title || "",
+    src: getFallbackUrl(photo.variants),
+    srcset: buildSrcset(photo.variants, "webp") || "",
+    tags: photo.tags?.map((t) => t.name) || [],
+  });
+}
+
+const shopBase = lang === "sk" ? `/${lang}/obchod` : `/${lang}/shop`;
+const detailBase = `/${lang}/portfolio`;
+---
+
+{photos.length === 0 ? (
+  <p class="pf-gallery__empty">{labels.noPhotos}</p>
+) : (
+  <div class="pf-gallery">
+    <div class="pf-gallery__grid">
+      {photos.map((photo, i) => (
+        <button
+          class="pf-gallery__card"
+          type="button"
+          data-reveal
+          data-photo={photoData(photo)}
+          style={`--delay: ${(i % 6) * 0.07}s; --rotation: ${rotations[i % rotations.length]}deg`}
+        >
+          <div class="pf-gallery__frame">
+            <ResponsiveImage
+              variants={photo.variants}
+              alt={photo.altText || photo.title || ""}
+              width={photo.width || 800}
+              height={photo.height || 600}
+              dominantColor={photo.dominantColor}
+              blurhash={photo.blurhash}
+              sizes="(max-width: 600px) 90vw, (max-width: 1200px) 45vw, 360px"
+            />
+          </div>
+          {photo.title && <span class="pf-gallery__title">{photo.title}</span>}
+        </button>
+      ))}
+    </div>
+
+    <!-- Lightbox -->
+    <div
+      class="lightbox"
+      id="portfolio-lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label={labels.viewDetail}
+      aria-hidden="true"
+      data-detail-base={detailBase}
+      data-shop-base={shopBase}
+    >
+      <div class="lightbox__backdrop" data-lightbox-close></div>
+      <div class="lightbox__panel" data-lightbox-close>
+        <div class="lightbox__frame">
+          <button class="lightbox__close" data-lightbox-close aria-label={labels.close}>
+            &times;
+          </button>
+          <img id="lightbox-img" src="" alt="" />
+        </div>
+        <div class="lightbox__info">
+          <h3 id="lightbox-title" class="lightbox__title"></h3>
+          <div id="lightbox-tags" class="lightbox__tags"></div>
+          <div class="lightbox__actions">
+            <a id="lightbox-detail" class="lightbox__btn lightbox__btn--detail" href="#">
+              {labels.viewDetail}
+            </a>
+            {STORE_ENABLED && (
+              <a id="lightbox-shop" class="lightbox__btn lightbox__btn--shop" href="#">
+                {labels.buyAsPrint}
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+<style lang="scss">
+  @use "../styles/components/portfolio-gallery";
+</style>
+
+<script>
+  function initPortfolioGallery() {
+    const prefersReduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    // ── Scroll reveal ─────────────────────────────────
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            (entry.target as HTMLElement).classList.add("revealed");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+    );
+
+    document.querySelectorAll<HTMLElement>(".pf-gallery [data-reveal]").forEach((el) => {
+      if (prefersReduced) el.classList.add("revealed");
+      else observer.observe(el);
+    });
+
+    // ── Lightbox ──────────────────────────────────────
+    const lightbox = document.getElementById("portfolio-lightbox");
+    if (!lightbox) return;
+
+    const lightboxImg = document.getElementById("lightbox-img") as HTMLImageElement;
+    const lightboxTitle = document.getElementById("lightbox-title")!;
+    const lightboxTags = document.getElementById("lightbox-tags")!;
+    const lightboxDetail = document.getElementById("lightbox-detail") as HTMLAnchorElement;
+    // The shop button is only rendered when the store feature is enabled.
+    const lightboxShop = document.getElementById("lightbox-shop") as HTMLAnchorElement | null;
+
+    const detailBase = lightbox.dataset.detailBase || "";
+    const shopBase = lightbox.dataset.shopBase || "";
+    let lastFocus: HTMLElement | null = null;
+
+    function openLightbox(data: {
+      slug: string; title: string; alt: string; src: string; srcset: string; tags: string[];
+    }) {
+      lightboxImg.src = data.src;
+      if (data.srcset) {
+        lightboxImg.srcset = data.srcset;
+        lightboxImg.sizes = "(max-width: 900px) 88vw, 800px";
+      } else {
+        lightboxImg.removeAttribute("srcset");
+        lightboxImg.removeAttribute("sizes");
+      }
+      lightboxImg.alt = data.alt;
+      lightboxTitle.textContent = data.title;
+
+      lightboxTags.innerHTML = "";
+      data.tags.forEach((tagName) => {
+        const span = document.createElement("span");
+        span.className = "lightbox__tag";
+        span.textContent = tagName;
+        lightboxTags.appendChild(span);
+      });
+
+      lightboxDetail.href = `${detailBase}/${data.slug}`;
+      if (lightboxShop) lightboxShop.href = `${shopBase}/${data.slug}`;
+
+      lightbox!.setAttribute("aria-hidden", "false");
+      lightbox!.classList.add("is-open");
+      document.body.style.overflow = "hidden";
+
+      const closeBtn = lightbox!.querySelector<HTMLElement>("[data-lightbox-close]");
+      if (closeBtn) closeBtn.focus();
+    }
+
+    function closeLightbox() {
+      lightbox!.classList.remove("is-open");
+      lightbox!.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+      if (lastFocus) lastFocus.focus();
+    }
+
+    document.querySelectorAll<HTMLElement>("[data-photo]").forEach((card) => {
+      card.addEventListener("click", () => {
+        lastFocus = card;
+        try {
+          openLightbox(JSON.parse(card.getAttribute("data-photo") || "{}"));
+        } catch {
+          /* invalid data, ignore */
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-lightbox-close]").forEach((el) => {
+      el.addEventListener("click", (e) => {
+        if (e.target === el) closeLightbox();
+      });
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && lightbox!.classList.contains("is-open")) closeLightbox();
+    });
+
+    lightbox.addEventListener("keydown", (e) => {
+      if (e.key !== "Tab") return;
+      const focusable = lightbox!.querySelectorAll<HTMLElement>(
+        'button, a[href], [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+  }
+
+  initPortfolioGallery();
+  document.addEventListener("astro:after-swap", initPortfolioGallery);
+</script>

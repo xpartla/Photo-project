@@ -1,0 +1,141 @@
+@use "../variables" as *;
+
+@keyframes pf-hero-drop {
+  0%   { transform: translateY(-30px); opacity: 0; }
+  60%  { transform: translateY(4px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pf-hero-draw {
+  from { stroke-dashoffset: 320; }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes pf-hero-fade {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pf-hero {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  padding: 3rem 2rem 1.5rem;
+}
+
+// ── Background decorations ────────────────────────────
+.pf-hero__deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pf-hero__sparkle {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  opacity: 0.9;
+}
+
+.pf-hero__sparkle--1 { top: 22%; left: 14%; }
+.pf-hero__sparkle--2 { top: 30%; right: 16%; width: 16px; height: 16px; }
+.pf-hero__sparkle--3 { bottom: 22%; left: 24%; width: 14px; height: 14px; }
+
+.pf-hero__circle {
+  position: absolute;
+  opacity: 0.5;
+}
+
+.pf-hero__circle--1 { width: 72px; height: 72px; top: 6%; right: 9%; }
+.pf-hero__circle--2 { width: 52px; height: 52px; bottom: 4%; left: 7%; }
+
+.pf-hero__title {
+  position: relative;
+  z-index: 1;
+  font-family: $font-heading;
+  font-size: 3.5rem;
+  color: $dark;
+  margin: 0;
+  display: inline-block;
+  animation: pf-hero-drop 0.6s ease forwards;
+}
+
+.pf-hero__underline {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 200px;
+  height: 12px;
+  margin: -2px auto 0;
+
+  path {
+    stroke-dasharray: 320;
+    stroke-dashoffset: 320;
+    animation: pf-hero-draw 1s ease 0.3s forwards;
+  }
+}
+
+.pf-hero__subtitle {
+  position: relative;
+  z-index: 1;
+  font-family: $font-body;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: $dark;
+  margin-top: 0.75rem;
+  opacity: 0;
+  animation: pf-hero-fade 0.6s ease 0.7s forwards;
+}
+
+@media (max-width: $breakpoint-lg) {
+  .pf-hero__title {
+    font-size: 2.8rem;
+  }
+}
+
+@media (max-width: $breakpoint-md) {
+  .pf-hero {
+    padding: 2rem 1.25rem 1rem;
+  }
+
+  .pf-hero__title {
+    font-size: 2.2rem;
+  }
+
+  .pf-hero__underline {
+    width: 150px;
+  }
+
+  .pf-hero__subtitle {
+    font-size: 1rem;
+  }
+
+  .pf-hero__circle--1 { right: 4%; }
+  .pf-hero__circle--2 { left: 3%; }
+}
+
+@media (max-width: $breakpoint-sm) {
+  // Keep the title area clean on small phones.
+  .pf-hero__circle {
+    display: none;
+  }
+
+  .pf-hero__sparkle {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-hero__title,
+  .pf-hero__subtitle {
+    animation: none;
+    opacity: 1;
+  }
+
+  .pf-hero__underline path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

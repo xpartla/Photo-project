@@ -4,40 +4,38 @@ import SeoMeta from "../../../../components/SeoMeta.astro";
 import PortfolioHero from "../../../../components/PortfolioHero.astro";
 import PortfolioFilter from "../../../../components/PortfolioFilter.astro";
 import PortfolioGallery from "../../../../components/PortfolioGallery.astro";
-import { getCollection, getCollections, getTags } from "../../../../lib/api";
+import { getPhotos, getTags, getCollections } from "../../../../lib/api";
 import { t } from "../../../../lib/i18n";
-import type { TagSummary, CollectionSummary } from "../../../../lib/api";
+import type { PhotoSummary, TagSummary, CollectionSummary } from "../../../../lib/api";
 
-const lang = "en";
+const lang = "sk";
 const { slug } = Astro.params;
 
-let collection;
+let photos: PhotoSummary[] = [];
 let tags: TagSummary[] = [];
 let collections: CollectionSummary[] = [];
+let activeTag: TagSummary | undefined;
 try {
-  const [col, tg, cols] = await Promise.all([
-    getCollection(slug!, { lang, page: 1, size: 60 }),
-    getTags(lang),
-    getCollections(lang),
-  ]);
-  collection = col;
-  tags = tg;
-  collections = cols;
+  [tags, collections] = await Promise.all([getTags(lang), getCollections(lang)]);
+  activeTag = tags.find((tg) => tg.slug === slug);
+  if (!activeTag) return Astro.redirect("/sk/portfolio");
+  const result = await getPhotos({ tag: slug, size: 60, lang });
+  photos = result.items;
 } catch {
-  return Astro.redirect("/en/portfolio");
+  return Astro.redirect("/sk/portfolio");
 }
 
-const pageTitle = `${collection.name} — Portfolio — DogPhoto`;
-const pageDescription = collection.description || `${collection.name} — photo collection`;
+const pageTitle = `${activeTag.name} — Portfólio — DogPhoto`;
+const pageDescription = `${activeTag.name} — ${activeTag.photoCount} ${t(lang, "portfolio.photosTagged")}`;
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "ImageGallery",
-  name: collection.name,
+  name: activeTag.name,
   description: pageDescription,
   author: { "@type": "Person", name: "DogPhoto" },
-  inLanguage: "en",
-  numberOfItems: collection.photos.totalCount,
+  inLanguage: lang,
+  numberOfItems: activeTag.photoCount,
 };
 ---
 
@@ -47,17 +45,20 @@ const jsonLd = {
     title={pageTitle}
     description={pageDescription}
     lang={lang}
-    path={`/en/portfolio/collections/${slug}`}
+    path={`/sk/portfolio/znacky/${slug}`}
     jsonLd={jsonLd}
   />
 
-  <PortfolioHero title={collection.name} subtitle={collection.description} />
+  <PortfolioHero
+    title={activeTag.name}
+    subtitle={`${activeTag.photoCount} ${t(lang, "portfolio.photosTagged")}`}
+  />
 
   <PortfolioFilter
     lang={lang}
     collections={collections}
     tags={tags}
-    active={{ type: "collection", slug: slug! }}
+    active={{ type: "tag", slug: slug! }}
     labels={{
       filter: t(lang, "portfolio.filter"),
       allPhotos: t(lang, "portfolio.allPhotos"),
@@ -68,7 +69,7 @@ const jsonLd = {
 
   <PortfolioGallery
     lang={lang}
-    photos={collection.photos.items}
+    photos={photos}
     labels={{
       viewDetail: t(lang, "portfolio.viewDetail"),
       buyAsPrint: t(lang, "portfolio.buyAsPrint"),

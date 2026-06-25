@@ -1,17 +1,28 @@
 ---
 import BaseLayout from "../../../../layouts/BaseLayout.astro";
 import SeoMeta from "../../../../components/SeoMeta.astro";
-import ResponsiveImage from "../../../../components/ResponsiveImage.astro";
-import { getCollection } from "../../../../lib/api";
+import PortfolioHero from "../../../../components/PortfolioHero.astro";
+import PortfolioFilter from "../../../../components/PortfolioFilter.astro";
+import PortfolioGallery from "../../../../components/PortfolioGallery.astro";
+import { getCollection, getCollections, getTags } from "../../../../lib/api";
 import { t } from "../../../../lib/i18n";
+import type { TagSummary, CollectionSummary } from "../../../../lib/api";
 
 const lang = "sk";
 const { slug } = Astro.params;
-const page = Number(Astro.url.searchParams.get("page") || "1");
 
 let collection;
+let tags: TagSummary[] = [];
+let collections: CollectionSummary[] = [];
 try {
-  collection = await getCollection(slug!, { lang, page, size: 24 });
+  const [col, tg, cols] = await Promise.all([
+    getCollection(slug!, { lang, page: 1, size: 60 }),
+    getTags(lang),
+    getCollections(lang),
+  ]);
+  collection = col;
+  tags = tg;
+  collections = cols;
 } catch {
   return Astro.redirect("/sk/portfolio");
 }
@@ -40,50 +51,29 @@ const jsonLd = {
     jsonLd={jsonLd}
   />
 
-  <section class="collection-detail">
-    <nav class="breadcrumb">
-      <a href="/sk/portfolio">{t(lang, "portfolio.backToPortfolio")}</a>
-    </nav>
+  <PortfolioHero title={collection.name} subtitle={collection.description} />
 
-    <h1>{collection.name}</h1>
-    {collection.description && <p class="description">{collection.description}</p>}
-    <p class="count">{collection.photos.totalCount} {t(lang, "portfolio.photosInCollection")}</p>
+  <PortfolioFilter
+    lang={lang}
+    collections={collections}
+    tags={tags}
+    active={{ type: "collection", slug: slug! }}
+    labels={{
+      filter: t(lang, "portfolio.filter"),
+      allPhotos: t(lang, "portfolio.allPhotos"),
+      collections: t(lang, "portfolio.collections"),
+      tags: t(lang, "portfolio.tags"),
+    }}
+  />
 
-    {collection.photos.items.length === 0 ? (
-      <p>{t(lang, "portfolio.noPhotos")}</p>
-    ) : (
-      <div class="gallery-grid">
-        {collection.photos.items.map((photo) => (
-          <a href={`/sk/portfolio/${photo.slug}`} class="photo-card">
-            <ResponsiveImage
-              variants={photo.variants}
-              alt={photo.altText || photo.title || ""}
-              width={photo.width || 800}
-              height={photo.height || 600}
-              dominantColor={photo.dominantColor}
-              blurhash={photo.blurhash}
-              sizes="(max-width: 600px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            />
-            {photo.title && <span class="photo-title">{photo.title}</span>}
-          </a>
-        ))}
-      </div>
-    )}
-
-    {collection.photos.totalPages > 1 && (
-      <nav class="pagination">
-        {collection.photos.page > 1 && (
-          <a href={`/sk/portfolio/kolekcie/${slug}?page=${collection.photos.page - 1}`}>&laquo; Predchádzajúca</a>
-        )}
-        <span>{collection.photos.page} / {collection.photos.totalPages}</span>
-        {collection.photos.page < collection.photos.totalPages && (
-          <a href={`/sk/portfolio/kolekcie/${slug}?page=${collection.photos.page + 1}`}>Nasledujúca &raquo;</a>
-        )}
-      </nav>
-    )}
-  </section>
+  <PortfolioGallery
+    lang={lang}
+    photos={collection.photos.items}
+    labels={{
+      viewDetail: t(lang, "portfolio.viewDetail"),
+      buyAsPrint: t(lang, "portfolio.buyAsPrint"),
+      close: t(lang, "portfolio.close"),
+      noPhotos: t(lang, "portfolio.noPhotos"),
+    }}
+  />
 </BaseLayout>
-
-<style lang="scss">
-  @use "../../../../styles/components/collection-detail";
-</style>

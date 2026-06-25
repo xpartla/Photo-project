@@ -1,0 +1,129 @@
+---
+// Compact, expandable filter shown at the top of every portfolio listing page.
+// Collapsed it is a single pill ("Filter · <active>"); expanded it reveals
+// Collections + Tags chips that link to the matching sub-page, plus an
+// "All photos" reset. Navigation-based (no client-side filtering); the only JS
+// is expand/collapse.
+import type { CollectionSummary, TagSummary } from "../lib/api";
+
+interface Props {
+  lang: string;
+  collections: Pick<CollectionSummary, "slug" | "name">[];
+  tags: Pick<TagSummary, "slug" | "name" | "photoCount">[];
+  active?: { type: "tag" | "collection"; slug: string };
+  labels: {
+    filter: string;
+    allPhotos: string;
+    collections: string;
+    tags: string;
+  };
+}
+
+const { lang, collections, tags, active, labels } = Astro.props;
+
+const portfolioBase = `/${lang}/portfolio`;
+const collectionBase = `${portfolioBase}/${lang === "sk" ? "kolekcie" : "collections"}`;
+const tagBase = `${portfolioBase}/${lang === "sk" ? "znacky" : "tags"}`;
+
+const isCollectionActive = (slug: string) =>
+  active?.type === "collection" && active.slug === slug;
+const isTagActive = (slug: string) => active?.type === "tag" && active.slug === slug;
+
+const activeName = active
+  ? active.type === "collection"
+    ? collections.find((c) => c.slug === active.slug)?.name
+    : tags.find((t) => t.slug === active.slug)?.name
+  : undefined;
+---
+
+<section class="pf-filter" data-pf-filter>
+  <button
+    class="pf-filter__toggle"
+    data-pf-toggle
+    aria-expanded="false"
+    aria-controls="pf-filter-panel"
+  >
+    <svg class="pf-filter__icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="4" y1="6" x2="20" y2="6" /><line x1="7" y1="12" x2="17" y2="12" /><line x1="10" y1="18" x2="14" y2="18" />
+    </svg>
+    <span class="pf-filter__label">{labels.filter}</span>
+    {activeName && <span class="pf-filter__active">· {activeName}</span>}
+    <svg class="pf-filter__chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  </button>
+
+  <div class="pf-filter__panel" id="pf-filter-panel" data-pf-panel hidden>
+    <a
+      href={portfolioBase}
+      class:list={["pf-filter__chip", "pf-filter__chip--all", { "pf-filter__chip--active": !active }]}
+    >
+      {labels.allPhotos}
+    </a>
+
+    {collections.length > 0 && (
+      <div class="pf-filter__group">
+        <span class="pf-filter__group-label">{labels.collections}</span>
+        {collections.map((c) => (
+          <a
+            href={`${collectionBase}/${c.slug}`}
+            class:list={["pf-filter__chip", { "pf-filter__chip--active": isCollectionActive(c.slug) }]}
+          >
+            {c.name}
+          </a>
+        ))}
+      </div>
+    )}
+
+    {tags.length > 0 && (
+      <div class="pf-filter__group">
+        <span class="pf-filter__group-label">{labels.tags}</span>
+        {tags.map((tag) => (
+          <a
+            href={`${tagBase}/${tag.slug}`}
+            class:list={["pf-filter__chip", { "pf-filter__chip--active": isTagActive(tag.slug) }]}
+          >
+            {tag.name}
+            {typeof tag.photoCount === "number" && <span class="pf-filter__count">{tag.photoCount}</span>}
+          </a>
+        ))}
+      </div>
+    )}
+  </div>
+</section>
+
+<style lang="scss">
+  @use "../styles/components/portfolio-filter";
+</style>
+
+<script>
+  function initPortfolioFilter() {
+    document.querySelectorAll<HTMLElement>("[data-pf-filter]").forEach((root) => {
+      const toggle = root.querySelector<HTMLButtonElement>("[data-pf-toggle]");
+      const panel = root.querySelector<HTMLElement>("[data-pf-panel]");
+      if (!toggle || !panel || toggle.dataset.bound === "1") return;
+      toggle.dataset.bound = "1";
+
+      const setOpen = (open: boolean) => {
+        toggle.setAttribute("aria-expanded", String(open));
+        panel.hidden = !open;
+        root.classList.toggle("pf-filter--open", open);
+      };
+
+      toggle.addEventListener("click", () => {
+        setOpen(toggle.getAttribute("aria-expanded") !== "true");
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!root.contains(e.target as Node)) setOpen(false);
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") setOpen(false);
+      });
+    });
+  }
+
+  initPortfolioFilter();
+  document.addEventListener("astro:after-swap", initPortfolioFilter);
+</script>
