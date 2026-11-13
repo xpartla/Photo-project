@@ -34,6 +34,15 @@ project was picked back up after a five-month pause. One commit per item on
 - **Deployment note:** the partition key is the connection's remote address. Behind a reverse proxy (Azure App Service) set `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`, otherwise all visitors share the proxy's address and one bucket.
 - **`RateLimitTests.cs`** (new, 5 tests) — login over the limit gets 429 + `Retry-After`; the limit is per address; register and refresh share the auth bucket; the booking form is limited; unlisted endpoints are not.
 
+### Added — EF Core migrations (all environments)
+- **Initial migration per module** under `Persistence/<Module>/Migrations/` for `IdentityDbContext`, `PortfolioDbContext`, `EShopDbContext`, `BookingDbContext` and `BlogDbContext` (25 tables across 5 schemas, each schema keeping its own `__EFMigrationsHistory`).
+- **`ApplyMigrationsAsync` now just calls `MigrateAsync()`** for every context in every environment. Removed: the Development-only `EnsureCreated` / `CreateTables` bootstrap, the raw-SQL `identity` patches, and the "drop the `eshop` schema if it looks old" heuristic. Dev, tests and production now build the schema the same way.
+- **Tooling** — `dotnet-ef` 10.0.15 as a repo-local tool (`src/backend/dotnet-tools.json`, `dotnet tool restore`); `Microsoft.EntityFrameworkCore.Design` referenced from the API project so it can act as the design-time startup project; **`make migration CONTEXT=Booking NAME=AddSomething`** generates a migration.
+- **`MigrationTests.cs`** (new, 10 tests) — per context: the model has no changes missing from the migrations, and the database has every migration applied. Changing an entity without adding a migration now fails the suite.
+
+### Breaking (local only)
+- A database created before this change has tables but no migration history and cannot be upgraded in place. The API refuses to start with a message saying so; reset with `docker compose down -v`, start the stack and re-run the seed scripts.
+
 ### Verification
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.

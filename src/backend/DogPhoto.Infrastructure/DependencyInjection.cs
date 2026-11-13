@@ -16,7 +16,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 
 namespace DogPhoto.Infrastructure;
@@ -100,79 +99,43 @@ public static class DependencyInjection
     {
         using var scope = services.CreateScope();
         var sp = scope.ServiceProvider;
-        var env = sp.GetRequiredService<IHostEnvironment>();
 
-        if (env.IsDevelopment())
+        var contexts = new (DbContext Context, string Schema)[]
         {
-            // In development, create schemas and tables from model directly
-            // This avoids needing migration files during early development
-            var contexts = new DbContext[]
-            {
-                sp.GetRequiredService<IdentityDbContext>(),
-                sp.GetRequiredService<PortfolioDbContext>(),
-                sp.GetRequiredService<EShopDbContext>(),
-                sp.GetRequiredService<BookingDbContext>(),
-                sp.GetRequiredService<BlogDbContext>(),
-            };
+            (sp.GetRequiredService<IdentityDbContext>(), IdentityDbContext.Schema),
+            (sp.GetRequiredService<PortfolioDbContext>(), PortfolioDbContext.Schema),
+            (sp.GetRequiredService<EShopDbContext>(), EShopDbContext.Schema),
+            (sp.GetRequiredService<BookingDbContext>(), BookingDbContext.Schema),
+            (sp.GetRequiredService<BlogDbContext>(), BlogDbContext.Schema),
+        };
 
-            // Ensure database exists using first context
-            await contexts[0].Database.EnsureCreatedAsync();
-
-            // Dev-only schema patches for identity: additive changes (new column,
-            // new table) that EnsureCreated skips on an already-existing schema.
-            // Kept idempotent via IF NOT EXISTS so re-runs are safe.
-            var identityDb = sp.GetRequiredService<IdentityDbContext>();
-            await identityDb.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE identity.users ADD COLUMN IF NOT EXISTS \"Phone\" varchar(50)");
-            await identityDb.Database.ExecuteSqlRawAsync("""
-                CREATE TABLE IF NOT EXISTS identity.addresses (
-                    "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                    "UserId" uuid NOT NULL REFERENCES identity.users("Id") ON DELETE CASCADE,
-                    "Label" varchar(64),
-                    "Name" varchar(256) NOT NULL,
-                    "Street" varchar(256) NOT NULL,
-                    "City" varchar(128) NOT NULL,
-                    "PostalCode" varchar(32) NOT NULL,
-                    "Country" varchar(2) NOT NULL DEFAULT 'SK',
-                    "IsDefaultShipping" boolean NOT NULL DEFAULT false,
-                    "IsDefaultBilling" boolean NOT NULL DEFAULT false,
-                    "CreatedAt" timestamptz NOT NULL DEFAULT now(),
-                    "UpdatedAt" timestamptz NOT NULL DEFAULT now()
-                )
-                """);
-            await identityDb.Database.ExecuteSqlRawAsync(
-                "CREATE INDEX IF NOT EXISTS \"IX_addresses_UserId\" ON identity.addresses(\"UserId\")");
-
-            // Dev-only: rebuild the eshop schema when its model has changed in a
-            // backwards-incompatible way. Detection is by presence of a table that
-            // only exists in the latest model. Product data is re-seeded by seed-shop.sh.
-            var eshopDb = sp.GetRequiredService<EShopDbContext>();
-            var variantsTableExists = await eshopDb.Database
-                .SqlQueryRaw<bool>("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'eshop' AND table_name = 'product_variants') AS \"Value\"")
-                .FirstAsync();
-            if (!variantsTableExists)
-            {
-                await eshopDb.Database.ExecuteSqlRawAsync("DROP SCHEMA IF EXISTS eshop CASCADE");
-            }
-
-            // For remaining contexts, create schemas and tables via SQL generation
-            foreach (var context in contexts.Skip(1))
-            {
-                var internalSp = ((Microsoft.EntityFrameworkCore.Infrastructure.IInfrastructure<IServiceProvider>)context).Instance;
-                var creator = (Microsoft.EntityFrameworkCore.Storage.IRelationalDatabaseCreator)
-                    internalSp.GetRequiredService<Microsoft.EntityFrameworkCore.Storage.IDatabaseCreator>();
-                try { await creator.CreateTablesAsync(); } catch { /* Tables already exist */ }
-            }
-        }
-        else
+        foreach (var (context, schema) in contexts)
         {
-            // In production, use proper migrations
-            await sp.GetRequiredService<IdentityDbContext>().Database.MigrateAsync();
-            await sp.GetRequiredService<PortfolioDbContext>().Database.MigrateAsync();
-            await sp.GetRequiredService<EShopDbContext>().Database.MigrateAsync();
-            await sp.GetRequiredService<BookingDbContext>().Database.MigrateAsync();
-            await sp.GetRequiredService<BlogDbContext>().Database.MigrateAsync();
+            await ThrowIfCreatedWithoutMigrationsAsync(context, schema);
+            await context.Database.MigrateAsync();
         }
+    }
+
+    // Databases from before migrations existed were built with EnsureCreated:
+    // the tables are there but the history table is not, so Migrate() would
+    // fail on the first CREATE TABLE with a far less helpful message.
+    private static async Task ThrowIfCreatedWithoutMigrationsAsync(DbContext context, string schema)
+    {
+        if (!await context.Database.CanConnectAsync()) return;
+
+        var legacy = await context.Database
+            .SqlQuery<bool>($"""
+                SELECT EXISTS (SELECT 1 FROM information_schema.tables
+                               WHERE table_schema = {schema} AND table_name <> '__EFMigrationsHistory')
+                   AND NOT EXISTS (SELECT 1 FROM information_schema.tables
+                                   WHERE table_schema = {schema} AND table_name = '__EFMigrationsHistory') AS "Value"
+                """)
+            .SingleAsync();
+
+        if (legacy)
+            throw new InvalidOperationException(
+                $"Schema '{schema}' was created without EF migrations and cannot be upgraded in place. " +
+                "For a local database, reset it with `docker compose down -v` and start the stack again.");
     }
 
     public static async Task SeedDataAsync(IServiceProvider services)

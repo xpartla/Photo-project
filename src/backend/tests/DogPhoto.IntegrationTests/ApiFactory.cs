@@ -60,8 +60,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Force Development so DependencyInjection.ApplyMigrationsAsync uses
-        // EnsureCreated/CreateTables (no migration files exist yet).
+        // Development loads appsettings.Development.json and enables the
+        // development-only surface (mock payments).
         builder.UseEnvironment(Environments.Development);
 
         builder.ConfigureTestServices(services =>
