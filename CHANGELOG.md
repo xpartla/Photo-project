@@ -91,6 +91,23 @@ project was picked back up after a five-month pause. One commit per item on
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.
 
+## Booking packages for the dog-only launch (2026-06-25)
+
+The booking page moves from the original generic session types to the three
+packages actually on offer. (Written retrospectively on 2026-11-13 from commit
+`b6574c7`, which shipped without a changelog entry.)
+
+### Changed
+- **Packages** — the seeded session types `dog-portrait` / `action-session` / `outdoor-session` are replaced by **Legacy** (35 mm film, 24 frames, 90 min, 180 EUR, 1 dog), **Digital** (15 edited photos, 60 min, 130 EUR, 1 dog) and **Action** (12 edited photos, 90 min, 150 EUR, up to 2 dogs), with bilingual descriptions.
+- **Startup seed became a reconcile** — instead of seeding once into an empty table, `SeedDataAsync` upserted the three packages by slug on every start and deactivated any other active session type, so the old types dropped off the public page while existing bookings kept their foreign keys. (Superseded on 2026-11-13: the seed now only inserts missing packages.)
+- **Bilingual "includes"** — `SessionType.IncludesJson` changed from a flat array to `{"sk":[...],"en":[...]}`. `MapSessionType` picks the list for the requested language and still reads the legacy flat shape.
+- **Booking page** (`en/booking/index.astro`, `sk/rezervacia/index.astro`) — cards are shown in a fixed Legacy → Digital → Action order rather than by price; the category pill and the duration line were removed from the cards and the detail modal; the price moved above the description.
+- **FAQ** rewritten around the packages: print quality, what the Legacy package contains, delivery times, and extra prints (replacing "how long / how many photos / where").
+- **`_booking.scss`** — the card button is pinned to the bottom with `margin-top: auto` so cards of different text length line up.
+
+### Testing
+- `BookingTests` updated for the new slugs (`legacy`, `action`) and the 90-minute Legacy duration.
+
 ## Portfolio tilt & gallery layout polish (2026-06-25)
 
 Small visual fixes to the portfolio index and its tag/collection sub-pages: the
