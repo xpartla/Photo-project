@@ -383,12 +383,15 @@ export interface SessionTypeSummary {
   currency: string;
   category: string;
   includes?: string[];
+  includesSk?: string[];
+  includesEn?: string[];
   maxDogs: number;
   isActive: boolean;
 }
 
+// Includes inactive packages so they can be re-activated.
 export const listSessionTypes = (lang: "sk" | "en" = "sk") =>
-  request<SessionTypeSummary[]>(`/api/booking/session-types?lang=${lang}`);
+  request<SessionTypeSummary[]>(`/api/booking/session-types?lang=${lang}&includeInactive=true`);
 
 export interface UpdateSessionTypeInput {
   nameSk?: string;
@@ -398,7 +401,8 @@ export interface UpdateSessionTypeInput {
   durationMinutes?: number;
   basePrice?: number;
   category?: string;
-  includesJson?: string[];
+  includesSk?: string[];
+  includesEn?: string[];
   maxDogs?: number;
   isActive?: boolean;
 }
@@ -415,7 +419,8 @@ export interface CreateSessionTypeInput {
   durationMinutes?: number;
   basePrice?: number;
   category?: string;
-  includesJson?: string[];
+  includesSk?: string[];
+  includesEn?: string[];
   maxDogs?: number;
   isActive?: boolean;
 }

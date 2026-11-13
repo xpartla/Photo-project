@@ -22,10 +22,12 @@ const langSlug = lang === "sk" ? "rezervacia" : "booking";
         <input class="account-form__input" name="slug" pattern="[a-z0-9-]+" required />
       </div>
       <div class="account-form__field">
-        <label class="account-form__label">{t(lang, "booking.category.portrait")}</label>
+        <label class="account-form__label">{t(lang, "admin.booking.category")}</label>
         <select class="account-form__input" name="category">
-          <option value="portrait">portrait</option>
+          <option value="film">film</option>
+          <option value="digital">digital</option>
           <option value="action">action</option>
+          <option value="portrait">portrait</option>
           <option value="studio">studio</option>
           <option value="outdoor">outdoor</option>
         </select>
@@ -65,9 +67,15 @@ const langSlug = lang === "sk" ? "rezervacia" : "booking";
         <input class="account-form__input" type="number" name="maxDogs" value="1" />
       </div>
     </div>
-    <div class="account-form__field">
-      <label class="account-form__label">{t(lang, "admin.booking.includes")}</label>
-      <textarea class="account-form__input" name="includes" rows="3"></textarea>
+    <div class="account-form__row">
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.booking.includesSk")}</label>
+        <textarea class="account-form__input" name="includesSk" rows="3"></textarea>
+      </div>
+      <div class="account-form__field">
+        <label class="account-form__label">{t(lang, "admin.booking.includesEn")}</label>
+        <textarea class="account-form__input" name="includesEn" rows="3"></textarea>
+      </div>
     </div>
     <div id="new-type-error" class="account-form__error"></div>
     <div class="account-form__actions">
@@ -88,8 +96,10 @@ const langSlug = lang === "sk" ? "rezervacia" : "booking";
     duration: t(lang, "admin.booking.duration"),
     price: t(lang, "admin.booking.basePrice"),
     maxDogs: t(lang, "admin.booking.maxDogs"),
-    includes: t(lang, "admin.booking.includes"),
+    includesSk: t(lang, "admin.booking.includesSk"),
+    includesEn: t(lang, "admin.booking.includesEn"),
     active: t(lang, "admin.booking.active"),
+    inactive: t(lang, "admin.booking.inactive"),
     save: t(lang, "admin.common.save"),
     saving: t(lang, "admin.common.saving"),
     saved: t(lang, "admin.common.saved"),
@@ -115,11 +125,13 @@ const langSlug = lang === "sk" ? "rezervacia" : "booking";
     return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!));
   }
 
+  const lines = (text: string): string[] => text.split("\n").map((l) => l.trim()).filter(Boolean);
+
   function render(items: any[]) {
     const container = document.getElementById("types-container")!;
     container.innerHTML = items.map((st: any) => `
       <form class="account-form" data-id="${escapeHtml(st.id)}" style="margin-bottom:16px;">
-        <h2 class="account-form__section-title">${escapeHtml(st.nameSk)} <span style="color:#7EAA92;">${st.basePrice} EUR · ${st.durationMinutes} min</span></h2>
+        <h2 class="account-form__section-title">${escapeHtml(st.nameSk)} <span style="color:#7EAA92;">${st.basePrice} EUR · ${st.durationMinutes} min</span>${st.isActive ? "" : ` <span class="admin-status-pill admin-status-pill--cancelled" data-inactive>${escapeHtml(cfg.t.inactive)}</span>`}</h2>
         <div class="account-form__row">
           <div class="account-form__field">
             <label class="account-form__label">${escapeHtml(cfg.t.nameSkLabel)}</label>
@@ -154,9 +166,15 @@ const langSlug = lang === "sk" ? "rezervacia" : "booking";
             <input class="account-form__input" type="number" data-field="maxDogs" value="${st.maxDogs}" />
           </div>
         </div>
-        <div class="account-form__field">
-          <label class="account-form__label">${escapeHtml(cfg.t.includes)}</label>
-          <textarea class="account-form__input" data-field="includes" rows="3">${escapeHtml((st.includes || []).join("\n"))}</textarea>
+        <div class="account-form__row">
+          <div class="account-form__field">
+            <label class="account-form__label">${escapeHtml(cfg.t.includesSk)}</label>
+            <textarea class="account-form__input" data-field="includesSk" rows="3">${escapeHtml((st.includesSk || []).join("\n"))}</textarea>
+          </div>
+          <div class="account-form__field">
+            <label class="account-form__label">${escapeHtml(cfg.t.includesEn)}</label>
+            <textarea class="account-form__input" data-field="includesEn" rows="3">${escapeHtml((st.includesEn || []).join("\n"))}</textarea>
+          </div>
         </div>
         <label class="account-form__checkbox">
           <input type="checkbox" data-field="isActive" ${st.isActive ? "checked" : ""} />
@@ -182,7 +200,6 @@ const langSlug = lang === "sk" ? "rezervacia" : "booking";
         btn.textContent = cfg.t.saving;
         try {
           const f = (name: string) => form.querySelector(`[data-field='${name}']`) as HTMLInputElement | HTMLTextAreaElement;
-          const includesText = (f("includes") as HTMLTextAreaElement).value;
           await updateSessionType(form.dataset.id!, {
             nameSk: (f("nameSk") as HTMLInputElement).value,
             nameEn: (f("nameEn") as HTMLInputElement).value,
@@ -191,10 +208,14 @@ const langSlug = lang === "sk" ? "rezervacia" : "booking";
             durationMinutes: parseInt((f("durationMinutes") as HTMLInputElement).value, 10),
             basePrice: parseFloat((f("basePrice") as HTMLInputElement).value),
             maxDogs: parseInt((f("maxDogs") as HTMLInputElement).value, 10),
-            includesJson: includesText.split("\n").map((s) => s.trim()).filter(Boolean),
+            includesSk: lines((f("includesSk") as HTMLTextAreaElement).value),
+            includesEn: lines((f("includesEn") as HTMLTextAreaElement).value),
             isActive: (form.querySelector("[data-field='isActive']") as HTMLInputElement).checked,
           });
-          okEl.textContent = cfg.t.saved;
+          // Re-render so the title, price and active badge reflect what was saved.
+          await reload();
+          const savedForm = document.querySelector(`form[data-id='${form.dataset.id}'] [data-success]`);
+          if (savedForm) savedForm.textContent = cfg.t.saved;
         } catch (err: any) {
           errEl.textContent = err.message;
         } finally {
@@ -232,7 +253,6 @@ const langSlug = lang === "sk" ? "rezervacia" : "booking";
     const errEl = document.getElementById("new-type-error")!;
     errEl.textContent = "";
     const fd = new FormData(newForm);
-    const includesText = String(fd.get("includes") ?? "");
     try {
       await createSessionType({
         slug: String(fd.get("slug") ?? "").trim(),
@@ -244,7 +264,8 @@ const langSlug = lang === "sk" ? "rezervacia" : "booking";
         basePrice: parseFloat(String(fd.get("basePrice") ?? "100")),
         category: String(fd.get("category") ?? "portrait"),
         maxDogs: parseInt(String(fd.get("maxDogs") ?? "1"), 10),
-        includesJson: includesText.split("\n").map((s: string) => s.trim()).filter(Boolean),
+        includesSk: lines(String(fd.get("includesSk") ?? "")),
+        includesEn: lines(String(fd.get("includesEn") ?? "")),
         isActive: true,
       });
       newForm.hidden = true;

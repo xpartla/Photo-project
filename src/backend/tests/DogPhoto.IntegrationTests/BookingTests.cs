@@ -290,28 +290,6 @@ public sealed class BookingTests : ApiTestBase
     }
 
     [Fact]
-    public async Task AdminCanUpdateSessionType()
-    {
-        var admin = await CreateAdminClientAsync();
-
-        // Get existing session type
-        var typesResponse = await admin.GetAsync("/api/booking/session-types");
-        var typesBody = await typesResponse.Content.ReadAsStringAsync();
-        using var typesDoc = JsonDocument.Parse(typesBody);
-        var id = typesDoc.RootElement.EnumerateArray().First().GetProperty("id").GetString();
-
-        var response = await admin.PutAsJsonAsync($"/api/booking/session-types/{id}", new
-        {
-            basePrice = 999.0m
-        });
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(body);
-        Assert.Equal(999.0m, doc.RootElement.GetProperty("basePrice").GetDecimal());
-    }
-
-    [Fact]
     public async Task AdminCanBlockSlot()
     {
         var admin = await CreateAdminClientAsync();

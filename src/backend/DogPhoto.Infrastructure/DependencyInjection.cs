@@ -151,15 +151,12 @@ public static class DependencyInjection
         using var scope = services.CreateScope();
         var sp = scope.ServiceProvider;
 
-        // Seed / reconcile booking session types — the dog-only launch packages.
-        // This runs every startup (not just on an empty table) so edits to the
-        // canonical package content take effect without a manual DB reset.
-        // Rows are matched by slug; any other active session type (e.g. retired
-        // seed data) is deactivated so it drops out of the public listing while
-        // keeping existing bookings' foreign-key references intact.
+        // Starter booking packages. Only packages whose slug is missing are
+        // inserted: once a row exists the admin UI owns it, so edits and
+        // deactivations survive restarts.
         // `includes` is stored bilingually as {"sk":[...],"en":[...]}.
         var bookingDb = sp.GetRequiredService<BookingDbContext>();
-        var desiredSessionTypes = new[]
+        var starterPackages = new[]
         {
             new SessionType
             {
@@ -202,37 +199,8 @@ public static class DependencyInjection
             }
         };
 
-        var existingSessionTypes = await bookingDb.SessionTypes.ToListAsync();
-        var sessionTypesBySlug = existingSessionTypes.ToDictionary(s => s.Slug);
-        foreach (var desired in desiredSessionTypes)
-        {
-            if (sessionTypesBySlug.TryGetValue(desired.Slug, out var row))
-            {
-                row.NameSk = desired.NameSk;
-                row.NameEn = desired.NameEn;
-                row.DescriptionSk = desired.DescriptionSk;
-                row.DescriptionEn = desired.DescriptionEn;
-                row.DurationMinutes = desired.DurationMinutes;
-                row.BasePrice = desired.BasePrice;
-                row.Category = desired.Category;
-                row.MaxDogs = desired.MaxDogs;
-                row.IncludesJson = desired.IncludesJson;
-                row.IsActive = true;
-                row.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                bookingDb.SessionTypes.Add(desired);
-            }
-        }
-
-        var desiredSlugs = desiredSessionTypes.Select(d => d.Slug).ToHashSet();
-        foreach (var stale in existingSessionTypes.Where(s => s.IsActive && !desiredSlugs.Contains(s.Slug)))
-        {
-            stale.IsActive = false;
-            stale.UpdatedAt = DateTime.UtcNow;
-        }
-
+        var existingSlugs = await bookingDb.SessionTypes.Select(s => s.Slug).ToListAsync();
+        bookingDb.SessionTypes.AddRange(starterPackages.Where(d => !existingSlugs.Contains(d.Slug)));
         await bookingDb.SaveChangesAsync();
 
         // Seed eshop lookup tables (formats & paper types)

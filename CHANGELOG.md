@@ -51,6 +51,16 @@ project was picked back up after a five-month pause. One commit per item on
 - **Frontend** — `/mock-pay/[id]` returns 404 outside `astro dev`.
 - **`PaymentGatewayTests.cs`** (new, 6 tests) — boots a second host in `Production` mode: no usable gateway, webhook and payment-info routes unmapped, order creation 503; Development keeps the mock flow.
 
+### Changed — booking packages are managed in the admin UI
+- **Startup seed no longer overwrites packages.** `SeedDataAsync` used to rewrite Legacy / Digital / Action on every API start and deactivate any other active package, so admin edits were lost and admin-created packages were switched off. It now only inserts starter packages whose slug is missing; existing rows are never touched.
+- **Bilingual "includes" in the API.** `POST` / `PUT /api/booking/session-types` take `includesSk` and `includesEn` (replacing `includesJson`, which stored a flat list and silently dropped one language on every edit). A language left out of an update keeps its stored value. Responses add `includesSk` / `includesEn` next to the localized `includes`.
+- **`GET /api/booking/session-types?includeInactive=true`** — honoured for admins only, so deactivated packages stay listed in the CMS and can be re-activated.
+- **Validation** on create/update: slug format, non-empty names, duration > 0, price ≥ 0, max dogs ≥ 1.
+- **`AdminSessionTypes.astro`** — separate SK and EN "includes" fields in the create and edit forms, an "Inactive" pill on deactivated packages, the list re-renders after saving, and the category field has its own label plus the `film` / `digital` options the starter packages use.
+- **i18n** — `admin.booking.includes` split into `admin.booking.includesSk` / `includesEn`; new `admin.booking.category`, `admin.booking.inactive` (SK + EN).
+- **`SessionTypeTests.cs`** (new, 18 tests) — admin-only create/update, localized includes, partial updates, validation, deactivated packages hidden from the public and unbookable, and a restart test proving admin edits and custom packages survive the startup seed. `AdminCanUpdateSessionType` moved there so it no longer reprices a starter package.
+- **E2E** — `admin.spec.ts`: create a package through the form, deactivate it, and confirm it stays listed for the admin but leaves the public API.
+
 ### Verification
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.

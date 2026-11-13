@@ -122,6 +122,39 @@ test.describe("admin booking", () => {
     await expect(page.locator("#types-container form").first()).toBeVisible();
   });
 
+  test("a package can be created, then deactivated without disappearing", async ({ page, request }) => {
+    const token = await getAdminToken(request);
+    await primeAdmin(page, token);
+    const slug = `e2e-${Date.now()}`;
+
+    await page.goto("/sk/admin/rezervacia/types");
+    await page.locator("#new-type-btn").click();
+    const form = page.locator("#new-type-form");
+    await form.locator("[name=slug]").fill(slug);
+    await form.locator("[name=nameSk]").fill(`Balík ${slug}`);
+    await form.locator("[name=nameEn]").fill(`Package ${slug}`);
+    await form.locator("[name=basePrice]").fill("9999");
+    await form.locator("[name=includesSk]").fill("prvá položka\ndruhá položka");
+    await form.locator("[name=includesEn]").fill("first item\nsecond item");
+    await form.locator("button[type=submit]").click();
+
+    const card = page.locator("#types-container form", { hasText: `Balík ${slug}` });
+    await expect(card).toBeVisible();
+    await expect(card.locator("[data-field=includesSk]")).toHaveValue("prvá položka\ndruhá položka");
+    await expect(card.locator("[data-field=includesEn]")).toHaveValue("first item\nsecond item");
+    await expect(card.locator("[data-inactive]")).toHaveCount(0);
+
+    await card.locator("[data-field=isActive]").uncheck();
+    await card.locator("button[type=submit]").click();
+    await expect(card.locator("[data-inactive]")).toBeVisible();
+
+    // Still listed for the admin after a reload, gone from the public API.
+    await page.reload();
+    await expect(page.locator("#types-container form", { hasText: `Balík ${slug}` }).locator("[data-inactive]")).toBeVisible();
+    const publicList = await (await request.get(`${API_URL}/api/booking/session-types`)).json();
+    expect(publicList.some((st: { slug: string }) => st.slug === slug)).toBe(false);
+  });
+
   test("bookings list renders with status filter", async ({ page, request }) => {
     const token = await getAdminToken(request);
     await primeAdmin(page, token);
