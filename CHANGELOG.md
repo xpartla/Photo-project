@@ -94,8 +94,17 @@ project was picked back up after a five-month pause. One commit per item on
 - Removed the four `booking.category.*` i18n keys, unused since that rework.
 
 ### Verification
-- Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
-- `docker compose up -d --build` builds and boots on the pinned images.
+- **Backend** (host, .NET SDK 10.0.404): 8/8 architecture tests, 138/138 integration tests (86 before this work, 3 of them failing).
+- **Frontend unit** (Vitest): 64/64.
+- **E2E** (Playwright against the compose stack): store hidden — 42 passed, 16 skipped; store enabled — 58 passed.
+- `astro build` completes; `docker compose up -d --build` builds and boots on the pinned images, and the database is created purely from migrations.
+- **Not verified:** a Release build / the `prod` Docker target of the API. It currently fails on the ImageSharp licence check described above.
+
+### Still open
+- A Six Labors licence key (or a different imaging library) is needed before the API can be built in Release.
+- The startup seed still creates `admin@dogphoto.sk` / `admin123` and the sample customer in every environment; production needs a different way to create the first admin.
+- "Order paid" handling (status change + e-mails) lives inside the Development-only mock webhook and has to move into shared code when a real payment gateway is added.
+- Deployment to Azure App Service itself (pipeline, infrastructure, production configuration) is not started.
 
 ## Booking packages for the dog-only launch (2026-06-25)
 
