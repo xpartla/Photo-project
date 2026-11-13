@@ -1,6 +1,8 @@
 using DogPhoto.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.Internal;
 using Xunit;
 
 namespace DogPhoto.IntegrationTests;
@@ -11,6 +13,9 @@ namespace DogPhoto.IntegrationTests;
 /// </summary>
 public sealed class ConfigurationTests
 {
+    private static readonly IHostEnvironment Development =
+        new HostingEnvironment { EnvironmentName = Environments.Development };
+
     private static IConfiguration Config(string? jwtSecret)
     {
         var values = new Dictionary<string, string?>
@@ -25,7 +30,7 @@ public sealed class ConfigurationTests
     public void AddInfrastructure_WithoutJwtSecret_Throws()
     {
         var ex = Assert.Throws<InvalidOperationException>(
-            () => new ServiceCollection().AddInfrastructure(Config(jwtSecret: null)));
+            () => new ServiceCollection().AddInfrastructure(Config(jwtSecret: null), Development));
         Assert.Contains("Jwt:Secret", ex.Message);
     }
 
@@ -33,12 +38,12 @@ public sealed class ConfigurationTests
     public void AddInfrastructure_WithShortJwtSecret_Throws()
     {
         Assert.Throws<InvalidOperationException>(
-            () => new ServiceCollection().AddInfrastructure(Config(jwtSecret: "too-short")));
+            () => new ServiceCollection().AddInfrastructure(Config(jwtSecret: "too-short"), Development));
     }
 
     [Fact]
     public void AddInfrastructure_WithValidJwtSecret_Succeeds()
     {
-        new ServiceCollection().AddInfrastructure(Config(jwtSecret: new string('x', 32)));
+        new ServiceCollection().AddInfrastructure(Config(jwtSecret: new string('x', 32)), Development);
     }
 }

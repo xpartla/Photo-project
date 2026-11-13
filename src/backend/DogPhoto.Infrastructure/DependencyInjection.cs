@@ -16,13 +16,14 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 
 namespace DogPhoto.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         var connectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("Connection string 'Default' not found.");
@@ -82,8 +83,15 @@ public static class DependencyInjection
         services.AddScoped<IEmailService, SmtpEmailService>();
 
         // Payment gateway
-        services.AddSingleton<MockPaymentGateway>();
-        services.AddSingleton<IPaymentGateway>(sp => sp.GetRequiredService<MockPaymentGateway>());
+        if (environment.IsDevelopment())
+        {
+            services.AddSingleton<MockPaymentGateway>();
+            services.AddSingleton<IPaymentGateway>(sp => sp.GetRequiredService<MockPaymentGateway>());
+        }
+        else
+        {
+            services.AddSingleton<IPaymentGateway, UnavailablePaymentGateway>();
+        }
 
         // Image pipeline
         services.AddScoped<IImageProcessor, ImageProcessor>();

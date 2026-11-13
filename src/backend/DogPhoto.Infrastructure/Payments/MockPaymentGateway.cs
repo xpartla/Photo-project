@@ -8,6 +8,8 @@ public class MockPaymentGateway(IConfiguration configuration) : IPaymentGateway
     private readonly ConcurrentDictionary<string, MockPayment> _payments = new();
     private readonly string _frontendBaseUrl = configuration["FrontendBaseUrl"] ?? "http://localhost:4321";
 
+    public bool IsAvailable => true;
+
     public Task<PaymentSession> CreatePaymentAsync(Guid orderId, decimal amount, string currency, string returnUrl, string cancelUrl, CancellationToken ct = default)
     {
         var paymentId = $"mock_{Guid.NewGuid():N}";

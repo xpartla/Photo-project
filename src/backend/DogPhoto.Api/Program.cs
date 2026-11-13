@@ -12,7 +12,7 @@ using DogPhoto.SharedKernel.Middleware;
 var builder = WebApplication.CreateBuilder(args);
 
 // Infrastructure (DbContexts, Auth, DI)
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 
 // Health checks with DB connectivity (using EF Core DbContext check)
 builder.Services.AddHealthChecks()

@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DogPhoto.Infrastructure.EShop;
@@ -264,131 +265,8 @@ public static class EShopEndpoints
             return Results.Ok(MapProduct(product, l, photoVariants, tagsByPhoto));
         });
 
-        group.MapPost("/webhooks/payment", async (
-            PaymentWebhookRequest request,
-            EShopDbContext db,
-            PortfolioDbContext portfolioDb,
-            IPaymentGateway gateway,
-            IEmailService emailService,
-            ILoggerFactory loggerFactory) =>
-        {
-            var logger = loggerFactory.CreateLogger("EShop.Webhook");
-
-            var order = await db.Orders
-                .Include(o => o.Items)
-                .FirstOrDefaultAsync(o => o.GoPayPaymentId == request.PaymentId);
-
-            if (order is null)
-            {
-                logger.LogWarning("Webhook received for unknown payment {PaymentId}", request.PaymentId);
-                return Results.NotFound(new { error = "Order not found for this payment." });
-            }
-
-            if (request.Status == "paid")
-            {
-                if (order.Status != "pending_payment")
-                    return Results.Ok(new { orderId = order.Id, status = order.Status, message = "Already processed." });
-
-                if (gateway is MockPaymentGateway mock)
-                    mock.ConfirmPayment(request.PaymentId);
-
-                order.Status = "paid";
-                order.UpdatedAt = DateTime.UtcNow;
-                await db.SaveChangesAsync();
-
-                try
-                {
-                    // Look up each order item's product photo for thumbnails.
-                    var productIds = order.Items.Select(oi => oi.ProductId).Distinct().ToList();
-                    var productPhotos = await db.Products.IgnoreQueryFilters()
-                        .Where(p => productIds.Contains(p.Id))
-                        .Select(p => new { p.Id, p.PhotoId })
-                        .ToDictionaryAsync(p => p.Id, p => p.PhotoId);
-                    var photoIds = productPhotos.Values
-                        .Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
-                    var photoVariants = photoIds.Count > 0
-                        ? await portfolioDb.PhotoVariants.Where(v => photoIds.Contains(v.PhotoId)).ToListAsync()
-                        : new List<PhotoVariant>();
-
-                    var items = order.Items
-                        .Select(oi =>
-                        {
-                            productPhotos.TryGetValue(oi.ProductId, out var photoId);
-                            var img = EmailImageUrl(PickThumbnail(photoVariants, photoId));
-                            return new OrderEmailTemplates.OrderItemInfo(
-                                oi.ProductTitleEn,
-                                oi.FormatNameEn,
-                                oi.PaperTypeNameEn,
-                                img,
-                                oi.Quantity,
-                                oi.UnitPrice,
-                                oi.EditionNumber);
-                        })
-                        .ToList();
-
-                    var shippingAddress = ParseAddress(order.ShippingAddressJson);
-
-                    var customerHtml = OrderEmailTemplates.CustomerOrderConfirmation(
-                        order.Id, items, order.TotalAmount, order.Currency, shippingAddress);
-                    await emailService.SendAsync(
-                        order.CustomerEmail ?? "customer@example.com",
-                        $"Order Confirmation #{order.Id.ToString()[..8]} — PartlPhoto",
-                        customerHtml);
-
-                    var photographerHtml = OrderEmailTemplates.PhotographerOrderNotification(
-                        order.Id, order.CustomerEmail ?? "unknown", items, order.TotalAmount, order.Currency, shippingAddress);
-                    await emailService.SendAsync(
-                        "admin@partlphoto.sk",
-                        $"New Order #{order.Id.ToString()[..8]} — {order.TotalAmount} {order.Currency}",
-                        photographerHtml);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Failed to send order emails for order {OrderId}", order.Id);
-                }
-
-                return Results.Ok(new { orderId = order.Id, status = order.Status });
-            }
-
-            if (request.Status == "cancelled")
-            {
-                if (gateway is MockPaymentGateway mock)
-                    mock.CancelPayment(request.PaymentId);
-
-                if (order.Status == "pending_payment")
-                {
-                    order.Status = "cancelled";
-                    order.UpdatedAt = DateTime.UtcNow;
-
-                    await RestoreEditionCounts(db, order.Id);
-                    await db.SaveChangesAsync();
-                }
-
-                return Results.Ok(new { orderId = order.Id, status = order.Status });
-            }
-
-            return Results.BadRequest(new { error = $"Unknown payment status: {request.Status}" });
-        });
-
-        group.MapGet("/payments/{paymentId}", (string paymentId, IPaymentGateway gateway) =>
-        {
-            if (gateway is not MockPaymentGateway mock)
-                return Results.NotFound();
-
-            var payment = mock.GetPayment(paymentId);
-            if (payment is null) return Results.NotFound();
-
-            return Results.Ok(new
-            {
-                paymentId = payment.PaymentId,
-                orderId = payment.OrderId,
-                amount = payment.Amount,
-                currency = payment.Currency,
-                status = payment.Status.ToString().ToLower(),
-                returnUrl = payment.ReturnUrl,
-                cancelUrl = payment.CancelUrl
-            });
-        });
+        if (app.ServiceProvider.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            MapMockPaymentEndpoints(group);
 
         // ── Authenticated endpoints ────────────────────────────────────
 
@@ -567,6 +445,10 @@ public static class EShopEndpoints
             ILoggerFactory loggerFactory) =>
         {
             var logger = loggerFactory.CreateLogger("EShop.Orders");
+
+            if (!gateway.IsAvailable)
+                return Results.Json(new { error = "Online payments are not available yet." },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
 
             var cart = await db.ShoppingCarts
                 .Include(c => c.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.Product)
@@ -1013,6 +895,138 @@ public static class EShopEndpoints
             }
 
             return Results.Ok(new { orderId = order.Id, previousStatus, newStatus = order.Status });
+        });
+    }
+
+    // The mock gateway is confirmed by an unauthenticated browser request from
+    // /mock-pay, so these routes exist only in Development. A real gateway
+    // brings its own signature-verified webhook.
+    private static void MapMockPaymentEndpoints(RouteGroupBuilder group)
+    {
+        group.MapPost("/webhooks/payment", async (
+            PaymentWebhookRequest request,
+            EShopDbContext db,
+            PortfolioDbContext portfolioDb,
+            IPaymentGateway gateway,
+            IEmailService emailService,
+            ILoggerFactory loggerFactory) =>
+        {
+            var logger = loggerFactory.CreateLogger("EShop.Webhook");
+
+            var order = await db.Orders
+                .Include(o => o.Items)
+                .FirstOrDefaultAsync(o => o.GoPayPaymentId == request.PaymentId);
+
+            if (order is null)
+            {
+                logger.LogWarning("Webhook received for unknown payment {PaymentId}", request.PaymentId);
+                return Results.NotFound(new { error = "Order not found for this payment." });
+            }
+
+            if (request.Status == "paid")
+            {
+                if (order.Status != "pending_payment")
+                    return Results.Ok(new { orderId = order.Id, status = order.Status, message = "Already processed." });
+
+                if (gateway is MockPaymentGateway mock)
+                    mock.ConfirmPayment(request.PaymentId);
+
+                order.Status = "paid";
+                order.UpdatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+
+                try
+                {
+                    // Look up each order item's product photo for thumbnails.
+                    var productIds = order.Items.Select(oi => oi.ProductId).Distinct().ToList();
+                    var productPhotos = await db.Products.IgnoreQueryFilters()
+                        .Where(p => productIds.Contains(p.Id))
+                        .Select(p => new { p.Id, p.PhotoId })
+                        .ToDictionaryAsync(p => p.Id, p => p.PhotoId);
+                    var photoIds = productPhotos.Values
+                        .Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+                    var photoVariants = photoIds.Count > 0
+                        ? await portfolioDb.PhotoVariants.Where(v => photoIds.Contains(v.PhotoId)).ToListAsync()
+                        : new List<PhotoVariant>();
+
+                    var items = order.Items
+                        .Select(oi =>
+                        {
+                            productPhotos.TryGetValue(oi.ProductId, out var photoId);
+                            var img = EmailImageUrl(PickThumbnail(photoVariants, photoId));
+                            return new OrderEmailTemplates.OrderItemInfo(
+                                oi.ProductTitleEn,
+                                oi.FormatNameEn,
+                                oi.PaperTypeNameEn,
+                                img,
+                                oi.Quantity,
+                                oi.UnitPrice,
+                                oi.EditionNumber);
+                        })
+                        .ToList();
+
+                    var shippingAddress = ParseAddress(order.ShippingAddressJson);
+
+                    var customerHtml = OrderEmailTemplates.CustomerOrderConfirmation(
+                        order.Id, items, order.TotalAmount, order.Currency, shippingAddress);
+                    await emailService.SendAsync(
+                        order.CustomerEmail ?? "customer@example.com",
+                        $"Order Confirmation #{order.Id.ToString()[..8]} — PartlPhoto",
+                        customerHtml);
+
+                    var photographerHtml = OrderEmailTemplates.PhotographerOrderNotification(
+                        order.Id, order.CustomerEmail ?? "unknown", items, order.TotalAmount, order.Currency, shippingAddress);
+                    await emailService.SendAsync(
+                        "admin@partlphoto.sk",
+                        $"New Order #{order.Id.ToString()[..8]} — {order.TotalAmount} {order.Currency}",
+                        photographerHtml);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to send order emails for order {OrderId}", order.Id);
+                }
+
+                return Results.Ok(new { orderId = order.Id, status = order.Status });
+            }
+
+            if (request.Status == "cancelled")
+            {
+                if (gateway is MockPaymentGateway mock)
+                    mock.CancelPayment(request.PaymentId);
+
+                if (order.Status == "pending_payment")
+                {
+                    order.Status = "cancelled";
+                    order.UpdatedAt = DateTime.UtcNow;
+
+                    await RestoreEditionCounts(db, order.Id);
+                    await db.SaveChangesAsync();
+                }
+
+                return Results.Ok(new { orderId = order.Id, status = order.Status });
+            }
+
+            return Results.BadRequest(new { error = $"Unknown payment status: {request.Status}" });
+        });
+
+        group.MapGet("/payments/{paymentId}", (string paymentId, IPaymentGateway gateway) =>
+        {
+            if (gateway is not MockPaymentGateway mock)
+                return Results.NotFound();
+
+            var payment = mock.GetPayment(paymentId);
+            if (payment is null) return Results.NotFound();
+
+            return Results.Ok(new
+            {
+                paymentId = payment.PaymentId,
+                orderId = payment.OrderId,
+                amount = payment.Amount,
+                currency = payment.Currency,
+                status = payment.Status.ToString().ToLower(),
+                returnUrl = payment.ReturnUrl,
+                cancelUrl = payment.CancelUrl
+            });
         });
     }
 

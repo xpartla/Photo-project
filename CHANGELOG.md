@@ -43,6 +43,14 @@ project was picked back up after a five-month pause. One commit per item on
 ### Breaking (local only)
 - A database created before this change has tables but no migration history and cannot be upgraded in place. The API refuses to start with a message saying so; reset with `docker compose down -v`, start the stack and re-run the seed scripts.
 
+### Security — mock payments are Development-only
+- **`MockPaymentGateway` is registered only in Development.** Every other environment gets `UnavailablePaymentGateway`, so the mock (which marks an order paid on an unauthenticated browser request) cannot be deployed by accident.
+- **`POST /api/shop/webhooks/payment` and `GET /api/shop/payments/{id}`** moved into `MapMockPaymentEndpoints` and are mapped only in Development. A real gateway will bring its own signature-verified webhook.
+- **`IPaymentGateway.IsAvailable`** (new). `POST /api/shop/orders` returns `503 { error }` up front when no gateway is available, instead of creating an order nobody can pay for.
+- `AddInfrastructure` now takes the `IHostEnvironment`.
+- **Frontend** — `/mock-pay/[id]` returns 404 outside `astro dev`.
+- **`PaymentGatewayTests.cs`** (new, 6 tests) — boots a second host in `Production` mode: no usable gateway, webhook and payment-info routes unmapped, order creation 503; Development keeps the mock flow.
+
 ### Verification
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.
