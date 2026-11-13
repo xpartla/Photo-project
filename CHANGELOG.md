@@ -61,6 +61,20 @@ project was picked back up after a five-month pause. One commit per item on
 - **`SessionTypeTests.cs`** (new, 18 tests) — admin-only create/update, localized includes, partial updates, validation, deactivated packages hidden from the public and unbookable, and a restart test proving admin edits and custom packages survive the startup seed. `AdminCanUpdateSessionType` moved there so it no longer reprices a starter package.
 - **E2E** — `admin.spec.ts`: create a package through the form, deactivate it, and confirm it stays listed for the admin but leaves the public API.
 
+### Changed — notification address and e-mail language
+- **Photographer notifications go to a configured address.** New `Notifications:PhotographerEmail` setting (`NotificationSettings`, default `admin@partlphoto.sk`) replaces the address hard-coded in the booking and order handlers.
+- **Customer e-mails follow the customer's language.** `booking.bookings` and `eshop.orders` gain a `Language` column (`sk` default; migrations `AddLanguage`). `POST /api/booking/bookings` and `POST /api/shop/orders` accept an optional `language`; anything other than `en` is stored as `sk`. Booking confirmation / confirmed / cancelled and order confirmation / status-update e-mails — subjects, body text, package names and product, format and paper names — are rendered in that language. Notifications to the photographer stay in English.
+- **Frontend** — the booking form and both checkout pages send the page language (`document.documentElement.lang`).
+- **`Languages`** (`DogPhoto.SharedKernel.Localization`) — language constants, `Normalize` and `Pick`.
+- E-mail footers now read "Dog photography, Bratislava" / "fotografia psov, Bratislava"; the old "Fine art film & dog photography" line predated the dog-only refactor.
+
+### Security — booking e-mails escape user input
+- `BookingEmailTemplates` interpolated the client name, e-mail, phone and special requests from the public booking form straight into HTML, so a visitor could inject markup or links into the e-mail the photographer receives. All values are now HTML-encoded (the order templates already were). The templates were rebuilt on a shared layout while being localized.
+
+### Testing — e-mails
+- `BookingTests` (+6, replacing 1): Slovak by default with an English photographer notification, English on request, unknown language falls back to Slovak, confirm/cancel follow the booking language, form input is escaped, and the notification goes to the configured address.
+- `EShopTests` (+3): order confirmation and status e-mails in Slovak and English with matching product names; photographer notification in English.
+
 ### Verification
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.

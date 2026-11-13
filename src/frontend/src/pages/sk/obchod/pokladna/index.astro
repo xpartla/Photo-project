@@ -253,6 +253,8 @@ const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000"
       };
 
       const orderBody: any = {
+        // Order e-mails are sent in this language.
+        language: document.documentElement.lang,
         billingAddress: sameBilling ? null : billingAddress,
         returnUrl: cfg.returnUrlTemplate,
         cancelUrl: cfg.cancelUrl,

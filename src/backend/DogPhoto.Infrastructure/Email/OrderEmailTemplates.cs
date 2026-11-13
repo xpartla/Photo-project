@@ -1,7 +1,25 @@
+using DogPhoto.SharedKernel.Localization;
+
 namespace DogPhoto.Infrastructure.Email;
 
+/// <summary>
+/// Customer e-mails are written in the language the order was placed in;
+/// the photographer notification is always English.
+/// </summary>
 public static class OrderEmailTemplates
 {
+    public static string CustomerOrderConfirmationSubject(string lang, Guid orderId) =>
+        Languages.Pick(lang,
+            $"Potvrdenie objednávky č. {OrderRef(orderId)} — PartlPhoto",
+            $"Order Confirmation #{OrderRef(orderId)} — PartlPhoto");
+
+    public static string OrderStatusUpdateSubject(string lang, Guid orderId) =>
+        Languages.Pick(lang,
+            $"Objednávka č. {OrderRef(orderId)} — zmena stavu",
+            $"Order #{OrderRef(orderId)} — Status Update");
+
+    private static string OrderRef(Guid orderId) => orderId.ToString()[..8].ToUpper();
+
     public record OrderItemInfo(
         string Title,
         string? FormatName,
@@ -34,35 +52,39 @@ public static class OrderEmailTemplates
     // ── Public templates ───────────────────────────────────────────────
 
     public static string CustomerOrderConfirmation(
+        string lang,
         Guid orderId,
         List<OrderItemInfo> items,
         decimal totalAmount,
         string currency,
         OrderAddress? shippingAddress = null)
     {
-        var orderRef = orderId.ToString()[..8].ToUpper();
+        var orderRef = OrderRef(orderId);
 
         return Wrap(
             $"""
             <div style="text-align:center;margin:0 0 24px;">
-              <div style="font-family:{FontHeading};font-size:26px;line-height:1.1;color:{C_Dark};margin:0 0 6px;">Order confirmed!</div>
-              <div style="font-size:15px;color:{C_Muted};">Thank you &mdash; your payment has been received.</div>
+              <div style="font-family:{FontHeading};font-size:26px;line-height:1.1;color:{C_Dark};margin:0 0 6px;">{Languages.Pick(lang, "Objednávka potvrdená!", "Order confirmed!")}</div>
+              <div style="font-size:15px;color:{C_Muted};">{Languages.Pick(lang, "Ďakujeme &mdash; vašu platbu sme prijali.", "Thank you &mdash; your payment has been received.")}</div>
             </div>
 
-            {OrderNumberCard(orderRef)}
+            {OrderNumberCard(lang, orderRef)}
 
-            <h3 style="font-family:{FontHeading};font-size:18px;margin:24px 0 8px;color:{C_Dark};">What you ordered</h3>
-            {ItemsTable(items, currency)}
+            <h3 style="font-family:{FontHeading};font-size:18px;margin:24px 0 8px;color:{C_Dark};">{Languages.Pick(lang, "Čo ste si objednali", "What you ordered")}</h3>
+            {ItemsTable(lang, items, currency)}
 
-            {TotalRow(totalAmount, currency)}
+            {TotalRow(lang, totalAmount, currency)}
 
-            {(shippingAddress is not null ? AddressBlock("Shipping to", shippingAddress) : "")}
+            {(shippingAddress is not null ? AddressBlock(Languages.Pick(lang, "Doručíme na adresu", "Shipping to"), shippingAddress) : "")}
 
             <p style="margin:20px 0 0;font-size:14px;color:{C_Muted};">
-              We'll prepare your prints and notify you when they ship.
+              {Languages.Pick(lang,
+                  "Vaše výtlačky pripravíme a dáme vám vedieť, keď ich odošleme.",
+                  "We'll prepare your prints and notify you when they ship.")}
             </p>
             """,
-            heading: "PartlPhoto");
+            heading: "PartlPhoto",
+            lang);
     }
 
     public static string PhotographerOrderNotification(
@@ -73,7 +95,8 @@ public static class OrderEmailTemplates
         string currency,
         OrderAddress? shippingAddress)
     {
-        var orderRef = orderId.ToString()[..8].ToUpper();
+        const string lang = Languages.English;
+        var orderRef = OrderRef(orderId);
 
         return Wrap(
             $"""
@@ -96,38 +119,40 @@ public static class OrderEmailTemplates
             {(shippingAddress is not null ? AddressBlock("Ship to", shippingAddress) : "")}
 
             <h3 style="font-family:{FontHeading};font-size:18px;margin:24px 0 8px;color:{C_Dark};">Items</h3>
-            {ItemsTable(items, currency)}
+            {ItemsTable(lang, items, currency)}
             """,
-            heading: "PartlPhoto — Admin");
+            heading: "PartlPhoto — Admin",
+            lang);
     }
 
-    public static string OrderStatusUpdate(Guid orderId, string newStatus, string customerName)
+    public static string OrderStatusUpdate(string lang, Guid orderId, string newStatus, string customerName)
     {
-        var orderRef = orderId.ToString()[..8].ToUpper();
+        var orderRef = OrderRef(orderId);
         var statusDisplay = newStatus switch
         {
-            "processing" => "Your order is being prepared",
-            "shipped" => "Your order has been shipped",
-            "completed" => "Your order has been delivered",
-            "cancelled" => "Your order has been cancelled",
-            "refunded" => "Your order has been refunded",
-            _ => $"Your order status is now: {newStatus}"
+            "processing" => Languages.Pick(lang, "Vašu objednávku pripravujeme", "Your order is being prepared"),
+            "shipped" => Languages.Pick(lang, "Vaša objednávka bola odoslaná", "Your order has been shipped"),
+            "completed" => Languages.Pick(lang, "Vaša objednávka bola doručená", "Your order has been delivered"),
+            "cancelled" => Languages.Pick(lang, "Vaša objednávka bola zrušená", "Your order has been cancelled"),
+            "refunded" => Languages.Pick(lang, "Platba za vašu objednávku bola vrátená", "Your order has been refunded"),
+            _ => Languages.Pick(lang, $"Stav vašej objednávky: {newStatus}", $"Your order status is now: {newStatus}")
         };
 
         return Wrap(
             $"""
-            <h2 style="font-family:{FontHeading};font-size:22px;margin:0 0 16px;color:{C_Dark};">Order update</h2>
-            <p style="font-size:15px;color:{C_Dark};margin:0 0 8px;">Hi {E(customerName)},</p>
-            <p style="font-size:15px;color:{C_Dark};margin:0 0 16px;"><strong>Order #{orderRef}</strong> &mdash; {E(statusDisplay)}.</p>
+            <h2 style="font-family:{FontHeading};font-size:22px;margin:0 0 16px;color:{C_Dark};">{Languages.Pick(lang, "Aktualizácia objednávky", "Order update")}</h2>
+            <p style="font-size:15px;color:{C_Dark};margin:0 0 8px;">{Languages.Pick(lang, "Dobrý deň", "Hi")} {E(customerName)},</p>
+            <p style="font-size:15px;color:{C_Dark};margin:0 0 16px;"><strong>{Languages.Pick(lang, "Objednávka č.", "Order #")}{(lang == Languages.English ? "" : " ")}{orderRef}</strong> &mdash; {E(statusDisplay)}.</p>
             """,
-            heading: "PartlPhoto");
+            heading: "PartlPhoto",
+            lang);
     }
 
     // ── Shared fragments ───────────────────────────────────────────────
 
-    private static string Wrap(string innerHtml, string heading) => $"""
+    private static string Wrap(string innerHtml, string heading, string lang) => $"""
         <!DOCTYPE html>
-        <html>
+        <html lang="{lang}">
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -140,7 +165,7 @@ public static class OrderEmailTemplates
                 {innerHtml}
               </div>
               <p style="margin:16px 0 0;text-align:center;font-size:12px;color:{C_Muted};">
-                PartlPhoto &mdash; Fine art film &amp; dog photography, Bratislava
+                {Languages.Pick(lang, "PartlPhoto &mdash; fotografia psov, Bratislava", "PartlPhoto &mdash; Dog photography, Bratislava")}
               </p>
             </td></tr>
           </table>
@@ -148,16 +173,16 @@ public static class OrderEmailTemplates
         </html>
         """;
 
-    private static string OrderNumberCard(string orderRef) => $"""
+    private static string OrderNumberCard(string lang, string orderRef) => $"""
         <div style="text-align:center;padding:14px;border:2px solid {C_Dark};border-radius:10px;background:{C_Cream};margin:0 0 8px;">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:{C_Muted};font-weight:700;margin-bottom:2px;">Order number</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:{C_Muted};font-weight:700;margin-bottom:2px;">{Languages.Pick(lang, "Číslo objednávky", "Order number")}</div>
           <div style="font-family:{FontHeading};font-size:22px;color:{C_Dark};">#{orderRef}</div>
         </div>
         """;
 
-    private static string ItemsTable(List<OrderItemInfo> items, string currency)
+    private static string ItemsTable(string lang, List<OrderItemInfo> items, string currency)
     {
-        var rows = string.Join("", items.Select(i => ItemRow(i, currency)));
+        var rows = string.Join("", items.Select(i => ItemRow(lang, i, currency)));
         return $"""
             <table role="presentation" style="width:100%;border-collapse:collapse;">
               {rows}
@@ -165,7 +190,7 @@ public static class OrderEmailTemplates
             """;
     }
 
-    private static string ItemRow(OrderItemInfo i, string currency)
+    private static string ItemRow(string lang, OrderItemInfo i, string currency)
     {
         var thumb = !string.IsNullOrEmpty(i.ImageUrl)
             ? $"""<img src="{E(i.ImageUrl)}" alt="{E(i.Title)}" width="72" height="72" style="display:block;border:2px solid {C_Dark};border-radius:6px;object-fit:cover;background:{C_Cream};" />"""
@@ -181,7 +206,7 @@ public static class OrderEmailTemplates
                 .Select(p => Pill(p!)));
 
         var edition = i.EditionNumber.HasValue
-            ? $"""<div style="margin-top:6px;font-size:12px;color:{C_Terracotta};font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Edition #{i.EditionNumber}</div>"""
+            ? $"""<div style="margin-top:6px;font-size:12px;color:{C_Terracotta};font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">{Languages.Pick(lang, "Edícia č. ", "Edition #")}{i.EditionNumber}</div>"""
             : "";
 
         var lineTotal = i.UnitPrice * i.Quantity;
@@ -205,10 +230,10 @@ public static class OrderEmailTemplates
         <span style="display:inline-block;font-size:12px;font-weight:700;line-height:1.2;color:{C_Dark};padding:3px 10px;border:1.5px solid {C_Dark};border-radius:999px;background:{C_Cream};margin:0 4px 2px 0;">{E(text)}</span>
         """;
 
-    private static string TotalRow(decimal total, string currency) => $"""
+    private static string TotalRow(string lang, decimal total, string currency) => $"""
         <table role="presentation" style="width:100%;border-collapse:collapse;margin:8px 0 0;">
           <tr>
-            <td style="padding:14px 0 0;font-size:15px;font-weight:700;color:{C_Dark};border-top:2px solid {C_Dark};">Total</td>
+            <td style="padding:14px 0 0;font-size:15px;font-weight:700;color:{C_Dark};border-top:2px solid {C_Dark};">{Languages.Pick(lang, "Spolu", "Total")}</td>
             <td style="padding:14px 0 0;font-family:{FontHeading};font-size:22px;color:{C_Dark};text-align:right;border-top:2px solid {C_Dark};">{total} {E(currency)}</td>
           </tr>
         </table>

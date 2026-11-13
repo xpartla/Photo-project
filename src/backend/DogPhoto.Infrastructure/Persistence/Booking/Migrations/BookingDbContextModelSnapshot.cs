@@ -81,6 +81,13 @@ namespace DogPhoto.Infrastructure.Persistence.Booking.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasDefaultValue("sk");
+
                     b.Property<Guid>("SessionTypeId")
                         .HasColumnType("uuid");
 

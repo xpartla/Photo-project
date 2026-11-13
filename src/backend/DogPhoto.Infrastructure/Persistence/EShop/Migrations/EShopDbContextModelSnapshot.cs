@@ -109,6 +109,13 @@ namespace DogPhoto.Infrastructure.Persistence.EShop.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasDefaultValue("sk");
+
                     b.Property<string>("ShippingAddressJson")
                         .HasColumnType("jsonb");
 

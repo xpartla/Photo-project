@@ -6,6 +6,7 @@ using DogPhoto.Infrastructure.Persistence.Identity;
 using DogPhoto.Infrastructure.Persistence.Portfolio;
 using DogPhoto.SharedKernel.Auth;
 using DogPhoto.SharedKernel.Email;
+using DogPhoto.SharedKernel.Localization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -13,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DogPhoto.Infrastructure.EShop;
 
@@ -499,6 +501,7 @@ public static class EShopEndpoints
                 Status = "pending_payment",
                 Currency = "EUR",
                 CustomerEmail = request.Email ?? currentUser.Email,
+                Language = Languages.Normalize(request.Language),
                 ShippingAddressJson = JsonSerializer.Serialize(shippingResult.Address, AddressJsonOptions),
                 BillingAddressJson = JsonSerializer.Serialize(billingResult.Address ?? shippingResult.Address, AddressJsonOptions)
             };
@@ -882,10 +885,11 @@ public static class EShopEndpoints
             {
                 try
                 {
-                    var html = OrderEmailTemplates.OrderStatusUpdate(order.Id, request.Status, order.CustomerEmail);
+                    var lang = Languages.Normalize(order.Language);
+                    var html = OrderEmailTemplates.OrderStatusUpdate(lang, order.Id, request.Status, order.CustomerEmail);
                     await emailService.SendAsync(
                         order.CustomerEmail,
-                        $"Order #{order.Id.ToString()[..8]} — Status Update",
+                        OrderEmailTemplates.OrderStatusUpdateSubject(lang, order.Id),
                         html);
                 }
                 catch (Exception ex)
@@ -909,6 +913,7 @@ public static class EShopEndpoints
             PortfolioDbContext portfolioDb,
             IPaymentGateway gateway,
             IEmailService emailService,
+            IOptions<NotificationSettings> notifications,
             ILoggerFactory loggerFactory) =>
         {
             var logger = loggerFactory.CreateLogger("EShop.Webhook");
@@ -949,16 +954,16 @@ public static class EShopEndpoints
                         ? await portfolioDb.PhotoVariants.Where(v => photoIds.Contains(v.PhotoId)).ToListAsync()
                         : new List<PhotoVariant>();
 
-                    var items = order.Items
+                    List<OrderEmailTemplates.OrderItemInfo> ItemsIn(string language) => order.Items
                         .Select(oi =>
                         {
                             productPhotos.TryGetValue(oi.ProductId, out var photoId);
-                            var img = EmailImageUrl(PickThumbnail(photoVariants, photoId));
+                            var english = language == Languages.English;
                             return new OrderEmailTemplates.OrderItemInfo(
-                                oi.ProductTitleEn,
-                                oi.FormatNameEn,
-                                oi.PaperTypeNameEn,
-                                img,
+                                english ? oi.ProductTitleEn : oi.ProductTitleSk,
+                                english ? oi.FormatNameEn : oi.FormatNameSk,
+                                english ? oi.PaperTypeNameEn : oi.PaperTypeNameSk,
+                                EmailImageUrl(PickThumbnail(photoVariants, photoId)),
                                 oi.Quantity,
                                 oi.UnitPrice,
                                 oi.EditionNumber);
@@ -966,18 +971,20 @@ public static class EShopEndpoints
                         .ToList();
 
                     var shippingAddress = ParseAddress(order.ShippingAddressJson);
+                    var lang = Languages.Normalize(order.Language);
 
                     var customerHtml = OrderEmailTemplates.CustomerOrderConfirmation(
-                        order.Id, items, order.TotalAmount, order.Currency, shippingAddress);
+                        lang, order.Id, ItemsIn(lang), order.TotalAmount, order.Currency, shippingAddress);
                     await emailService.SendAsync(
                         order.CustomerEmail ?? "customer@example.com",
-                        $"Order Confirmation #{order.Id.ToString()[..8]} — PartlPhoto",
+                        OrderEmailTemplates.CustomerOrderConfirmationSubject(lang, order.Id),
                         customerHtml);
 
                     var photographerHtml = OrderEmailTemplates.PhotographerOrderNotification(
-                        order.Id, order.CustomerEmail ?? "unknown", items, order.TotalAmount, order.Currency, shippingAddress);
+                        order.Id, order.CustomerEmail ?? "unknown", ItemsIn(Languages.English),
+                        order.TotalAmount, order.Currency, shippingAddress);
                     await emailService.SendAsync(
-                        "admin@partlphoto.sk",
+                        notifications.Value.PhotographerEmail,
                         $"New Order #{order.Id.ToString()[..8]} — {order.TotalAmount} {order.Currency}",
                         photographerHtml);
                 }
@@ -1319,7 +1326,8 @@ public record CreateOrderRequest(
     bool? SaveBillingAddress = null,
     string? Email = null,
     string? ReturnUrl = null,
-    string? CancelUrl = null);
+    string? CancelUrl = null,
+    string? Language = null);
 
 public record AddressDto(
     string Name,

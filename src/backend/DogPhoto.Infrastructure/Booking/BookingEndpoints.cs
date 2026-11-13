@@ -5,11 +5,13 @@ using DogPhoto.Infrastructure.Persistence.Booking;
 using DogPhoto.Infrastructure.RateLimiting;
 using DogPhoto.SharedKernel.Auth;
 using DogPhoto.SharedKernel.Email;
+using DogPhoto.SharedKernel.Localization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DogPhoto.Infrastructure.Booking;
 
@@ -91,6 +93,7 @@ public static partial class BookingEndpoints
             BookingDbContext db,
             ICurrentUser currentUser,
             IEmailService emailService,
+            IOptions<NotificationSettings> notifications,
             ILoggerFactory loggerFactory) =>
         {
             // Validate required fields
@@ -140,6 +143,7 @@ public static partial class BookingEndpoints
                 ClientName = request.ClientName,
                 ClientEmail = request.ClientEmail,
                 ClientPhone = request.ClientPhone,
+                Language = Languages.Normalize(request.Language),
                 DogCount = request.DogCount,
                 SpecialRequests = request.SpecialRequests,
                 TotalPrice = sessionType.BasePrice
@@ -151,20 +155,19 @@ public static partial class BookingEndpoints
             // Send confirmation emails
             try
             {
-                var dateStr = slot?.Date.ToString("dd.MM.yyyy") ?? "TBD";
-                var timeStr = slot is not null ? $"{slot.StartTime:HH:mm} - {slot.EndTime:HH:mm}" : "TBD";
-
+                var lang = booking.Language;
                 var customerHtml = BookingEmailTemplates.CustomerConfirmation(
+                    lang,
                     booking.ClientName,
-                    sessionType.NameEn,
-                    dateStr,
-                    timeStr,
+                    SessionName(sessionType, lang),
+                    SlotDate(slot, lang),
+                    SlotTime(slot, lang),
                     booking.TotalPrice,
                     sessionType.Currency);
 
                 await emailService.SendAsync(
                     booking.ClientEmail,
-                    "Booking Confirmation — PartlPhoto",
+                    BookingEmailTemplates.CustomerConfirmationSubject(lang),
                     customerHtml);
 
                 var photographerHtml = BookingEmailTemplates.PhotographerNotification(
@@ -172,13 +175,13 @@ public static partial class BookingEndpoints
                     booking.ClientEmail,
                     booking.ClientPhone,
                     sessionType.NameEn,
-                    dateStr,
-                    timeStr,
+                    SlotDate(slot, Languages.English),
+                    SlotTime(slot, Languages.English),
                     booking.DogCount,
                     booking.SpecialRequests);
 
                 await emailService.SendAsync(
-                    "admin@partlphoto.sk",
+                    notifications.Value.PhotographerEmail,
                     $"New Booking: {booking.ClientName} — {sessionType.NameEn}",
                     photographerHtml);
             }
@@ -568,32 +571,24 @@ public static partial class BookingEndpoints
 
         try
         {
-            var dateStr = booking.Slot?.Date.ToString("dd.MM.yyyy") ?? "TBD";
-            var timeStr = booking.Slot is not null
-                ? $"{booking.Slot.StartTime:HH:mm} - {booking.Slot.EndTime:HH:mm}"
-                : "TBD";
+            var lang = Languages.Normalize(booking.Language);
+            var sessionName = SessionName(booking.SessionType, lang);
+            var date = SlotDate(booking.Slot, lang);
+            var time = SlotTime(booking.Slot, lang);
 
             string subject;
             string html;
             if (isConfirmation)
             {
-                subject = "Your booking is confirmed — PartlPhoto";
+                subject = BookingEmailTemplates.CustomerConfirmedSubject(lang);
                 html = BookingEmailTemplates.CustomerConfirmed(
-                    booking.ClientName,
-                    booking.SessionType.NameEn,
-                    dateStr,
-                    timeStr,
-                    booking.TotalPrice,
-                    booking.SessionType.Currency);
+                    lang, booking.ClientName, sessionName, date, time,
+                    booking.TotalPrice, booking.SessionType.Currency);
             }
             else
             {
-                subject = "Your booking was cancelled — PartlPhoto";
-                html = BookingEmailTemplates.CustomerCancelled(
-                    booking.ClientName,
-                    booking.SessionType.NameEn,
-                    dateStr,
-                    timeStr);
+                subject = BookingEmailTemplates.CustomerCancelledSubject(lang);
+                html = BookingEmailTemplates.CustomerCancelled(lang, booking.ClientName, sessionName, date, time);
             }
 
             await emailService.SendAsync(booking.ClientEmail, subject, html);
@@ -605,6 +600,15 @@ public static partial class BookingEndpoints
                 booking.Id, isConfirmation);
         }
     }
+
+    private static string SessionName(SessionType st, string lang) =>
+        Languages.Pick(lang, st.NameSk, st.NameEn);
+
+    private static string SlotDate(AvailabilitySlot? slot, string lang) =>
+        slot?.Date.ToString("dd.MM.yyyy") ?? BookingEmailTemplates.ToBeArranged(lang);
+
+    private static string SlotTime(AvailabilitySlot? slot, string lang) =>
+        slot is not null ? $"{slot.StartTime:HH:mm} - {slot.EndTime:HH:mm}" : BookingEmailTemplates.ToBeArranged(lang);
 
     private static object MapSessionType(SessionType st, string lang)
     {
@@ -715,7 +719,8 @@ public record CreateBookingRequest(
     string ClientEmail,
     string? ClientPhone,
     int DogCount = 1,
-    string? SpecialRequests = null);
+    string? SpecialRequests = null,
+    string? Language = null);
 
 public record CreateAvailabilityRequest(
     string Date,

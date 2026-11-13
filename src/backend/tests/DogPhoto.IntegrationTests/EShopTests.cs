@@ -378,6 +378,77 @@ public sealed class EShopTests : ApiTestBase
         Assert.True(FakeEmail.SentEmails.Count >= 1, "At least one email should be sent on order confirmation");
     }
 
+    private async Task<(string OrderId, string Recipient, string Slug)> PlacePaidOrderAsync(string? language)
+    {
+        var admin = await CreateAdminClientAsync();
+        var slug = $"mail-prod-{Guid.NewGuid():N}"[..25];
+        var (_, _, variantIds) = await CreateTestProductAsync(admin, slug, editionSize: null, isLimitedEdition: false);
+
+        var customer = await CreateCustomerClientAsync();
+        await customer.PostAsJsonAsync("/api/shop/cart/items", new { variantId = variantIds[0], quantity = 1 });
+        var recipient = $"order-{Guid.NewGuid():N}@example.test";
+
+        var orderResponse = await customer.PostAsJsonAsync("/api/shop/orders", new
+        {
+            shippingAddress = new { name = "Test Customer", street = "Test Street 1", city = "Bratislava", postalCode = "81101", country = "SK" },
+            email = recipient,
+            language
+        });
+        Assert.Equal(HttpStatusCode.Created, orderResponse.StatusCode);
+        using var orderDoc = JsonDocument.Parse(await orderResponse.Content.ReadAsStringAsync());
+        var orderId = orderDoc.RootElement.GetProperty("orderId").GetString()!;
+        var paymentId = orderDoc.RootElement.GetProperty("paymentId").GetString()!;
+
+        var webhook = await CreateClient().PostAsJsonAsync("/api/shop/webhooks/payment", new { paymentId, status = "paid" });
+        Assert.Equal(HttpStatusCode.OK, webhook.StatusCode);
+        return (orderId, recipient, slug);
+    }
+
+    private FakeEmailService.SentEmail[] EmailsTo(string recipient) =>
+        FakeEmail.SentEmails.Where(e => e.To == recipient).ToArray();
+
+    [Fact]
+    public async Task OrderEmails_WithoutLanguage_AreSlovakForTheCustomer_AndEnglishForThePhotographer()
+    {
+        var (_, recipient, slug) = await PlacePaidOrderAsync(language: null);
+
+        var confirmation = Assert.Single(EmailsTo(recipient));
+        Assert.Contains("Potvrdenie objednávky", confirmation.Subject);
+        Assert.Contains("Objednávka potvrdená", confirmation.HtmlBody);
+        Assert.Contains($"Test {slug} SK", confirmation.HtmlBody);
+        Assert.DoesNotContain($"Test {slug} EN", confirmation.HtmlBody);
+
+        var notification = Assert.Single(EmailsTo("admin@partlphoto.sk"), e => e.HtmlBody.Contains(recipient));
+        Assert.Contains("New Order", notification.Subject);
+        Assert.Contains($"Test {slug} EN", notification.HtmlBody);
+    }
+
+    [Fact]
+    public async Task OrderEmails_InEnglish_UseEnglishTextAndProductNames()
+    {
+        var (orderId, recipient, slug) = await PlacePaidOrderAsync(language: "en");
+
+        var confirmation = Assert.Single(EmailsTo(recipient));
+        Assert.Contains("Order Confirmation", confirmation.Subject);
+        Assert.Contains("Order confirmed!", confirmation.HtmlBody);
+        Assert.Contains($"Test {slug} EN", confirmation.HtmlBody);
+
+        var admin = await CreateAdminClientAsync();
+        (await admin.PutAsJsonAsync($"/api/shop/orders/{orderId}/status", new { status = "processing" })).EnsureSuccessStatusCode();
+        Assert.Contains(EmailsTo(recipient), e => e.Subject.Contains("Status Update") && e.HtmlBody.Contains("being prepared"));
+    }
+
+    [Fact]
+    public async Task OrderStatusEmail_FollowsTheOrderLanguage()
+    {
+        var (orderId, recipient, _) = await PlacePaidOrderAsync(language: "sk");
+
+        var admin = await CreateAdminClientAsync();
+        (await admin.PutAsJsonAsync($"/api/shop/orders/{orderId}/status", new { status = "processing" })).EnsureSuccessStatusCode();
+
+        Assert.Contains(EmailsTo(recipient), e => e.Subject.Contains("zmena stavu") && e.HtmlBody.Contains("pripravujeme"));
+    }
+
     [Fact]
     public async Task CreateOrder_EmptyCart_ReturnsBadRequest()
     {

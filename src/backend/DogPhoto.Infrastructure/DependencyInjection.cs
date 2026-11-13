@@ -80,6 +80,7 @@ public static class DependencyInjection
 
         // Email
         services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
+        services.Configure<NotificationSettings>(configuration.GetSection(NotificationSettings.SectionName));
         services.AddScoped<IEmailService, SmtpEmailService>();
 
         // Payment gateway

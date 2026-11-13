@@ -384,6 +384,8 @@ const monthNames = lang === "sk"
         clientPhone: (document.getElementById("field-phone") as HTMLInputElement).value.trim() || undefined,
         dogCount: parseInt(fieldDogs.value, 10) || 1,
         specialRequests: (document.getElementById("field-requests") as HTMLTextAreaElement).value.trim() || undefined,
+        // Confirmation and status e-mails are sent in this language.
+        language: document.documentElement.lang,
       };
 
       try {

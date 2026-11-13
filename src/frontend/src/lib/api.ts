@@ -142,6 +142,7 @@ export interface CreateBookingRequest {
   clientPhone?: string;
   dogCount: number;
   specialRequests?: string;
+  language?: string;
 }
 
 export interface BookingDetail {

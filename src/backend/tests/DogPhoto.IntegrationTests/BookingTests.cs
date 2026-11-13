@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using DogPhoto.Infrastructure.Email;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DogPhoto.IntegrationTests;
@@ -378,39 +381,113 @@ public sealed class BookingTests : ApiTestBase
 
     // ── Email verification ────────────────────────────────────────
 
-    [Fact]
-    public async Task CreateBooking_SendsConfirmationEmails()
+    private async Task<(string BookingId, string Recipient)> BookAsync(
+        HttpClient client, string templateDate, string? language = null,
+        string clientName = "Email Test", string? specialRequests = null)
     {
-        FakeEmail.Clear();
+        var (slotId, sessionTypeId) = await CreateSlotAndGetSessionTypeAsync(D(templateDate));
+        var recipient = $"booking-{Guid.NewGuid():N}@example.test";
 
-        var (slotId, sessionTypeId) = await CreateSlotAndGetSessionTypeAsync(D("2027-01-10"));
-
-        var client = CreateClient();
         var response = await client.PostAsJsonAsync("/api/booking/bookings", new
         {
             sessionTypeId,
             slotId,
-            clientName = "Email Test",
-            clientEmail = "emailtest@example.com",
-            dogCount = 1
+            clientName,
+            clientEmail = recipient,
+            dogCount = 1,
+            specialRequests,
+            language
         });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
-        // Should have sent exactly 2 emails: one to customer, one to photographer
-        Assert.Equal(2, FakeEmail.SentEmails.Count);
-
-        var customerEmail = FakeEmail.SentEmails.FirstOrDefault(e => e.To == "emailtest@example.com");
-        Assert.NotNull(customerEmail);
-        Assert.Contains("Booking Confirmation", customerEmail.Subject);
-        Assert.Contains("Email Test", customerEmail.HtmlBody);
-
-        var photographerEmail = FakeEmail.SentEmails.FirstOrDefault(e => e.To == "admin@partlphoto.sk");
-        Assert.NotNull(photographerEmail);
-        Assert.Contains("New Booking", photographerEmail.Subject);
-        Assert.Contains("emailtest@example.com", photographerEmail.HtmlBody);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return (doc.RootElement.GetProperty("id").GetString()!, recipient);
     }
 
-    // ── Edge cases ────────────────────────────────────────────────
+    private FakeEmailService.SentEmail[] EmailsTo(string recipient) =>
+        FakeEmail.SentEmails.Where(e => e.To == recipient).ToArray();
+
+    [Fact]
+    public async Task CreateBooking_WithoutLanguage_SendsSlovakCustomerEmail_AndEnglishPhotographerEmail()
+    {
+        var (_, recipient) = await BookAsync(CreateClient(), "2027-01-10");
+
+        var customerEmail = Assert.Single(EmailsTo(recipient));
+        Assert.Contains("Potvrdenie rezervácie", customerEmail.Subject);
+        Assert.Contains("Dobrý deň", customerEmail.HtmlBody);
+        Assert.Contains("Email Test", customerEmail.HtmlBody);
+        Assert.DoesNotContain("Thank you for your booking", customerEmail.HtmlBody);
+
+        var photographerEmail = Assert.Single(
+            EmailsTo("admin@partlphoto.sk"), e => e.HtmlBody.Contains(recipient));
+        Assert.Contains("New Booking", photographerEmail.Subject);
+    }
+
+    [Fact]
+    public async Task CreateBooking_InEnglish_SendsEnglishCustomerEmail()
+    {
+        var (_, recipient) = await BookAsync(CreateClient(), "2027-01-11", language: "en");
+
+        var customerEmail = Assert.Single(EmailsTo(recipient));
+        Assert.Contains("Booking Confirmation", customerEmail.Subject);
+        Assert.Contains("Thank you for your booking", customerEmail.HtmlBody);
+        Assert.DoesNotContain("Dobrý deň", customerEmail.HtmlBody);
+    }
+
+    [Fact]
+    public async Task CreateBooking_UnknownLanguage_FallsBackToSlovak()
+    {
+        var (_, recipient) = await BookAsync(CreateClient(), "2027-01-12", language: "de");
+
+        Assert.Contains("Potvrdenie rezervácie", Assert.Single(EmailsTo(recipient)).Subject);
+    }
+
+    [Fact]
+    public async Task ConfirmAndCancel_EmailTheCustomerInTheBookingLanguage()
+    {
+        var admin = await CreateAdminClientAsync();
+
+        var (englishId, english) = await BookAsync(CreateClient(), "2027-01-13", language: "en");
+        (await admin.PutAsync($"/api/booking/bookings/{englishId}/confirm", null)).EnsureSuccessStatusCode();
+        Assert.Contains(EmailsTo(english), e => e.Subject.Contains("Your booking is confirmed"));
+
+        var (slovakId, slovak) = await BookAsync(CreateClient(), "2027-01-14");
+        (await admin.PutAsync($"/api/booking/bookings/{slovakId}/confirm", null)).EnsureSuccessStatusCode();
+        (await admin.PutAsync($"/api/booking/bookings/{slovakId}/cancel", null)).EnsureSuccessStatusCode();
+        Assert.Contains(EmailsTo(slovak), e => e.Subject.Contains("Vaša rezervácia je potvrdená"));
+        Assert.Contains(EmailsTo(slovak), e => e.Subject.Contains("Vaša rezervácia bola zrušená"));
+    }
+
+    [Fact]
+    public async Task BookingEmails_EscapeHtmlFromTheBookingForm()
+    {
+        const string script = "<script>alert(1)</script>";
+        var (_, recipient) = await BookAsync(CreateClient(), "2027-01-15",
+            clientName: $"Eve {script}", specialRequests: "<img src=x onerror=alert(2)>");
+
+        var customerEmail = Assert.Single(EmailsTo(recipient));
+        var photographerEmail = Assert.Single(
+            EmailsTo("admin@partlphoto.sk"), e => e.HtmlBody.Contains(recipient));
+
+        foreach (var body in new[] { customerEmail.HtmlBody, photographerEmail.HtmlBody })
+        {
+            Assert.DoesNotContain(script, body);
+            Assert.Contains("&lt;script&gt;", body);
+        }
+        Assert.DoesNotContain("<img src=x", photographerEmail.HtmlBody);
+    }
+
+    [Fact]
+    public async Task PhotographerNotification_GoesToTheConfiguredAddress()
+    {
+        const string studio = "studio@example.test";
+        using var host = Factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.Configure<NotificationSettings>(settings => settings.PhotographerEmail = studio)));
+
+        var (_, recipient) = await BookAsync(host.CreateClient(), "2027-01-16");
+
+        Assert.Contains(EmailsTo(studio), e => e.HtmlBody.Contains(recipient));
+        Assert.DoesNotContain(EmailsTo("admin@partlphoto.sk"), e => e.HtmlBody.Contains(recipient));
+    }
 
     [Fact]
     public async Task CreateBooking_BlockedSlot_Returns400()
