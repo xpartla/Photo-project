@@ -75,6 +75,12 @@ project was picked back up after a five-month pause. One commit per item on
 - `BookingTests` (+6, replacing 1): Slovak by default with an English photographer notification, English on request, unknown language falls back to Slovak, confirm/cancel follow the booking language, form input is escaped, and the notification goes to the configured address.
 - `EShopTests` (+3): order confirmation and status e-mails in Slovak and English with matching product names; photographer notification in English.
 
+### Added — contact page
+- **`/sk/kontakt` and `/en/contact`** — the navbar has linked there since the first design pass, but the page never existed (404). `ContactContent.astro` (shared) renders the portfolio sub-page hero, three outlined cards (e-mail, phone, where I shoot), social links and a "book a session" call to action; the SK/EN pages are thin wrappers with `ContactPage` + `LocalBusiness` JSON-LD. New `_contact.scss`.
+- **`lib/contact.ts`** — one source for e-mail, phone and social profiles, now also used by the footer (which had its own hard-coded copies). **The phone number, opening hours and social URLs are placeholders** to be replaced before launch.
+- **i18n** — 13 `contact.*` keys per language; `footer.phone` removed (the number is not language-specific); `getAlternateUrl` maps `kontakt ↔ contact`.
+- **Tests** — unit: the new route mapping, plus a check that `sk.json` and `en.json` define exactly the same keys. E2E `contact.spec.ts` (4): both languages render, hreflang points at the other language, the navbar link works, and an axe scan of the page content reports no violations.
+
 ### Verification
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.

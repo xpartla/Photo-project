@@ -1,0 +1,242 @@
+@use "sass:color";
+@use "../variables" as *;
+
+.contact {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 24px 96px;
+
+  @media (max-width: $breakpoint-md) {
+    padding: 16px 16px 64px;
+  }
+}
+
+.contact__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+
+  @media (max-width: $breakpoint-md) {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.contact__card {
+  border: $outline-width solid $outline;
+  border-radius: 12px;
+  background: $white;
+  box-shadow: 4px 4px 0 $outline;
+  padding: 24px;
+  text-align: center;
+  transition: transform $transition-base, box-shadow $transition-base;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 6px 6px 0 $outline;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+.contact__icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  padding: 10px;
+  border: $outline-width solid $outline;
+  border-radius: 50%;
+  background: $peach;
+  fill: none;
+  stroke: $dark;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.contact__card-title {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.contact__link,
+.contact__value {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: $dark;
+  // Long e-mail addresses must wrap on narrow cards instead of overflowing.
+  overflow-wrap: anywhere;
+}
+
+.contact__link {
+  min-height: 44px;
+  line-height: 44px;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+
+  &:hover {
+    text-decoration-color: $terracotta;
+  }
+
+  &:focus-visible {
+    outline: 3px solid $dark;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+.contact__value {
+  min-height: 44px;
+  line-height: 44px;
+}
+
+.contact__note {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.contact__social {
+  margin-top: 48px;
+  text-align: center;
+}
+
+.contact__social-title {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+}
+
+.contact__social-list {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.contact__social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 20px;
+  border: $outline-width solid $outline;
+  border-radius: 8px;
+  background: $lavender;
+  box-shadow: 3px 3px 0 $outline;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: $dark;
+  transition: transform $transition-base, box-shadow $transition-base, background-color $transition-fast;
+
+  &:hover {
+    background: color.adjust($lavender, $lightness: -8%);
+    transform: translateY(-1px);
+    box-shadow: 4px 4px 0 $outline;
+  }
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid $dark;
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover,
+    &:active {
+      transform: none;
+    }
+  }
+}
+
+.contact__social-icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.contact__cta {
+  margin-top: 48px;
+  padding: 32px 24px;
+  border: $outline-width-thick solid $outline;
+  border-radius: 12px;
+  background: $sage;
+  box-shadow: 5px 5px 0 $outline;
+  text-align: center;
+}
+
+.contact__cta-title {
+  font-size: 2.25rem;
+  color: $dark;
+  margin-bottom: 8px;
+
+  @media (max-width: $breakpoint-sm) {
+    font-size: 1.5rem;
+  }
+}
+
+.contact__cta-text {
+  font-weight: 600;
+  color: $dark;
+  margin-bottom: 24px;
+}
+
+.contact__cta-btn {
+  display: inline-block;
+  min-height: 44px;
+  padding: 12px 32px;
+  border: $outline-width solid $outline;
+  border-radius: 8px;
+  background: $peach;
+  box-shadow: 3px 3px 0 $outline;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: $dark;
+  transition: transform $transition-base, box-shadow $transition-base, background-color $transition-fast;
+
+  &:hover {
+    background: color.adjust($peach, $lightness: -8%);
+    transform: translateY(-1px);
+    box-shadow: 4px 4px 0 $outline;
+  }
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid $dark;
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover,
+    &:active {
+      transform: none;
+    }
+  }
+}

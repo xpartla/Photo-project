@@ -107,4 +107,22 @@ describe("i18n", () => {
         .toBe("/en/admin/booking/calendar");
     });
   });
+
+  describe("contact route", () => {
+    it("maps /sk/kontakt to /en/contact and back", () => {
+      expect(getAlternateUrl("sk", "/sk/kontakt")).toBe("/en/contact");
+      expect(getAlternateUrl("en", "/en/contact")).toBe("/sk/kontakt");
+    });
+  });
+
+  describe("dictionaries", () => {
+    it("define exactly the same keys in both languages", async () => {
+      const sk = (await import("../../src/i18n/sk.json")).default;
+      const en = (await import("../../src/i18n/en.json")).default;
+      const skKeys = Object.keys(sk).sort();
+      const enKeys = Object.keys(en).sort();
+      expect(enKeys.filter((k) => !skKeys.includes(k))).toEqual([]);
+      expect(skKeys.filter((k) => !enKeys.includes(k))).toEqual([]);
+    });
+  });
 });
