@@ -81,6 +81,12 @@ project was picked back up after a five-month pause. One commit per item on
 - **i18n** — 13 `contact.*` keys per language; `footer.phone` removed (the number is not language-specific); `getAlternateUrl` maps `kontakt ↔ contact`.
 - **Tests** — unit: the new route mapping, plus a check that `sk.json` and `en.json` define exactly the same keys. E2E `contact.spec.ts` (4): both languages render, hreflang points at the other language, the navbar link works, and an axe scan of the page content reports no violations.
 
+### Fixed — E2E suite matches the hidden store
+- **Store-dependent specs skip themselves** when the store is off, like `shop.spec.ts` already did: the "admin shop" group and the `/sk/admin/obchod` axe scan in `admin.spec.ts`, and the checkout pre-fill test in `account.spec.ts`. The admin dashboard test now expects the Shop card only when the store is enabled. The flag check lives in one place, `tests/e2e/store.ts`.
+- **`account.spec.ts`** — the registration test's login-link locator matched the navbar links too (strict-mode failure); scoped to the page content.
+- **Navbar account button had no accessible name** (axe `button-name`, critical — caught by the account dashboard scan). Added `aria-label` and hid the decorative icon from assistive tech.
+- Result: store hidden — 42 passed, 16 skipped, 0 failed (was 8 failed). Store enabled (`PUBLIC_STORE_ENABLED=true` on the frontend and for Playwright, after `make seed-shop`) — 58 passed, 0 skipped.
+
 ### Verification
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.

@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { STORE_ENABLED, STORE_HIDDEN_REASON } from "./store";
 
 const API_URL = process.env.PLAYWRIGHT_API_URL ?? "http://localhost:5000";
 
@@ -21,15 +22,15 @@ async function primeAdmin(page: Page, token: string): Promise<void> {
 }
 
 test.describe("admin dashboard", () => {
-  test("renders the four section cards for an admin", async ({ page, request }) => {
+  test("renders a card for every enabled section", async ({ page, request }) => {
     const token = await getAdminToken(request);
     await primeAdmin(page, token);
 
     await page.goto("/sk/admin");
     await expect(page.locator(".admin__card", { hasText: "Portfólio" })).toBeVisible();
-    await expect(page.locator(".admin__card", { hasText: "Obchod" })).toBeVisible();
     await expect(page.locator(".admin__card", { hasText: "Rezervácie" })).toBeVisible();
     await expect(page.locator(".admin__card", { hasText: "Blog" })).toBeVisible();
+    await expect(page.locator(".admin__card", { hasText: "Obchod" })).toHaveCount(STORE_ENABLED ? 1 : 0);
   });
 });
 
@@ -60,6 +61,8 @@ test.describe("admin portfolio", () => {
 });
 
 test.describe("admin shop", () => {
+  test.skip(!STORE_ENABLED, STORE_HIDDEN_REASON);
+
   test("products list renders", async ({ page, request }) => {
     const token = await getAdminToken(request);
     await primeAdmin(page, token);
@@ -176,6 +179,8 @@ test.describe("admin accessibility", () => {
   });
 
   test("/sk/admin/obchod has no critical violations", async ({ page, request }) => {
+    test.skip(!STORE_ENABLED, STORE_HIDDEN_REASON);
+
     const token = await getAdminToken(request);
     await primeAdmin(page, token);
 

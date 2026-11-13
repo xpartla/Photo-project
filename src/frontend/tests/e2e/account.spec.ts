@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { STORE_ENABLED, STORE_HIDDEN_REASON } from "./store";
 
 const API_URL = process.env.PLAYWRIGHT_API_URL ?? "http://localhost:5000";
 
@@ -28,7 +29,8 @@ test.describe("account (customer)", () => {
   test("registration page renders and links back to login", async ({ page }) => {
     await page.goto("/sk/registracia");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.locator("a[href='/sk/prihlasenie']")).toBeVisible();
+    // The navbar links to login too; this is the link under the form.
+    await expect(page.locator("main a[href='/sk/prihlasenie']")).toBeVisible();
   });
 
   test("account dashboard requires auth", async ({ page }) => {
@@ -67,6 +69,8 @@ test.describe("account (customer)", () => {
   });
 
   test("checkout pre-fills with the saved default shipping address", async ({ page, request }) => {
+    test.skip(!STORE_ENABLED, STORE_HIDDEN_REASON);
+
     const { token, email } = await registerFreshCustomer(request);
 
     // Seed an address directly via the API.
