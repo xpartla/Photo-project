@@ -1,5 +1,24 @@
 # Changelog
 
+## Known-gaps refactor (2026-11-13)
+
+Security, production-readiness and housekeeping fixes for the gaps found when the
+project was picked back up after a five-month pause. One commit per item on
+`feature/gap-refactor`.
+
+### Changed — pinned image and package versions
+- **Docker** — backend images moved from the floating `10.0-preview` tags to `sdk:10.0` / `aspnet:10.0`; Azurite pinned to `3.37.0` (compose + `ApiFactory`), Mailpit to `v1.33.1`.
+- **NuGet** — the `10.*-*` pre-release floats (ASP.NET auth, EF Core, Npgsql, health checks, `Mvc.Testing`) are now `10.0.*`, so restores stay on the 10.0 servicing line.
+- **ImageSharp** pinned to `3.2.*`. From 3.2 the package validates a Six Labors licence at build time: Debug builds warn, **Release builds fail** until `SixLaborsLicenseKey` / `sixlabors.lic` is provided. Staying on 3.1.x is not an option — its latest patch carries unpatched high-severity advisories.
+
+### Fixed — expired integration tests
+- **`BookingTests`** used hard-coded slot dates that had drifted into the past, so the API rejected the bookings (3 failures). Dates are now template dates shifted by whole weeks from today, keeping weekday and spacing.
+- `GetSessionTypes_LanguageParameter_*` compared package names, which are identical in both languages since the Legacy / Digital / Action rename; it now compares descriptions.
+
+### Verification
+- Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
+- `docker compose up -d --build` builds and boots on the pinned images.
+
 ## Portfolio tilt & gallery layout polish (2026-06-25)
 
 Small visual fixes to the portfolio index and its tag/collection sub-pages: the

@@ -51,7 +51,7 @@ services:
       - frontend_node_modules:/app/node_modules
 
   azurite:
-    image: mcr.microsoft.com/azure-storage/azurite
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
     ports:
       - "10000:10000"
       - "10001:10001"
@@ -65,7 +65,7 @@ services:
     command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck --location /data
 
   mailpit:
-    image: axllent/mailpit
+    image: axllent/mailpit:v1.33.1
     ports:
       - "8025:8025"
       - "1025:1025"

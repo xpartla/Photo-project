@@ -1,7 +1,7 @@
 # =============================================================================
 # Dev target: hot reload with dotnet watch
 # =============================================================================
-FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS dev
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dev
 
 WORKDIR /app/src
 
@@ -25,7 +25,7 @@ ENTRYPOINT ["dotnet", "watch", "run", "--project", "DogPhoto.Api", "--urls", "ht
 # =============================================================================
 # Build target: restore + publish
 # =============================================================================
-FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 WORKDIR /src
 
@@ -45,7 +45,7 @@ RUN dotnet publish DogPhoto.Api -c Release -o /app/publish --no-restore
 # =============================================================================
 # Prod target: minimal runtime image
 # =============================================================================
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS prod
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS prod
 
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 

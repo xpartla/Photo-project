@@ -22,7 +22,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         .WithPassword("dogphoto_test")
         .Build();
 
-    private readonly AzuriteContainer _azurite = new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:latest")
+    private readonly AzuriteContainer _azurite = new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:3.37.0")
         .WithCommand("--skipApiVersionCheck")
         .Build();
 
