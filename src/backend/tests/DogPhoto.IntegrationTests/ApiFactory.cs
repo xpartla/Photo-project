@@ -22,7 +22,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         .WithPassword("dogphoto_test")
         .Build();
 
-    private readonly AzuriteContainer _azurite = new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:latest")
+    private readonly AzuriteContainer _azurite = new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:3.37.0")
         .WithCommand("--skipApiVersionCheck")
         .Build();
 
@@ -60,8 +60,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Force Development so DependencyInjection.ApplyMigrationsAsync uses
-        // EnsureCreated/CreateTables (no migration files exist yet).
+        // Development loads appsettings.Development.json and enables the
+        // development-only surface (mock payments).
         builder.UseEnvironment(Environments.Development);
 
         builder.ConfigureTestServices(services =>
@@ -93,6 +93,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Environment.SetEnvironmentVariable("Jwt__Secret", "integration-test-secret-minimum-32-characters!!");
         Environment.SetEnvironmentVariable("Jwt__Issuer", "DogPhoto.Tests");
         Environment.SetEnvironmentVariable("Jwt__Audience", "DogPhoto.Tests");
+        // Every test request comes from the same (absent) client address, so the
+        // production limits would throttle the suite. RateLimitTests lowers them
+        // again for its own host.
+        Environment.SetEnvironmentVariable("RateLimiting__Auth__PermitLimit", "100000");
+        Environment.SetEnvironmentVariable("RateLimiting__Booking__PermitLimit", "100000");
     }
 
     async Task IAsyncLifetime.DisposeAsync()
@@ -106,5 +111,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Environment.SetEnvironmentVariable("Jwt__Secret", null);
         Environment.SetEnvironmentVariable("Jwt__Issuer", null);
         Environment.SetEnvironmentVariable("Jwt__Audience", null);
+        Environment.SetEnvironmentVariable("RateLimiting__Auth__PermitLimit", null);
+        Environment.SetEnvironmentVariable("RateLimiting__Booking__PermitLimit", null);
     }
 }

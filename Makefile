@@ -16,7 +16,7 @@
 .PHONY: help up down logs seed seed-shop seed-blog \
         test test-backend test-backend-unit test-backend-integration \
         test-frontend test-frontend-unit test-e2e \
-        playwright-install build-backend build-frontend fix-backend-perms
+        playwright-install build-backend build-frontend fix-backend-perms migration
 
 help:
 	@echo "PartlPhoto — common tasks"
@@ -39,6 +39,8 @@ help:
 	@echo "  make build-backend            dotnet build of the solution (host)"
 	@echo "  make build-frontend           astro build (in the frontend container)"
 	@echo "  make fix-backend-perms        chown src/backend back to the host user (after a container build)"
+	@echo "  make migration CONTEXT=Booking NAME=AddSomething"
+	@echo "                                Generate an EF Core migration for one module's DbContext (host)"
 
 # ── Stack management ───────────────────────────────────────────────────
 
@@ -75,6 +77,20 @@ build-frontend:
 # Recover from earlier in-container builds that left root-owned bin/obj.
 fix-backend-perms:
 	sudo chown -R "$$USER:$$USER" src/backend
+
+# Generate an EF Core migration after changing an entity or its mapping.
+# CONTEXT is the module name (Identity, Portfolio, EShop, Booking, Blog).
+# Migrations are applied automatically when the API starts.
+migration:
+	@$(call require_dotnet)
+	@if [ -z "$(CONTEXT)" ] || [ -z "$(NAME)" ]; then \
+	  echo "usage: make migration CONTEXT=Booking NAME=AddSomething"; \
+	  exit 1; \
+	fi
+	cd src/backend && dotnet tool restore && dotnet ef migrations add $(NAME) \
+	  --context $(CONTEXT)DbContext \
+	  --project DogPhoto.Infrastructure --startup-project DogPhoto.Api \
+	  --output-dir Persistence/$(CONTEXT)/Migrations
 
 # ── Backend tests ──────────────────────────────────────────────────────
 

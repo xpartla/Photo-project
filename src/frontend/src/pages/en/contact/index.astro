@@ -1,0 +1,44 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import SeoMeta from "../../../components/SeoMeta.astro";
+import ContactContent from "../../../components/ContactContent.astro";
+import { CONTACT } from "../../../lib/contact";
+import { t } from "../../../lib/i18n";
+
+const lang = "en";
+const pageTitle = `${t(lang, "contact.title")} — PartlPhoto`;
+const pageDescription = t(lang, "contact.description");
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ContactPage",
+  name: pageTitle,
+  description: pageDescription,
+  inLanguage: lang,
+  mainEntity: {
+    "@type": "LocalBusiness",
+    name: "PartlPhoto",
+    email: CONTACT.email,
+    telephone: CONTACT.phoneHref,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: "Bratislava",
+      addressCountry: "SK",
+    },
+    sameAs: [CONTACT.instagram, CONTACT.facebook],
+  },
+};
+---
+
+<BaseLayout title={pageTitle} description={pageDescription} lang={lang}>
+  <SeoMeta
+    slot="head"
+    title={pageTitle}
+    description={pageDescription}
+    lang={lang}
+    path="/en/contact"
+    jsonLd={jsonLd}
+  />
+
+  <ContactContent lang={lang} />
+</BaseLayout>

@@ -77,8 +77,8 @@ const langSwitchLabel = lang === "sk" ? "EN" : "SK";
 
         <!-- Logged-in state (hidden by default, toggled via JS) -->
         <div class="navbar__account" data-account-menu hidden>
-          <button class="navbar__account-toggle" data-account-toggle aria-expanded="false" aria-haspopup="true">
-            <svg class="navbar__account-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <button class="navbar__account-toggle" data-account-toggle aria-expanded="false" aria-haspopup="true" aria-label={t(lang, "account.title")}>
+            <svg class="navbar__account-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>

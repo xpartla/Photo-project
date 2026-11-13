@@ -52,6 +52,13 @@ export function getAlternateUrl(lang: string, path: string): string {
     if (lang === "en" && rest.startsWith("booking")) {
       return `/${altLang}/rezervacia${rest.slice("booking".length)}`;
     }
+    // Contact page: kontakt ↔ contact
+    if (lang === "sk" && rest.startsWith("kontakt")) {
+      return `/${altLang}/contact${rest.slice("kontakt".length)}`;
+    }
+    if (lang === "en" && rest.startsWith("contact")) {
+      return `/${altLang}/kontakt${rest.slice("contact".length)}`;
+    }
     // Login routes: prihlasenie ↔ login
     if (lang === "sk" && rest.startsWith("prihlasenie")) {
       return `/${altLang}/login${rest.slice("prihlasenie".length)}`;

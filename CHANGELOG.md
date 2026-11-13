@@ -1,5 +1,128 @@
 # Changelog
 
+## Known-gaps refactor (2026-11-13)
+
+Security, production-readiness and housekeeping fixes for the gaps found when the
+project was picked back up after a five-month pause. One commit per item on
+`feature/gap-refactor`.
+
+### Changed — pinned image and package versions
+- **Docker** — backend images moved from the floating `10.0-preview` tags to `sdk:10.0` / `aspnet:10.0`; Azurite pinned to `3.37.0` (compose + `ApiFactory`), Mailpit to `v1.33.1`.
+- **NuGet** — the `10.*-*` pre-release floats (ASP.NET auth, EF Core, Npgsql, health checks, `Mvc.Testing`) are now `10.0.*`, so restores stay on the 10.0 servicing line.
+- **ImageSharp** pinned to `3.2.*`. From 3.2 the package validates a Six Labors licence at build time: Debug builds warn, **Release builds fail** until `SixLaborsLicenseKey` / `sixlabors.lic` is provided. Staying on 3.1.x is not an option — its latest patch carries unpatched high-severity advisories.
+
+### Fixed — expired integration tests
+- **`BookingTests`** used hard-coded slot dates that had drifted into the past, so the API rejected the bookings (3 failures). Dates are now template dates shifted by whole weeks from today, keeping weekday and spacing.
+- `GetSessionTypes_LanguageParameter_*` compared package names, which are identical in both languages since the Legacy / Digital / Action rename; it now compares descriptions.
+
+### Security — removed the Google login endpoint
+- **`POST /api/auth/google` deleted.** It discarded the result of its token check and trusted the `email` / `subject` in the request body, so any caller could obtain tokens for any account, including the admin. Nothing in the frontend used it.
+- Removed with it: `ITokenService.ValidateAccessToken` (its only caller) and the `Microsoft.AspNetCore.Authentication.Google` package. The `OAuthProvider` / `OAuthSubject` columns stay for a future, properly verified implementation.
+- **`AuthTests.cs`** (new, 3 tests) — a forged Google login for the admin e-mail gets 404; wrong password gets 401; refresh rotates the token and rejects reuse of the old one.
+
+### Security — JWT secret is required
+- **No more hard-coded fallback secret.** `AddInfrastructure` now throws at startup when `Jwt:Secret` is missing or shorter than 32 bytes (`JwtSettings.MinSecretBytes`, the HMAC-SHA256 minimum), instead of silently signing tokens with a secret that is in the source code. Local dev is unaffected: `appsettings.Development.json` supplies one.
+- **`ConfigurationTests.cs`** (new, 3 tests) — missing secret throws, short secret throws, valid secret registers.
+
+### Security — rate limiting that is actually applied
+- **Before:** an `"auth"` limiter policy was registered in `Program.cs` but never attached to an endpoint, and it was a single window shared by every visitor.
+- **Now:** per-client-IP fixed-window limits (`RateLimiting/RateLimitingExtensions.cs`, policies in `RateLimitPolicies`):
+  - `auth` — `POST /api/auth/login`, `/register`, `/refresh`: 10 requests / 60 s
+  - `booking` — `POST /api/booking/bookings` (public, sends e-mail): 5 requests / 60 s
+- Limits live in the `RateLimiting` config section (`RateLimitSettings`) and are read per request. `appsettings.Development.json` raises both to 1000 so local E2E runs, which log in on every test, are not throttled.
+- Rejections return `429` with a `Retry-After` header and the usual `{ "error": "…" }` body.
+- **Deployment note:** the partition key is the connection's remote address. Behind a reverse proxy (Azure App Service) set `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`, otherwise all visitors share the proxy's address and one bucket.
+- **`RateLimitTests.cs`** (new, 5 tests) — login over the limit gets 429 + `Retry-After`; the limit is per address; register and refresh share the auth bucket; the booking form is limited; unlisted endpoints are not.
+
+### Added — EF Core migrations (all environments)
+- **Initial migration per module** under `Persistence/<Module>/Migrations/` for `IdentityDbContext`, `PortfolioDbContext`, `EShopDbContext`, `BookingDbContext` and `BlogDbContext` (25 tables across 5 schemas, each schema keeping its own `__EFMigrationsHistory`).
+- **`ApplyMigrationsAsync` now just calls `MigrateAsync()`** for every context in every environment. Removed: the Development-only `EnsureCreated` / `CreateTables` bootstrap, the raw-SQL `identity` patches, and the "drop the `eshop` schema if it looks old" heuristic. Dev, tests and production now build the schema the same way.
+- **Tooling** — `dotnet-ef` 10.0.15 as a repo-local tool (`src/backend/dotnet-tools.json`, `dotnet tool restore`); `Microsoft.EntityFrameworkCore.Design` referenced from the API project so it can act as the design-time startup project; **`make migration CONTEXT=Booking NAME=AddSomething`** generates a migration.
+- **`MigrationTests.cs`** (new, 10 tests) — per context: the model has no changes missing from the migrations, and the database has every migration applied. Changing an entity without adding a migration now fails the suite.
+
+### Breaking (local only)
+- A database created before this change has tables but no migration history and cannot be upgraded in place. The API refuses to start with a message saying so; reset with `docker compose down -v`, start the stack and re-run the seed scripts.
+
+### Security — mock payments are Development-only
+- **`MockPaymentGateway` is registered only in Development.** Every other environment gets `UnavailablePaymentGateway`, so the mock (which marks an order paid on an unauthenticated browser request) cannot be deployed by accident.
+- **`POST /api/shop/webhooks/payment` and `GET /api/shop/payments/{id}`** moved into `MapMockPaymentEndpoints` and are mapped only in Development. A real gateway will bring its own signature-verified webhook.
+- **`IPaymentGateway.IsAvailable`** (new). `POST /api/shop/orders` returns `503 { error }` up front when no gateway is available, instead of creating an order nobody can pay for.
+- `AddInfrastructure` now takes the `IHostEnvironment`.
+- **Frontend** — `/mock-pay/[id]` returns 404 outside `astro dev`.
+- **`PaymentGatewayTests.cs`** (new, 6 tests) — boots a second host in `Production` mode: no usable gateway, webhook and payment-info routes unmapped, order creation 503; Development keeps the mock flow.
+
+### Changed — booking packages are managed in the admin UI
+- **Startup seed no longer overwrites packages.** `SeedDataAsync` used to rewrite Legacy / Digital / Action on every API start and deactivate any other active package, so admin edits were lost and admin-created packages were switched off. It now only inserts starter packages whose slug is missing; existing rows are never touched.
+- **Bilingual "includes" in the API.** `POST` / `PUT /api/booking/session-types` take `includesSk` and `includesEn` (replacing `includesJson`, which stored a flat list and silently dropped one language on every edit). A language left out of an update keeps its stored value. Responses add `includesSk` / `includesEn` next to the localized `includes`.
+- **`GET /api/booking/session-types?includeInactive=true`** — honoured for admins only, so deactivated packages stay listed in the CMS and can be re-activated.
+- **Validation** on create/update: slug format, non-empty names, duration > 0, price ≥ 0, max dogs ≥ 1.
+- **`AdminSessionTypes.astro`** — separate SK and EN "includes" fields in the create and edit forms, an "Inactive" pill on deactivated packages, the list re-renders after saving, and the category field has its own label plus the `film` / `digital` options the starter packages use.
+- **i18n** — `admin.booking.includes` split into `admin.booking.includesSk` / `includesEn`; new `admin.booking.category`, `admin.booking.inactive` (SK + EN).
+- **`SessionTypeTests.cs`** (new, 18 tests) — admin-only create/update, localized includes, partial updates, validation, deactivated packages hidden from the public and unbookable, and a restart test proving admin edits and custom packages survive the startup seed. `AdminCanUpdateSessionType` moved there so it no longer reprices a starter package.
+- **E2E** — `admin.spec.ts`: create a package through the form, deactivate it, and confirm it stays listed for the admin but leaves the public API.
+
+### Changed — notification address and e-mail language
+- **Photographer notifications go to a configured address.** New `Notifications:PhotographerEmail` setting (`NotificationSettings`, default `admin@partlphoto.sk`) replaces the address hard-coded in the booking and order handlers.
+- **Customer e-mails follow the customer's language.** `booking.bookings` and `eshop.orders` gain a `Language` column (`sk` default; migrations `AddLanguage`). `POST /api/booking/bookings` and `POST /api/shop/orders` accept an optional `language`; anything other than `en` is stored as `sk`. Booking confirmation / confirmed / cancelled and order confirmation / status-update e-mails — subjects, body text, package names and product, format and paper names — are rendered in that language. Notifications to the photographer stay in English.
+- **Frontend** — the booking form and both checkout pages send the page language (`document.documentElement.lang`).
+- **`Languages`** (`DogPhoto.SharedKernel.Localization`) — language constants, `Normalize` and `Pick`.
+- E-mail footers now read "Dog photography, Bratislava" / "fotografia psov, Bratislava"; the old "Fine art film & dog photography" line predated the dog-only refactor.
+
+### Security — booking e-mails escape user input
+- `BookingEmailTemplates` interpolated the client name, e-mail, phone and special requests from the public booking form straight into HTML, so a visitor could inject markup or links into the e-mail the photographer receives. All values are now HTML-encoded (the order templates already were). The templates were rebuilt on a shared layout while being localized.
+
+### Testing — e-mails
+- `BookingTests` (+6, replacing 1): Slovak by default with an English photographer notification, English on request, unknown language falls back to Slovak, confirm/cancel follow the booking language, form input is escaped, and the notification goes to the configured address.
+- `EShopTests` (+3): order confirmation and status e-mails in Slovak and English with matching product names; photographer notification in English.
+
+### Added — contact page
+- **`/sk/kontakt` and `/en/contact`** — the navbar has linked there since the first design pass, but the page never existed (404). `ContactContent.astro` (shared) renders the portfolio sub-page hero, three outlined cards (e-mail, phone, where I shoot), social links and a "book a session" call to action; the SK/EN pages are thin wrappers with `ContactPage` + `LocalBusiness` JSON-LD. New `_contact.scss`.
+- **`lib/contact.ts`** — one source for e-mail, phone and social profiles, now also used by the footer (which had its own hard-coded copies). **The phone number, opening hours and social URLs are placeholders** to be replaced before launch.
+- **i18n** — 13 `contact.*` keys per language; `footer.phone` removed (the number is not language-specific); `getAlternateUrl` maps `kontakt ↔ contact`.
+- **Tests** — unit: the new route mapping, plus a check that `sk.json` and `en.json` define exactly the same keys. E2E `contact.spec.ts` (4): both languages render, hreflang points at the other language, the navbar link works, and an axe scan of the page content reports no violations.
+
+### Fixed — E2E suite matches the hidden store
+- **Store-dependent specs skip themselves** when the store is off, like `shop.spec.ts` already did: the "admin shop" group and the `/sk/admin/obchod` axe scan in `admin.spec.ts`, and the checkout pre-fill test in `account.spec.ts`. The admin dashboard test now expects the Shop card only when the store is enabled. The flag check lives in one place, `tests/e2e/store.ts`.
+- **`account.spec.ts`** — the registration test's login-link locator matched the navbar links too (strict-mode failure); scoped to the page content.
+- **Navbar account button had no accessible name** (axe `button-name`, critical — caught by the account dashboard scan). Added `aria-label` and hid the decorative icon from assistive tech.
+- Result: store hidden — 42 passed, 16 skipped, 0 failed (was 8 failed). Store enabled (`PUBLIC_STORE_ENABLED=true` on the frontend and for Playwright, after `make seed-shop`) — 58 passed, 0 skipped.
+
+### Docs
+- **Root `README.md`** (new) — what the project is, quick start, local URLs and accounts, test and migration commands, and how to turn the store on.
+- **`src/frontend/README.md` deleted** — it was the untouched Astro starter template.
+- Retrospective changelog entry for the 2026-06-25 booking package rework (below).
+- Removed the four `booking.category.*` i18n keys, unused since that rework.
+
+### Verification
+- **Backend** (host, .NET SDK 10.0.404): 8/8 architecture tests, 138/138 integration tests (86 before this work, 3 of them failing).
+- **Frontend unit** (Vitest): 64/64.
+- **E2E** (Playwright against the compose stack): store hidden — 42 passed, 16 skipped; store enabled — 58 passed.
+- `astro build` completes; `docker compose up -d --build` builds and boots on the pinned images, and the database is created purely from migrations.
+- **Not verified:** a Release build / the `prod` Docker target of the API. It currently fails on the ImageSharp licence check described above.
+
+### Still open
+- A Six Labors licence key (or a different imaging library) is needed before the API can be built in Release.
+- The startup seed still creates `admin@dogphoto.sk` / `admin123` and the sample customer in every environment; production needs a different way to create the first admin.
+- "Order paid" handling (status change + e-mails) lives inside the Development-only mock webhook and has to move into shared code when a real payment gateway is added.
+- Deployment to Azure App Service itself (pipeline, infrastructure, production configuration) is not started.
+
+## Booking packages for the dog-only launch (2026-06-25)
+
+The booking page moves from the original generic session types to the three
+packages actually on offer. (Written retrospectively on 2026-11-13 from commit
+`b6574c7`, which shipped without a changelog entry.)
+
+### Changed
+- **Packages** — the seeded session types `dog-portrait` / `action-session` / `outdoor-session` are replaced by **Legacy** (35 mm film, 24 frames, 90 min, 180 EUR, 1 dog), **Digital** (15 edited photos, 60 min, 130 EUR, 1 dog) and **Action** (12 edited photos, 90 min, 150 EUR, up to 2 dogs), with bilingual descriptions.
+- **Startup seed became a reconcile** — instead of seeding once into an empty table, `SeedDataAsync` upserted the three packages by slug on every start and deactivated any other active session type, so the old types dropped off the public page while existing bookings kept their foreign keys. (Superseded on 2026-11-13: the seed now only inserts missing packages.)
+- **Bilingual "includes"** — `SessionType.IncludesJson` changed from a flat array to `{"sk":[...],"en":[...]}`. `MapSessionType` picks the list for the requested language and still reads the legacy flat shape.
+- **Booking page** (`en/booking/index.astro`, `sk/rezervacia/index.astro`) — cards are shown in a fixed Legacy → Digital → Action order rather than by price; the category pill and the duration line were removed from the cards and the detail modal; the price moved above the description.
+- **FAQ** rewritten around the packages: print quality, what the Legacy package contains, delivery times, and extra prints (replacing "how long / how many photos / where").
+- **`_booking.scss`** — the card button is pinned to the bottom with `margin-top: auto` so cards of different text length line up.
+
+### Testing
+- `BookingTests` updated for the new slugs (`legacy`, `action`) and the 90-minute Legacy duration.
+
 ## Portfolio tilt & gallery layout polish (2026-06-25)
 
 Small visual fixes to the portfolio index and its tag/collection sub-pages: the

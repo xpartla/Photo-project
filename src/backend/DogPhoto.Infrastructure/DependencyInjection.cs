@@ -23,7 +23,7 @@ namespace DogPhoto.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         var connectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("Connection string 'Default' not found.");
@@ -41,14 +41,13 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString, o => o.MigrationsHistoryTable("__EFMigrationsHistory", BlogDbContext.Schema)));
 
         // Auth
-        var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
-            ?? new JwtSettings { Secret = configuration["Jwt:Secret"] ?? "dev-secret-key-minimum-32-characters-long!!" };
+        var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>() ?? new JwtSettings();
+        if (Encoding.UTF8.GetByteCount(jwtSettings.Secret ?? string.Empty) < JwtSettings.MinSecretBytes)
+            throw new InvalidOperationException(
+                $"Jwt:Secret is missing or shorter than {JwtSettings.MinSecretBytes} bytes. " +
+                "Set it in configuration (environment variable Jwt__Secret).");
 
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
-
-        // Ensure JwtSettings is always available even if section is missing
-        if (string.IsNullOrEmpty(jwtSettings.Secret))
-            jwtSettings.Secret = "dev-secret-key-minimum-32-characters-long!!";
 
         services.AddAuthentication(options =>
         {
@@ -81,11 +80,19 @@ public static class DependencyInjection
 
         // Email
         services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
+        services.Configure<NotificationSettings>(configuration.GetSection(NotificationSettings.SectionName));
         services.AddScoped<IEmailService, SmtpEmailService>();
 
         // Payment gateway
-        services.AddSingleton<MockPaymentGateway>();
-        services.AddSingleton<IPaymentGateway>(sp => sp.GetRequiredService<MockPaymentGateway>());
+        if (environment.IsDevelopment())
+        {
+            services.AddSingleton<MockPaymentGateway>();
+            services.AddSingleton<IPaymentGateway>(sp => sp.GetRequiredService<MockPaymentGateway>());
+        }
+        else
+        {
+            services.AddSingleton<IPaymentGateway, UnavailablePaymentGateway>();
+        }
 
         // Image pipeline
         services.AddScoped<IImageProcessor, ImageProcessor>();
@@ -101,79 +108,43 @@ public static class DependencyInjection
     {
         using var scope = services.CreateScope();
         var sp = scope.ServiceProvider;
-        var env = sp.GetRequiredService<IHostEnvironment>();
 
-        if (env.IsDevelopment())
+        var contexts = new (DbContext Context, string Schema)[]
         {
-            // In development, create schemas and tables from model directly
-            // This avoids needing migration files during early development
-            var contexts = new DbContext[]
-            {
-                sp.GetRequiredService<IdentityDbContext>(),
-                sp.GetRequiredService<PortfolioDbContext>(),
-                sp.GetRequiredService<EShopDbContext>(),
-                sp.GetRequiredService<BookingDbContext>(),
-                sp.GetRequiredService<BlogDbContext>(),
-            };
+            (sp.GetRequiredService<IdentityDbContext>(), IdentityDbContext.Schema),
+            (sp.GetRequiredService<PortfolioDbContext>(), PortfolioDbContext.Schema),
+            (sp.GetRequiredService<EShopDbContext>(), EShopDbContext.Schema),
+            (sp.GetRequiredService<BookingDbContext>(), BookingDbContext.Schema),
+            (sp.GetRequiredService<BlogDbContext>(), BlogDbContext.Schema),
+        };
 
-            // Ensure database exists using first context
-            await contexts[0].Database.EnsureCreatedAsync();
-
-            // Dev-only schema patches for identity: additive changes (new column,
-            // new table) that EnsureCreated skips on an already-existing schema.
-            // Kept idempotent via IF NOT EXISTS so re-runs are safe.
-            var identityDb = sp.GetRequiredService<IdentityDbContext>();
-            await identityDb.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE identity.users ADD COLUMN IF NOT EXISTS \"Phone\" varchar(50)");
-            await identityDb.Database.ExecuteSqlRawAsync("""
-                CREATE TABLE IF NOT EXISTS identity.addresses (
-                    "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                    "UserId" uuid NOT NULL REFERENCES identity.users("Id") ON DELETE CASCADE,
-                    "Label" varchar(64),
-                    "Name" varchar(256) NOT NULL,
-                    "Street" varchar(256) NOT NULL,
-                    "City" varchar(128) NOT NULL,
-                    "PostalCode" varchar(32) NOT NULL,
-                    "Country" varchar(2) NOT NULL DEFAULT 'SK',
-                    "IsDefaultShipping" boolean NOT NULL DEFAULT false,
-                    "IsDefaultBilling" boolean NOT NULL DEFAULT false,
-                    "CreatedAt" timestamptz NOT NULL DEFAULT now(),
-                    "UpdatedAt" timestamptz NOT NULL DEFAULT now()
-                )
-                """);
-            await identityDb.Database.ExecuteSqlRawAsync(
-                "CREATE INDEX IF NOT EXISTS \"IX_addresses_UserId\" ON identity.addresses(\"UserId\")");
-
-            // Dev-only: rebuild the eshop schema when its model has changed in a
-            // backwards-incompatible way. Detection is by presence of a table that
-            // only exists in the latest model. Product data is re-seeded by seed-shop.sh.
-            var eshopDb = sp.GetRequiredService<EShopDbContext>();
-            var variantsTableExists = await eshopDb.Database
-                .SqlQueryRaw<bool>("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'eshop' AND table_name = 'product_variants') AS \"Value\"")
-                .FirstAsync();
-            if (!variantsTableExists)
-            {
-                await eshopDb.Database.ExecuteSqlRawAsync("DROP SCHEMA IF EXISTS eshop CASCADE");
-            }
-
-            // For remaining contexts, create schemas and tables via SQL generation
-            foreach (var context in contexts.Skip(1))
-            {
-                var internalSp = ((Microsoft.EntityFrameworkCore.Infrastructure.IInfrastructure<IServiceProvider>)context).Instance;
-                var creator = (Microsoft.EntityFrameworkCore.Storage.IRelationalDatabaseCreator)
-                    internalSp.GetRequiredService<Microsoft.EntityFrameworkCore.Storage.IDatabaseCreator>();
-                try { await creator.CreateTablesAsync(); } catch { /* Tables already exist */ }
-            }
-        }
-        else
+        foreach (var (context, schema) in contexts)
         {
-            // In production, use proper migrations
-            await sp.GetRequiredService<IdentityDbContext>().Database.MigrateAsync();
-            await sp.GetRequiredService<PortfolioDbContext>().Database.MigrateAsync();
-            await sp.GetRequiredService<EShopDbContext>().Database.MigrateAsync();
-            await sp.GetRequiredService<BookingDbContext>().Database.MigrateAsync();
-            await sp.GetRequiredService<BlogDbContext>().Database.MigrateAsync();
+            await ThrowIfCreatedWithoutMigrationsAsync(context, schema);
+            await context.Database.MigrateAsync();
         }
+    }
+
+    // Databases from before migrations existed were built with EnsureCreated:
+    // the tables are there but the history table is not, so Migrate() would
+    // fail on the first CREATE TABLE with a far less helpful message.
+    private static async Task ThrowIfCreatedWithoutMigrationsAsync(DbContext context, string schema)
+    {
+        if (!await context.Database.CanConnectAsync()) return;
+
+        var legacy = await context.Database
+            .SqlQuery<bool>($"""
+                SELECT EXISTS (SELECT 1 FROM information_schema.tables
+                               WHERE table_schema = {schema} AND table_name <> '__EFMigrationsHistory')
+                   AND NOT EXISTS (SELECT 1 FROM information_schema.tables
+                                   WHERE table_schema = {schema} AND table_name = '__EFMigrationsHistory') AS "Value"
+                """)
+            .SingleAsync();
+
+        if (legacy)
+            throw new InvalidOperationException(
+                $"Schema '{schema}' was created without EF migrations and cannot be upgraded in place. " +
+                "For a local database, reset it with `docker compose down -v` and start the stack again.");
     }
 
     public static async Task SeedDataAsync(IServiceProvider services)
@@ -181,15 +152,12 @@ public static class DependencyInjection
         using var scope = services.CreateScope();
         var sp = scope.ServiceProvider;
 
-        // Seed / reconcile booking session types — the dog-only launch packages.
-        // This runs every startup (not just on an empty table) so edits to the
-        // canonical package content take effect without a manual DB reset.
-        // Rows are matched by slug; any other active session type (e.g. retired
-        // seed data) is deactivated so it drops out of the public listing while
-        // keeping existing bookings' foreign-key references intact.
+        // Starter booking packages. Only packages whose slug is missing are
+        // inserted: once a row exists the admin UI owns it, so edits and
+        // deactivations survive restarts.
         // `includes` is stored bilingually as {"sk":[...],"en":[...]}.
         var bookingDb = sp.GetRequiredService<BookingDbContext>();
-        var desiredSessionTypes = new[]
+        var starterPackages = new[]
         {
             new SessionType
             {
@@ -232,37 +200,8 @@ public static class DependencyInjection
             }
         };
 
-        var existingSessionTypes = await bookingDb.SessionTypes.ToListAsync();
-        var sessionTypesBySlug = existingSessionTypes.ToDictionary(s => s.Slug);
-        foreach (var desired in desiredSessionTypes)
-        {
-            if (sessionTypesBySlug.TryGetValue(desired.Slug, out var row))
-            {
-                row.NameSk = desired.NameSk;
-                row.NameEn = desired.NameEn;
-                row.DescriptionSk = desired.DescriptionSk;
-                row.DescriptionEn = desired.DescriptionEn;
-                row.DurationMinutes = desired.DurationMinutes;
-                row.BasePrice = desired.BasePrice;
-                row.Category = desired.Category;
-                row.MaxDogs = desired.MaxDogs;
-                row.IncludesJson = desired.IncludesJson;
-                row.IsActive = true;
-                row.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                bookingDb.SessionTypes.Add(desired);
-            }
-        }
-
-        var desiredSlugs = desiredSessionTypes.Select(d => d.Slug).ToHashSet();
-        foreach (var stale in existingSessionTypes.Where(s => s.IsActive && !desiredSlugs.Contains(s.Slug)))
-        {
-            stale.IsActive = false;
-            stale.UpdatedAt = DateTime.UtcNow;
-        }
-
+        var existingSlugs = await bookingDb.SessionTypes.Select(s => s.Slug).ToListAsync();
+        bookingDb.SessionTypes.AddRange(starterPackages.Where(d => !existingSlugs.Contains(d.Slug)));
         await bookingDb.SaveChangesAsync();
 
         // Seed eshop lookup tables (formats & paper types)

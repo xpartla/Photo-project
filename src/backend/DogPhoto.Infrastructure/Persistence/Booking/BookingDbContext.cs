@@ -1,3 +1,4 @@
+using DogPhoto.SharedKernel.Localization;
 using Microsoft.EntityFrameworkCore;
 
 namespace DogPhoto.Infrastructure.Persistence.Booking;
@@ -45,6 +46,7 @@ public class BookingDbContext(DbContextOptions<BookingDbContext> options) : DbCo
             entity.Property(e => e.ClientName).IsRequired().HasMaxLength(256);
             entity.Property(e => e.ClientEmail).IsRequired().HasMaxLength(256);
             entity.Property(e => e.ClientPhone).HasMaxLength(50);
+            entity.Property(e => e.Language).IsRequired().HasMaxLength(2).HasDefaultValue(Languages.Default);
             entity.Property(e => e.TotalPrice).HasPrecision(10, 2);
             entity.Property(e => e.GoPayPaymentId).HasMaxLength(256);
             entity.HasOne(e => e.SessionType).WithMany().HasForeignKey(e => e.SessionTypeId);
@@ -93,6 +95,8 @@ public class BookingEntity
     public string ClientName { get; set; } = default!;
     public string ClientEmail { get; set; } = default!;
     public string? ClientPhone { get; set; }
+    /// <summary>Language the booking was made in; customer e-mails use it.</summary>
+    public string Language { get; set; } = Languages.Default;
     public int DogCount { get; set; } = 1;
     public string? SpecialRequests { get; set; }
     public decimal TotalPrice { get; set; }

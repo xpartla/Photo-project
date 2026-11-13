@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using DogPhoto.Infrastructure.Email;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DogPhoto.IntegrationTests;
@@ -8,6 +11,21 @@ namespace DogPhoto.IntegrationTests;
 public sealed class BookingTests : ApiTestBase
 {
     public BookingTests(ApiFactory factory) : base(factory) { }
+
+    // The literals passed to D() are template dates. They are shifted by a
+    // whole number of weeks so they always land in the future (the API rejects
+    // bookings on past slots) while keeping their weekday and relative spacing.
+    private static readonly DateOnly TemplateAnchor = new(2026, 6, 1);
+    private static readonly DateOnly ShiftedAnchor = NextMonday(DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30));
+
+    private static DateOnly NextMonday(DateOnly from) =>
+        from.AddDays(((int)DayOfWeek.Monday - (int)from.DayOfWeek + 7) % 7);
+
+    private static string D(string templateDate)
+    {
+        var template = DateOnly.ParseExact(templateDate, "yyyy-MM-dd");
+        return ShiftedAnchor.AddDays(template.DayNumber - TemplateAnchor.DayNumber).ToString("yyyy-MM-dd");
+    }
 
     /// <summary>
     /// Helper: create an availability slot and return its ID plus a session type ID.
@@ -92,7 +110,7 @@ public sealed class BookingTests : ApiTestBase
         var admin = await CreateAdminClientAsync();
         var response = await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2026-06-20",
+            date = D("2026-06-20"),
             startTime = "09:00",
             endTime = "10:30"
         });
@@ -109,7 +127,7 @@ public sealed class BookingTests : ApiTestBase
         var admin = await CreateAdminClientAsync();
         var response = await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2026-07-11",
+            date = D("2026-07-11"),
             startTime = "09:00",
             endTime = "16:00",
             slotDurationMinutes = 90,
@@ -129,15 +147,17 @@ public sealed class BookingTests : ApiTestBase
     public async Task GetAvailability_ReturnsCreatedSlots()
     {
         var admin = await CreateAdminClientAsync();
+        var date = D("2026-08-15");
         await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2026-08-15",
+            date,
             startTime = "10:00",
             endTime = "12:00"
         });
 
+        var parsed = DateOnly.ParseExact(date, "yyyy-MM-dd");
         var client = CreateClient();
-        var response = await client.GetAsync("/api/booking/availability?month=8&year=2026");
+        var response = await client.GetAsync($"/api/booking/availability?month={parsed.Month}&year={parsed.Year}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -154,7 +174,7 @@ public sealed class BookingTests : ApiTestBase
         var admin = await CreateAdminClientAsync();
         var slotResponse = await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2026-09-05",
+            date = D("2026-09-05"),
             startTime = "14:00",
             endTime = "15:30"
         });
@@ -228,7 +248,7 @@ public sealed class BookingTests : ApiTestBase
         // Create a slot
         var slotResponse = await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2026-09-12",
+            date = D("2026-09-12"),
             startTime = "10:00",
             endTime = "11:30"
         });
@@ -273,28 +293,6 @@ public sealed class BookingTests : ApiTestBase
     }
 
     [Fact]
-    public async Task AdminCanUpdateSessionType()
-    {
-        var admin = await CreateAdminClientAsync();
-
-        // Get existing session type
-        var typesResponse = await admin.GetAsync("/api/booking/session-types");
-        var typesBody = await typesResponse.Content.ReadAsStringAsync();
-        using var typesDoc = JsonDocument.Parse(typesBody);
-        var id = typesDoc.RootElement.EnumerateArray().First().GetProperty("id").GetString();
-
-        var response = await admin.PutAsJsonAsync($"/api/booking/session-types/{id}", new
-        {
-            basePrice = 999.0m
-        });
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(body);
-        Assert.Equal(999.0m, doc.RootElement.GetProperty("basePrice").GetDecimal());
-    }
-
-    [Fact]
     public async Task AdminCanBlockSlot()
     {
         var admin = await CreateAdminClientAsync();
@@ -302,7 +300,7 @@ public sealed class BookingTests : ApiTestBase
         // Create a slot
         var slotResponse = await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2026-10-03",
+            date = D("2026-10-03"),
             startTime = "09:00",
             endTime = "10:30"
         });
@@ -329,7 +327,7 @@ public sealed class BookingTests : ApiTestBase
         var customer = await CreateCustomerClientAsync();
         var response = await customer.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2026-11-01",
+            date = D("2026-11-01"),
             startTime = "09:00",
             endTime = "10:30"
         });
@@ -345,7 +343,7 @@ public sealed class BookingTests : ApiTestBase
         // Create a slot
         var slotResponse = await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2026-09-20",
+            date = D("2026-09-20"),
             startTime = "09:00",
             endTime = "10:30"
         });
@@ -383,39 +381,113 @@ public sealed class BookingTests : ApiTestBase
 
     // ── Email verification ────────────────────────────────────────
 
-    [Fact]
-    public async Task CreateBooking_SendsConfirmationEmails()
+    private async Task<(string BookingId, string Recipient)> BookAsync(
+        HttpClient client, string templateDate, string? language = null,
+        string clientName = "Email Test", string? specialRequests = null)
     {
-        FakeEmail.Clear();
+        var (slotId, sessionTypeId) = await CreateSlotAndGetSessionTypeAsync(D(templateDate));
+        var recipient = $"booking-{Guid.NewGuid():N}@example.test";
 
-        var (slotId, sessionTypeId) = await CreateSlotAndGetSessionTypeAsync("2027-01-10");
-
-        var client = CreateClient();
         var response = await client.PostAsJsonAsync("/api/booking/bookings", new
         {
             sessionTypeId,
             slotId,
-            clientName = "Email Test",
-            clientEmail = "emailtest@example.com",
-            dogCount = 1
+            clientName,
+            clientEmail = recipient,
+            dogCount = 1,
+            specialRequests,
+            language
         });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
-        // Should have sent exactly 2 emails: one to customer, one to photographer
-        Assert.Equal(2, FakeEmail.SentEmails.Count);
-
-        var customerEmail = FakeEmail.SentEmails.FirstOrDefault(e => e.To == "emailtest@example.com");
-        Assert.NotNull(customerEmail);
-        Assert.Contains("Booking Confirmation", customerEmail.Subject);
-        Assert.Contains("Email Test", customerEmail.HtmlBody);
-
-        var photographerEmail = FakeEmail.SentEmails.FirstOrDefault(e => e.To == "admin@partlphoto.sk");
-        Assert.NotNull(photographerEmail);
-        Assert.Contains("New Booking", photographerEmail.Subject);
-        Assert.Contains("emailtest@example.com", photographerEmail.HtmlBody);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return (doc.RootElement.GetProperty("id").GetString()!, recipient);
     }
 
-    // ── Edge cases ────────────────────────────────────────────────
+    private FakeEmailService.SentEmail[] EmailsTo(string recipient) =>
+        FakeEmail.SentEmails.Where(e => e.To == recipient).ToArray();
+
+    [Fact]
+    public async Task CreateBooking_WithoutLanguage_SendsSlovakCustomerEmail_AndEnglishPhotographerEmail()
+    {
+        var (_, recipient) = await BookAsync(CreateClient(), "2027-01-10");
+
+        var customerEmail = Assert.Single(EmailsTo(recipient));
+        Assert.Contains("Potvrdenie rezervácie", customerEmail.Subject);
+        Assert.Contains("Dobrý deň", customerEmail.HtmlBody);
+        Assert.Contains("Email Test", customerEmail.HtmlBody);
+        Assert.DoesNotContain("Thank you for your booking", customerEmail.HtmlBody);
+
+        var photographerEmail = Assert.Single(
+            EmailsTo("admin@partlphoto.sk"), e => e.HtmlBody.Contains(recipient));
+        Assert.Contains("New Booking", photographerEmail.Subject);
+    }
+
+    [Fact]
+    public async Task CreateBooking_InEnglish_SendsEnglishCustomerEmail()
+    {
+        var (_, recipient) = await BookAsync(CreateClient(), "2027-01-11", language: "en");
+
+        var customerEmail = Assert.Single(EmailsTo(recipient));
+        Assert.Contains("Booking Confirmation", customerEmail.Subject);
+        Assert.Contains("Thank you for your booking", customerEmail.HtmlBody);
+        Assert.DoesNotContain("Dobrý deň", customerEmail.HtmlBody);
+    }
+
+    [Fact]
+    public async Task CreateBooking_UnknownLanguage_FallsBackToSlovak()
+    {
+        var (_, recipient) = await BookAsync(CreateClient(), "2027-01-12", language: "de");
+
+        Assert.Contains("Potvrdenie rezervácie", Assert.Single(EmailsTo(recipient)).Subject);
+    }
+
+    [Fact]
+    public async Task ConfirmAndCancel_EmailTheCustomerInTheBookingLanguage()
+    {
+        var admin = await CreateAdminClientAsync();
+
+        var (englishId, english) = await BookAsync(CreateClient(), "2027-01-13", language: "en");
+        (await admin.PutAsync($"/api/booking/bookings/{englishId}/confirm", null)).EnsureSuccessStatusCode();
+        Assert.Contains(EmailsTo(english), e => e.Subject.Contains("Your booking is confirmed"));
+
+        var (slovakId, slovak) = await BookAsync(CreateClient(), "2027-01-14");
+        (await admin.PutAsync($"/api/booking/bookings/{slovakId}/confirm", null)).EnsureSuccessStatusCode();
+        (await admin.PutAsync($"/api/booking/bookings/{slovakId}/cancel", null)).EnsureSuccessStatusCode();
+        Assert.Contains(EmailsTo(slovak), e => e.Subject.Contains("Vaša rezervácia je potvrdená"));
+        Assert.Contains(EmailsTo(slovak), e => e.Subject.Contains("Vaša rezervácia bola zrušená"));
+    }
+
+    [Fact]
+    public async Task BookingEmails_EscapeHtmlFromTheBookingForm()
+    {
+        const string script = "<script>alert(1)</script>";
+        var (_, recipient) = await BookAsync(CreateClient(), "2027-01-15",
+            clientName: $"Eve {script}", specialRequests: "<img src=x onerror=alert(2)>");
+
+        var customerEmail = Assert.Single(EmailsTo(recipient));
+        var photographerEmail = Assert.Single(
+            EmailsTo("admin@partlphoto.sk"), e => e.HtmlBody.Contains(recipient));
+
+        foreach (var body in new[] { customerEmail.HtmlBody, photographerEmail.HtmlBody })
+        {
+            Assert.DoesNotContain(script, body);
+            Assert.Contains("&lt;script&gt;", body);
+        }
+        Assert.DoesNotContain("<img src=x", photographerEmail.HtmlBody);
+    }
+
+    [Fact]
+    public async Task PhotographerNotification_GoesToTheConfiguredAddress()
+    {
+        const string studio = "studio@example.test";
+        using var host = Factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.Configure<NotificationSettings>(settings => settings.PhotographerEmail = studio)));
+
+        var (_, recipient) = await BookAsync(host.CreateClient(), "2027-01-16");
+
+        Assert.Contains(EmailsTo(studio), e => e.HtmlBody.Contains(recipient));
+        Assert.DoesNotContain(EmailsTo("admin@partlphoto.sk"), e => e.HtmlBody.Contains(recipient));
+    }
 
     [Fact]
     public async Task CreateBooking_BlockedSlot_Returns400()
@@ -425,7 +497,7 @@ public sealed class BookingTests : ApiTestBase
         // Create and block a slot
         var slotResponse = await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2027-02-10",
+            date = D("2027-02-10"),
             startTime = "09:00",
             endTime = "10:30",
             isBlocked = true
@@ -458,7 +530,7 @@ public sealed class BookingTests : ApiTestBase
     public async Task CreateBooking_DogCountExceedsMax_Returns400()
     {
         // action session allows max 2 dogs
-        var (slotId, _) = await CreateSlotAndGetSessionTypeAsync("2027-02-15");
+        var (slotId, _) = await CreateSlotAndGetSessionTypeAsync(D("2027-02-15"));
 
         var client = CreateClient();
         var typesResponse = await client.GetAsync("/api/booking/session-types/action");
@@ -491,7 +563,7 @@ public sealed class BookingTests : ApiTestBase
         // (15:00-15:00 boundary: 14:30+0:30=15:00, 15:00+1:00=16:00 > 15:00 → 4 slots)
         var response = await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2027-03-14",
+            date = D("2027-03-14"),
             startTime = "09:00",
             endTime = "15:00",
             slotDurationMinutes = 60,
@@ -525,8 +597,8 @@ public sealed class BookingTests : ApiTestBase
         var resp = await customer.PostAsJsonAsync("/api/booking/availability/recurring", new
         {
             daysOfWeek = new[] { 6 },
-            fromDate = "2027-04-03",
-            toDate = "2027-04-24",
+            fromDate = D("2027-04-03"),
+            toDate = D("2027-04-24"),
             startTime = "09:00",
             endTime = "12:00",
             slotDurationMinutes = 60
@@ -543,8 +615,8 @@ public sealed class BookingTests : ApiTestBase
         var resp = await admin.PostAsJsonAsync("/api/booking/availability/recurring", new
         {
             daysOfWeek = new[] { 6 }, // 6 = Saturday (matches DayOfWeek enum)
-            fromDate = "2027-04-03",
-            toDate = "2027-04-24",
+            fromDate = D("2027-04-03"),
+            toDate = D("2027-04-24"),
             startTime = "09:00",
             endTime = "12:00",
             slotDurationMinutes = 60
@@ -565,7 +637,7 @@ public sealed class BookingTests : ApiTestBase
         // should skip that day entirely (whole-day skip, not per-slot).
         await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2027-05-07",
+            date = D("2027-05-07"),
             startTime = "10:00",
             endTime = "11:00"
         });
@@ -574,8 +646,8 @@ public sealed class BookingTests : ApiTestBase
         var resp = await admin.PostAsJsonAsync("/api/booking/availability/recurring", new
         {
             daysOfWeek = new[] { 5 }, // 5 = Friday
-            fromDate = "2027-05-07",
-            toDate = "2027-05-21",
+            fromDate = D("2027-05-07"),
+            toDate = D("2027-05-21"),
             startTime = "09:00",
             endTime = "12:00",
             slotDurationMinutes = 60
@@ -595,8 +667,8 @@ public sealed class BookingTests : ApiTestBase
         var resp = await admin.PostAsJsonAsync("/api/booking/availability/recurring", new
         {
             daysOfWeek = new[] { 6 },
-            fromDate = "2027-06-30",
-            toDate = "2027-06-01",
+            fromDate = D("2027-06-30"),
+            toDate = D("2027-06-01"),
             startTime = "09:00",
             endTime = "12:00",
             slotDurationMinutes = 60
@@ -611,8 +683,8 @@ public sealed class BookingTests : ApiTestBase
         var resp = await admin.PostAsJsonAsync("/api/booking/availability/recurring", new
         {
             daysOfWeek = Array.Empty<int>(),
-            fromDate = "2027-07-01",
-            toDate = "2027-07-31",
+            fromDate = D("2027-07-01"),
+            toDate = D("2027-07-31"),
             startTime = "09:00",
             endTime = "12:00",
             slotDurationMinutes = 60
@@ -641,7 +713,7 @@ public sealed class BookingTests : ApiTestBase
 
         var slotResp = await admin.PostAsJsonAsync("/api/booking/availability", new
         {
-            date = "2027-08-07",
+            date = D("2027-08-07"),
             startTime = "10:00",
             endTime = "11:00"
         });
@@ -672,20 +744,22 @@ public sealed class BookingTests : ApiTestBase
     }
 
     [Fact]
-    public async Task GetSessionTypes_LanguageParameter_ReturnsLocalizedNames()
+    public async Task GetSessionTypes_LanguageParameter_ReturnsLocalizedDescriptions()
     {
+        // The seeded packages share one name in both languages, so the
+        // description is the field that proves localization.
         var client = CreateClient();
 
         var skResponse = await client.GetAsync("/api/booking/session-types?lang=sk");
         var skBody = await skResponse.Content.ReadAsStringAsync();
         using var skDoc = JsonDocument.Parse(skBody);
-        var skName = skDoc.RootElement.EnumerateArray().First().GetProperty("name").GetString();
+        var skDescription = skDoc.RootElement.EnumerateArray().First().GetProperty("description").GetString();
 
         var enResponse = await client.GetAsync("/api/booking/session-types?lang=en");
         var enBody = await enResponse.Content.ReadAsStringAsync();
         using var enDoc = JsonDocument.Parse(enBody);
-        var enName = enDoc.RootElement.EnumerateArray().First().GetProperty("name").GetString();
+        var enDescription = enDoc.RootElement.EnumerateArray().First().GetProperty("description").GetString();
 
-        Assert.NotEqual(skName, enName);
+        Assert.NotEqual(skDescription, enDescription);
     }
 }

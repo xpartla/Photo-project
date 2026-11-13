@@ -1,28 +1,39 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using DogPhoto.Infrastructure.Email;
 using DogPhoto.Infrastructure.Persistence.Booking;
+using DogPhoto.Infrastructure.RateLimiting;
 using DogPhoto.SharedKernel.Auth;
 using DogPhoto.SharedKernel.Email;
+using DogPhoto.SharedKernel.Localization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DogPhoto.Infrastructure.Booking;
 
-public static class BookingEndpoints
+public static partial class BookingEndpoints
 {
+    [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$")]
+    private static partial Regex SlugPattern();
+
     public static void MapBookingEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/booking").WithTags("Booking");
 
         // ── Public endpoints ───────────────────────────────────────────
 
-        group.MapGet("/session-types", async (BookingDbContext db, string? lang) =>
+        group.MapGet("/session-types", async (BookingDbContext db, ICurrentUser currentUser, string? lang, bool? includeInactive) =>
         {
+            // includeInactive is honoured only for admins, so the CMS can
+            // list (and re-activate) packages hidden from the public site.
+            var showInactive = includeInactive == true && currentUser.IsAdmin;
+
             var types = await db.SessionTypes
-                .Where(st => st.IsActive)
+                .Where(st => showInactive || st.IsActive)
                 .OrderBy(st => st.BasePrice)
                 .ToListAsync();
 
@@ -82,6 +93,7 @@ public static class BookingEndpoints
             BookingDbContext db,
             ICurrentUser currentUser,
             IEmailService emailService,
+            IOptions<NotificationSettings> notifications,
             ILoggerFactory loggerFactory) =>
         {
             // Validate required fields
@@ -131,6 +143,7 @@ public static class BookingEndpoints
                 ClientName = request.ClientName,
                 ClientEmail = request.ClientEmail,
                 ClientPhone = request.ClientPhone,
+                Language = Languages.Normalize(request.Language),
                 DogCount = request.DogCount,
                 SpecialRequests = request.SpecialRequests,
                 TotalPrice = sessionType.BasePrice
@@ -142,20 +155,19 @@ public static class BookingEndpoints
             // Send confirmation emails
             try
             {
-                var dateStr = slot?.Date.ToString("dd.MM.yyyy") ?? "TBD";
-                var timeStr = slot is not null ? $"{slot.StartTime:HH:mm} - {slot.EndTime:HH:mm}" : "TBD";
-
+                var lang = booking.Language;
                 var customerHtml = BookingEmailTemplates.CustomerConfirmation(
+                    lang,
                     booking.ClientName,
-                    sessionType.NameEn,
-                    dateStr,
-                    timeStr,
+                    SessionName(sessionType, lang),
+                    SlotDate(slot, lang),
+                    SlotTime(slot, lang),
                     booking.TotalPrice,
                     sessionType.Currency);
 
                 await emailService.SendAsync(
                     booking.ClientEmail,
-                    "Booking Confirmation — PartlPhoto",
+                    BookingEmailTemplates.CustomerConfirmationSubject(lang),
                     customerHtml);
 
                 var photographerHtml = BookingEmailTemplates.PhotographerNotification(
@@ -163,13 +175,13 @@ public static class BookingEndpoints
                     booking.ClientEmail,
                     booking.ClientPhone,
                     sessionType.NameEn,
-                    dateStr,
-                    timeStr,
+                    SlotDate(slot, Languages.English),
+                    SlotTime(slot, Languages.English),
                     booking.DogCount,
                     booking.SpecialRequests);
 
                 await emailService.SendAsync(
-                    "admin@partlphoto.sk",
+                    notifications.Value.PhotographerEmail,
                     $"New Booking: {booking.ClientName} — {sessionType.NameEn}",
                     photographerHtml);
             }
@@ -189,7 +201,7 @@ public static class BookingEndpoints
                 totalPrice = booking.TotalPrice,
                 currency = sessionType.Currency
             });
-        });
+        }).RequireRateLimiting(RateLimitPolicies.Booking);
 
         // ── Authenticated endpoints ────────────────────────────────────
 
@@ -478,9 +490,12 @@ public static class BookingEndpoints
         {
             if (!currentUser.IsAdmin) return Results.Forbid();
 
-            if (string.IsNullOrWhiteSpace(request.Slug)) return Results.BadRequest(new { error = "Slug is required." });
+            if (string.IsNullOrWhiteSpace(request.Slug) || !SlugPattern().IsMatch(request.Slug))
+                return Results.BadRequest(new { error = "Slug is required and may contain only lowercase letters, digits and hyphens." });
             if (string.IsNullOrWhiteSpace(request.NameSk)) return Results.BadRequest(new { error = "NameSk is required." });
             if (string.IsNullOrWhiteSpace(request.NameEn)) return Results.BadRequest(new { error = "NameEn is required." });
+            if (ValidatePackageNumbers(request.DurationMinutes, request.BasePrice, request.MaxDogs) is { } invalid)
+                return Results.BadRequest(new { error = invalid });
             if (await db.SessionTypes.AnyAsync(s => s.Slug == request.Slug))
                 return Results.Conflict(new { error = $"Session type with slug '{request.Slug}' already exists." });
 
@@ -497,7 +512,7 @@ public static class BookingEndpoints
                 MaxDogs = request.MaxDogs ?? 1,
                 Currency = request.Currency ?? "EUR",
                 IsActive = request.IsActive ?? true,
-                IncludesJson = request.IncludesJson is null ? null : JsonSerializer.Serialize(request.IncludesJson),
+                IncludesJson = SerializeIncludes(request.IncludesSk, request.IncludesEn),
             };
             db.SessionTypes.Add(st);
             await db.SaveChangesAsync();
@@ -515,6 +530,13 @@ public static class BookingEndpoints
             var st = await db.SessionTypes.FindAsync(id);
             if (st is null) return Results.NotFound();
 
+            if (request.NameSk is not null && string.IsNullOrWhiteSpace(request.NameSk))
+                return Results.BadRequest(new { error = "NameSk cannot be empty." });
+            if (request.NameEn is not null && string.IsNullOrWhiteSpace(request.NameEn))
+                return Results.BadRequest(new { error = "NameEn cannot be empty." });
+            if (ValidatePackageNumbers(request.DurationMinutes, request.BasePrice, request.MaxDogs) is { } invalid)
+                return Results.BadRequest(new { error = invalid });
+
             if (request.NameSk is not null) st.NameSk = request.NameSk;
             if (request.NameEn is not null) st.NameEn = request.NameEn;
             if (request.DescriptionSk is not null) st.DescriptionSk = request.DescriptionSk;
@@ -522,7 +544,14 @@ public static class BookingEndpoints
             if (request.DurationMinutes.HasValue) st.DurationMinutes = request.DurationMinutes.Value;
             if (request.BasePrice.HasValue) st.BasePrice = request.BasePrice.Value;
             if (request.Category is not null) st.Category = request.Category;
-            if (request.IncludesJson is not null) st.IncludesJson = JsonSerializer.Serialize(request.IncludesJson);
+            if (request.IncludesSk is not null || request.IncludesEn is not null)
+            {
+                // A language left out of the request keeps what is stored.
+                var (currentSk, currentEn) = ParseIncludesByLanguage(st.IncludesJson);
+                st.IncludesJson = SerializeIncludes(
+                    request.IncludesSk?.ToArray() ?? currentSk,
+                    request.IncludesEn?.ToArray() ?? currentEn);
+            }
             if (request.MaxDogs.HasValue) st.MaxDogs = request.MaxDogs.Value;
             if (request.IsActive.HasValue) st.IsActive = request.IsActive.Value;
             st.UpdatedAt = DateTime.UtcNow;
@@ -542,32 +571,24 @@ public static class BookingEndpoints
 
         try
         {
-            var dateStr = booking.Slot?.Date.ToString("dd.MM.yyyy") ?? "TBD";
-            var timeStr = booking.Slot is not null
-                ? $"{booking.Slot.StartTime:HH:mm} - {booking.Slot.EndTime:HH:mm}"
-                : "TBD";
+            var lang = Languages.Normalize(booking.Language);
+            var sessionName = SessionName(booking.SessionType, lang);
+            var date = SlotDate(booking.Slot, lang);
+            var time = SlotTime(booking.Slot, lang);
 
             string subject;
             string html;
             if (isConfirmation)
             {
-                subject = "Your booking is confirmed — PartlPhoto";
+                subject = BookingEmailTemplates.CustomerConfirmedSubject(lang);
                 html = BookingEmailTemplates.CustomerConfirmed(
-                    booking.ClientName,
-                    booking.SessionType.NameEn,
-                    dateStr,
-                    timeStr,
-                    booking.TotalPrice,
-                    booking.SessionType.Currency);
+                    lang, booking.ClientName, sessionName, date, time,
+                    booking.TotalPrice, booking.SessionType.Currency);
             }
             else
             {
-                subject = "Your booking was cancelled — PartlPhoto";
-                html = BookingEmailTemplates.CustomerCancelled(
-                    booking.ClientName,
-                    booking.SessionType.NameEn,
-                    dateStr,
-                    timeStr);
+                subject = BookingEmailTemplates.CustomerCancelledSubject(lang);
+                html = BookingEmailTemplates.CustomerCancelled(lang, booking.ClientName, sessionName, date, time);
             }
 
             await emailService.SendAsync(booking.ClientEmail, subject, html);
@@ -580,9 +601,19 @@ public static class BookingEndpoints
         }
     }
 
+    private static string SessionName(SessionType st, string lang) =>
+        Languages.Pick(lang, st.NameSk, st.NameEn);
+
+    private static string SlotDate(AvailabilitySlot? slot, string lang) =>
+        slot?.Date.ToString("dd.MM.yyyy") ?? BookingEmailTemplates.ToBeArranged(lang);
+
+    private static string SlotTime(AvailabilitySlot? slot, string lang) =>
+        slot is not null ? $"{slot.StartTime:HH:mm} - {slot.EndTime:HH:mm}" : BookingEmailTemplates.ToBeArranged(lang);
+
     private static object MapSessionType(SessionType st, string lang)
     {
-        var includes = ParseIncludes(st.IncludesJson, lang);
+        var (includesSk, includesEn) = ParseIncludesByLanguage(st.IncludesJson);
+        var includes = lang == "en" ? includesEn ?? includesSk : includesSk ?? includesEn;
 
         return new
         {
@@ -599,33 +630,54 @@ public static class BookingEndpoints
             currency = st.Currency,
             category = st.Category,
             includes,
+            includesSk,
+            includesEn,
             maxDogs = st.MaxDogs,
             isActive = st.IsActive
         };
     }
 
-    // Includes are stored as JSONB. Current format is bilingual
-    // ({"sk":[...],"en":[...]}); the legacy format was a single flat array
-    // (["..."]). Both are supported so old rows keep rendering.
-    private static string[]? ParseIncludes(string? json, string lang)
+    // Includes are stored as JSONB {"sk":[...],"en":[...]}. Rows written before
+    // the bilingual format hold a flat array, which is read as both languages.
+    private static (string[]? Sk, string[]? En) ParseIncludesByLanguage(string? json)
     {
-        if (string.IsNullOrEmpty(json)) return null;
+        if (string.IsNullOrEmpty(json)) return (null, null);
 
         try
         {
             var byLang = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json);
-            if (byLang is not null && byLang.Count > 0)
-            {
-                if (byLang.TryGetValue(lang, out var localized) && localized is not null) return localized;
-                if (byLang.TryGetValue("en", out var en) && en is not null) return en;
-                if (byLang.TryGetValue("sk", out var sk) && sk is not null) return sk;
-                return byLang.Values.FirstOrDefault();
-            }
+            if (byLang is not null)
+                return (byLang.GetValueOrDefault("sk"), byLang.GetValueOrDefault("en"));
         }
-        catch { /* not the bilingual shape — fall through to the legacy flat array */ }
+        catch (JsonException) { /* not the bilingual shape */ }
 
-        try { return JsonSerializer.Deserialize<string[]>(json); }
-        catch { return null; }
+        try
+        {
+            var flat = JsonSerializer.Deserialize<string[]>(json);
+            return (flat, flat);
+        }
+        catch (JsonException) { return (null, null); }
+    }
+
+    private static string? SerializeIncludes(IEnumerable<string>? sk, IEnumerable<string>? en)
+    {
+        if (sk is null && en is null) return null;
+        return JsonSerializer.Serialize(new Dictionary<string, string[]>
+        {
+            ["sk"] = Clean(sk),
+            ["en"] = Clean(en),
+        });
+
+        static string[] Clean(IEnumerable<string>? items) =>
+            items?.Select(i => i.Trim()).Where(i => i.Length > 0).ToArray() ?? [];
+    }
+
+    private static string? ValidatePackageNumbers(int? durationMinutes, decimal? basePrice, int? maxDogs)
+    {
+        if (durationMinutes is <= 0) return "Duration must be greater than zero.";
+        if (basePrice is < 0) return "Base price cannot be negative.";
+        if (maxDogs is < 1) return "Max dogs must be at least 1.";
+        return null;
     }
 
     private static object MapBookingDetail(BookingEntity b)
@@ -667,7 +719,8 @@ public record CreateBookingRequest(
     string ClientEmail,
     string? ClientPhone,
     int DogCount = 1,
-    string? SpecialRequests = null);
+    string? SpecialRequests = null,
+    string? Language = null);
 
 public record CreateAvailabilityRequest(
     string Date,
@@ -699,7 +752,8 @@ public record UpdateSessionTypeRequest(
     int? DurationMinutes = null,
     decimal? BasePrice = null,
     string? Category = null,
-    List<string>? IncludesJson = null,
+    List<string>? IncludesSk = null,
+    List<string>? IncludesEn = null,
     int? MaxDogs = null,
     bool? IsActive = null);
 
@@ -712,7 +766,8 @@ public record CreateSessionTypeRequest(
     int? DurationMinutes = null,
     decimal? BasePrice = null,
     string? Category = null,
-    List<string>? IncludesJson = null,
+    List<string>? IncludesSk = null,
+    List<string>? IncludesEn = null,
     int? MaxDogs = null,
     string? Currency = null,
     bool? IsActive = null);

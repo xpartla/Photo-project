@@ -66,6 +66,7 @@ TestResults/
 coverage/
 
 # Misc
+AGENTS.md
 CLAUDE.md
 PLAN.md
 img/

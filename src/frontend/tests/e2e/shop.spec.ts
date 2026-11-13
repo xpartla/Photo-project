@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { ShopPage } from "./pages/ShopPage";
+import { STORE_ENABLED, STORE_HIDDEN_REASON } from "./store";
 
 const API_URL = process.env.PLAYWRIGHT_API_URL ?? "http://localhost:5000";
 
@@ -42,14 +43,7 @@ async function ensureProduct(
 }
 
 test.describe("shop", () => {
-  // The store is hidden for the dog-photography launch. While it is hidden the
-  // /shop and /obchod routes redirect to the home page, so every shop spec
-  // would fail. Run these only when the store is enabled for the test build
-  // (PUBLIC_STORE_ENABLED=true) — see docs/store-reenable.md.
-  test.skip(
-    process.env.PUBLIC_STORE_ENABLED !== "true",
-    "store is hidden (set PUBLIC_STORE_ENABLED=true to run shop specs)",
-  );
+  test.skip(!STORE_ENABLED, STORE_HIDDEN_REASON);
 
   // ── Product listing ────────────────────────────────────────
 

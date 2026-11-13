@@ -1,3 +1,4 @@
+using DogPhoto.SharedKernel.Localization;
 using Microsoft.EntityFrameworkCore;
 
 namespace DogPhoto.Infrastructure.Persistence.EShop;
@@ -87,6 +88,7 @@ public class EShopDbContext(DbContextOptions<EShopDbContext> options) : DbContex
             entity.Property(e => e.TotalAmount).HasPrecision(10, 2);
             entity.Property(e => e.Currency).IsRequired().HasMaxLength(3);
             entity.Property(e => e.CustomerEmail).HasMaxLength(256);
+            entity.Property(e => e.Language).IsRequired().HasMaxLength(2).HasDefaultValue(Languages.Default);
             entity.Property(e => e.GoPayPaymentId).HasMaxLength(256);
             entity.Property(e => e.ShippingAddressJson).HasColumnType("jsonb");
             entity.Property(e => e.BillingAddressJson).HasColumnType("jsonb");
@@ -187,6 +189,8 @@ public class Order
     public decimal TotalAmount { get; set; }
     public string Currency { get; set; } = "EUR";
     public string? CustomerEmail { get; set; }
+    /// <summary>Language the order was placed in; customer e-mails use it.</summary>
+    public string Language { get; set; } = Languages.Default;
     public string? GoPayPaymentId { get; set; }
     public string? ShippingAddressJson { get; set; }
     public string? BillingAddressJson { get; set; }

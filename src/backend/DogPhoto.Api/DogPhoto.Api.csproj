@@ -7,6 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Design-time only: lets `dotnet ef` use the API as its startup project. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.*">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DogPhoto.SharedKernel\DogPhoto.SharedKernel.csproj" />
     <ProjectReference Include="..\DogPhoto.Infrastructure\DogPhoto.Infrastructure.csproj" />
   </ItemGroup>

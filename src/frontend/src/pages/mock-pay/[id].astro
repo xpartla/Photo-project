@@ -3,6 +3,9 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getPaymentInfo } from "../../lib/api";
 import type { MockPaymentInfo } from "../../lib/api";
 
+// The mock gateway and its API routes exist only in development builds.
+if (!import.meta.env.DEV) return new Response(null, { status: 404 });
+
 const { id } = Astro.params;
 const apiBase = import.meta.env.PUBLIC_CLIENT_API_URL || "http://localhost:5000";
 
