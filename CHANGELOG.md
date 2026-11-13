@@ -87,6 +87,12 @@ project was picked back up after a five-month pause. One commit per item on
 - **Navbar account button had no accessible name** (axe `button-name`, critical — caught by the account dashboard scan). Added `aria-label` and hid the decorative icon from assistive tech.
 - Result: store hidden — 42 passed, 16 skipped, 0 failed (was 8 failed). Store enabled (`PUBLIC_STORE_ENABLED=true` on the frontend and for Playwright, after `make seed-shop`) — 58 passed, 0 skipped.
 
+### Docs
+- **Root `README.md`** (new) — what the project is, quick start, local URLs and accounts, test and migration commands, and how to turn the store on.
+- **`src/frontend/README.md` deleted** — it was the untouched Astro starter template.
+- Retrospective changelog entry for the 2026-06-25 booking package rework (below).
+- Removed the four `booking.category.*` i18n keys, unused since that rework.
+
 ### Verification
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.
