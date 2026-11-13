@@ -12,7 +12,6 @@ public interface ITokenService
 {
     string GenerateAccessToken(User user);
     string GenerateRefreshToken();
-    ClaimsPrincipal? ValidateAccessToken(string token);
 }
 
 public class JwtTokenService(IOptions<JwtSettings> jwtSettings) : ITokenService
@@ -44,28 +43,5 @@ public class JwtTokenService(IOptions<JwtSettings> jwtSettings) : ITokenService
     public string GenerateRefreshToken()
     {
         return Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
-    }
-
-    public ClaimsPrincipal? ValidateAccessToken(string token)
-    {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Secret));
-        var handler = new JwtSecurityTokenHandler();
-
-        try
-        {
-            return handler.ValidateToken(token, new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidIssuer = _settings.Issuer,
-                ValidateAudience = true,
-                ValidAudience = _settings.Audience,
-                ValidateLifetime = false,
-                IssuerSigningKey = key,
-            }, out _);
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

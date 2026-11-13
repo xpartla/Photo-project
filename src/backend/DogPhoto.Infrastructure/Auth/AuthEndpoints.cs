@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using DogPhoto.Infrastructure.Persistence.Identity;
 using DogPhoto.SharedKernel.Auth;
 using Microsoft.AspNetCore.Builder;
@@ -18,7 +17,6 @@ public static class AuthEndpoints
         group.MapPost("/login", Login);
         group.MapPost("/refresh", Refresh);
         group.MapGet("/me", Me).RequireAuthorization();
-        group.MapPost("/google", GoogleLogin);
     }
 
     private static async Task<IResult> Register(
@@ -90,50 +88,6 @@ public static class AuthEndpoints
         return Results.Ok(new { user.Id, user.Email, user.DisplayName, user.Role, user.AvatarUrl });
     }
 
-    private static async Task<IResult> GoogleLogin(
-        GoogleLoginRequest request,
-        IdentityDbContext db,
-        ITokenService tokenService)
-    {
-        var principal = tokenService.ValidateAccessToken(request.IdToken);
-
-        var email = request.Email;
-        var name = request.DisplayName;
-        var subject = request.Subject;
-
-        var user = await db.Users.FirstOrDefaultAsync(u =>
-            u.OAuthProvider == "Google" && u.OAuthSubject == subject);
-
-        if (user is null)
-        {
-            user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
-
-            if (user is null)
-            {
-                user = new User
-                {
-                    Email = email,
-                    DisplayName = name,
-                    OAuthProvider = "Google",
-                    OAuthSubject = subject,
-                    Role = Roles.Customer
-                };
-                db.Users.Add(user);
-            }
-            else
-            {
-                user.OAuthProvider = "Google";
-                user.OAuthSubject = subject;
-            }
-
-            await db.SaveChangesAsync();
-        }
-
-        var (accessToken, refreshToken) = await CreateTokens(user, db, tokenService);
-
-        return Results.Ok(new AuthResponse(accessToken, refreshToken, user.Id, user.Email, user.Role));
-    }
-
     private static async Task<(string accessToken, string refreshToken)> CreateTokens(
         User user, IdentityDbContext db, ITokenService tokenService)
     {
@@ -156,5 +110,4 @@ public static class AuthEndpoints
 public record RegisterRequest(string Email, string Password, string? DisplayName);
 public record LoginRequest(string Email, string Password);
 public record RefreshRequest(string RefreshToken);
-public record GoogleLoginRequest(string IdToken, string Email, string? DisplayName, string Subject);
 public record AuthResponse(string AccessToken, string RefreshToken, Guid UserId, string Email, string Role);

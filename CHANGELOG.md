@@ -15,6 +15,11 @@ project was picked back up after a five-month pause. One commit per item on
 - **`BookingTests`** used hard-coded slot dates that had drifted into the past, so the API rejected the bookings (3 failures). Dates are now template dates shifted by whole weeks from today, keeping weekday and spacing.
 - `GetSessionTypes_LanguageParameter_*` compared package names, which are identical in both languages since the Legacy / Digital / Action rename; it now compares descriptions.
 
+### Security — removed the Google login endpoint
+- **`POST /api/auth/google` deleted.** It discarded the result of its token check and trusted the `email` / `subject` in the request body, so any caller could obtain tokens for any account, including the admin. Nothing in the frontend used it.
+- Removed with it: `ITokenService.ValidateAccessToken` (its only caller) and the `Microsoft.AspNetCore.Authentication.Google` package. The `OAuthProvider` / `OAuthSubject` columns stay for a future, properly verified implementation.
+- **`AuthTests.cs`** (new, 3 tests) — a forged Google login for the admin e-mail gets 404; wrong password gets 401; refresh rotates the token and rejects reuse of the old one.
+
 ### Verification
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.
