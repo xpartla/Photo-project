@@ -20,6 +20,10 @@ project was picked back up after a five-month pause. One commit per item on
 - Removed with it: `ITokenService.ValidateAccessToken` (its only caller) and the `Microsoft.AspNetCore.Authentication.Google` package. The `OAuthProvider` / `OAuthSubject` columns stay for a future, properly verified implementation.
 - **`AuthTests.cs`** (new, 3 tests) — a forged Google login for the admin e-mail gets 404; wrong password gets 401; refresh rotates the token and rejects reuse of the old one.
 
+### Security — JWT secret is required
+- **No more hard-coded fallback secret.** `AddInfrastructure` now throws at startup when `Jwt:Secret` is missing or shorter than 32 bytes (`JwtSettings.MinSecretBytes`, the HMAC-SHA256 minimum), instead of silently signing tokens with a secret that is in the source code. Local dev is unaffected: `appsettings.Development.json` supplies one.
+- **`ConfigurationTests.cs`** (new, 3 tests) — missing secret throws, short secret throws, valid secret registers.
+
 ### Verification
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.

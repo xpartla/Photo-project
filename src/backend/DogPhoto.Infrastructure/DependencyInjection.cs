@@ -41,14 +41,13 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString, o => o.MigrationsHistoryTable("__EFMigrationsHistory", BlogDbContext.Schema)));
 
         // Auth
-        var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
-            ?? new JwtSettings { Secret = configuration["Jwt:Secret"] ?? "dev-secret-key-minimum-32-characters-long!!" };
+        var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>() ?? new JwtSettings();
+        if (Encoding.UTF8.GetByteCount(jwtSettings.Secret ?? string.Empty) < JwtSettings.MinSecretBytes)
+            throw new InvalidOperationException(
+                $"Jwt:Secret is missing or shorter than {JwtSettings.MinSecretBytes} bytes. " +
+                "Set it in configuration (environment variable Jwt__Secret).");
 
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
-
-        // Ensure JwtSettings is always available even if section is missing
-        if (string.IsNullOrEmpty(jwtSettings.Secret))
-            jwtSettings.Secret = "dev-secret-key-minimum-32-characters-long!!";
 
         services.AddAuthentication(options =>
         {
