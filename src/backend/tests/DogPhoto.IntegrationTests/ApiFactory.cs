@@ -93,6 +93,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Environment.SetEnvironmentVariable("Jwt__Secret", "integration-test-secret-minimum-32-characters!!");
         Environment.SetEnvironmentVariable("Jwt__Issuer", "DogPhoto.Tests");
         Environment.SetEnvironmentVariable("Jwt__Audience", "DogPhoto.Tests");
+        // Every test request comes from the same (absent) client address, so the
+        // production limits would throttle the suite. RateLimitTests lowers them
+        // again for its own host.
+        Environment.SetEnvironmentVariable("RateLimiting__Auth__PermitLimit", "100000");
+        Environment.SetEnvironmentVariable("RateLimiting__Booking__PermitLimit", "100000");
     }
 
     async Task IAsyncLifetime.DisposeAsync()
@@ -106,5 +111,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Environment.SetEnvironmentVariable("Jwt__Secret", null);
         Environment.SetEnvironmentVariable("Jwt__Issuer", null);
         Environment.SetEnvironmentVariable("Jwt__Audience", null);
+        Environment.SetEnvironmentVariable("RateLimiting__Auth__PermitLimit", null);
+        Environment.SetEnvironmentVariable("RateLimiting__Booking__PermitLimit", null);
     }
 }

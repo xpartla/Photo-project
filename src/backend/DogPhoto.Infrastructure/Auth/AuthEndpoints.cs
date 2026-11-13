@@ -1,4 +1,5 @@
 using DogPhoto.Infrastructure.Persistence.Identity;
+using DogPhoto.Infrastructure.RateLimiting;
 using DogPhoto.SharedKernel.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -13,9 +14,9 @@ public static class AuthEndpoints
     {
         var group = endpoints.MapGroup("/api/auth").WithTags("Auth");
 
-        group.MapPost("/register", Register);
-        group.MapPost("/login", Login);
-        group.MapPost("/refresh", Refresh);
+        group.MapPost("/register", Register).RequireRateLimiting(RateLimitPolicies.Auth);
+        group.MapPost("/login", Login).RequireRateLimiting(RateLimitPolicies.Auth);
+        group.MapPost("/refresh", Refresh).RequireRateLimiting(RateLimitPolicies.Auth);
         group.MapGet("/me", Me).RequireAuthorization();
     }
 

@@ -24,6 +24,16 @@ project was picked back up after a five-month pause. One commit per item on
 - **No more hard-coded fallback secret.** `AddInfrastructure` now throws at startup when `Jwt:Secret` is missing or shorter than 32 bytes (`JwtSettings.MinSecretBytes`, the HMAC-SHA256 minimum), instead of silently signing tokens with a secret that is in the source code. Local dev is unaffected: `appsettings.Development.json` supplies one.
 - **`ConfigurationTests.cs`** (new, 3 tests) — missing secret throws, short secret throws, valid secret registers.
 
+### Security — rate limiting that is actually applied
+- **Before:** an `"auth"` limiter policy was registered in `Program.cs` but never attached to an endpoint, and it was a single window shared by every visitor.
+- **Now:** per-client-IP fixed-window limits (`RateLimiting/RateLimitingExtensions.cs`, policies in `RateLimitPolicies`):
+  - `auth` — `POST /api/auth/login`, `/register`, `/refresh`: 10 requests / 60 s
+  - `booking` — `POST /api/booking/bookings` (public, sends e-mail): 5 requests / 60 s
+- Limits live in the `RateLimiting` config section (`RateLimitSettings`) and are read per request. `appsettings.Development.json` raises both to 1000 so local E2E runs, which log in on every test, are not throttled.
+- Rejections return `429` with a `Retry-After` header and the usual `{ "error": "…" }` body.
+- **Deployment note:** the partition key is the connection's remote address. Behind a reverse proxy (Azure App Service) set `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`, otherwise all visitors share the proxy's address and one bucket.
+- **`RateLimitTests.cs`** (new, 5 tests) — login over the limit gets 429 + `Retry-After`; the limit is per address; register and refresh share the auth bucket; the booking form is limited; unlisted endpoints are not.
+
 ### Verification
 - Backend: 8/8 arch tests, 86/86 integration tests (host, .NET SDK 10.0.404).
 - `docker compose up -d --build` builds and boots on the pinned images.

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DogPhoto.Infrastructure.Email;
 using DogPhoto.Infrastructure.Persistence.Booking;
+using DogPhoto.Infrastructure.RateLimiting;
 using DogPhoto.SharedKernel.Auth;
 using DogPhoto.SharedKernel.Email;
 using Microsoft.AspNetCore.Builder;
@@ -189,7 +190,7 @@ public static class BookingEndpoints
                 totalPrice = booking.TotalPrice,
                 currency = sessionType.Currency
             });
-        });
+        }).RequireRateLimiting(RateLimitPolicies.Booking);
 
         // ── Authenticated endpoints ────────────────────────────────────
 

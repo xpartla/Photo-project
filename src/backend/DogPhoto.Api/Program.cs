@@ -1,4 +1,3 @@
-using System.Threading.RateLimiting;
 using DogPhoto.Infrastructure;
 using DogPhoto.Infrastructure.Auth;
 using DogPhoto.Infrastructure.BlobStorage;
@@ -7,8 +6,8 @@ using DogPhoto.Infrastructure.Booking;
 using DogPhoto.Infrastructure.EShop;
 using DogPhoto.Infrastructure.ImagePipeline;
 using DogPhoto.Infrastructure.Portfolio;
+using DogPhoto.Infrastructure.RateLimiting;
 using DogPhoto.SharedKernel.Middleware;
-using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,16 +38,8 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Rate limiting
-builder.Services.AddRateLimiter(options =>
-{
-    options.AddFixedWindowLimiter("auth", limiter =>
-    {
-        limiter.PermitLimit = 10;
-        limiter.Window = TimeSpan.FromMinutes(1);
-    });
-    options.RejectionStatusCode = 429;
-});
+// Rate limiting (per client IP, limits in the RateLimiting config section)
+builder.Services.AddApiRateLimiting(builder.Configuration);
 
 var app = builder.Build();
 
